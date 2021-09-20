@@ -1,0 +1,10 @@
+redacted_cli
+.DS_Store
+__debug_bin
+.vagrant
+output
+vendor
+Gopkg.lock
+build/compiled
+go.sum
+*.json

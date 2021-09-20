@@ -1,0 +1,11 @@
+---
+# Example config file that is used for testing
+nats:
+  urls:
+    - localhost
+  retries: 100
+  timeout: 1
+
+backends:
+  puppet_resource_group:
+    cache_duration: 9
