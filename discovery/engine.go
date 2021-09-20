@@ -24,12 +24,6 @@ const DefaultBackendPriority = 50
 // unless it is overridden in the backend of the config
 const DefaultBackendCacheDurationSeconds = 1800
 
-// ConnectedEngine interface is for an engine that can tell whether or not it is
-// connected
-type ConnectedEngine interface {
-	IsNATSConnected() bool
-}
-
 // Engine is the main discovery engine. This is where all of the Sources and
 // sources are stored and is responsible for calling out to the right sources to
 // discover everything
