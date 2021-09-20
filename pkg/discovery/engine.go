@@ -8,7 +8,7 @@ import (
 
 	"github.com/dylanratcliffe/sdp-go"
 
-	"github.com/dylanratcliffe/deviant_cli/sources"
+	"github.com/dylanratcliffe/source-go/pkg/sources"
 	"github.com/spf13/viper"
 
 	"github.com/nats-io/nats.go"

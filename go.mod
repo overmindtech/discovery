@@ -1,4 +1,4 @@
-module github.com/dylanratcliffe/deviant_cli
+module github.com/dylanratcliffe/source-go
 
 go 1.17
 

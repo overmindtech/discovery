@@ -3,8 +3,8 @@ package discovery
 import (
 	"fmt"
 
-	"github.com/dylanratcliffe/deviant_cli/sources"
 	"github.com/dylanratcliffe/sdp-go"
+	"github.com/dylanratcliffe/source-go/pkg/sources"
 )
 
 // Assistant Underlying struct used to store the information that assistants

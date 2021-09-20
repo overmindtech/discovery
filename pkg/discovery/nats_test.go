@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dylanratcliffe/deviant_cli/sources"
 	"github.com/dylanratcliffe/sdp-go"
+	"github.com/dylanratcliffe/source-go/pkg/sources"
 )
 
 var A = Assistant{
