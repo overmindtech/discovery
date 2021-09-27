@@ -2,7 +2,6 @@ package discovery
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -309,40 +308,38 @@ func (r *RequestHandlerV2) linkItem(parent UnlinkedItem) {
 	lirWG.Wait()
 }
 
-// ConnectToNats connects to a given NATS URL, it also support retries. Servers
-// should be supplied as a slice of URLs e.g.
+// ConnectToNats connects to NATS using a given set of option and returns the
+// resulting connection e.g.
 //
 // engine.ConnectToNats([]string{"nats://127.0.0.1:1222",
 // "nats://127.0.0.1:1223"}, 5, 5)
 //
-func ConnectToNats(urls []string, retries int, timeout int) *nats.EncodedConn {
+func ConnectToNats(no NATSOptions) (*nats.EncodedConn, error) {
 	var tries int
 	var servers string
-	var hostname string
-	var timeoutDuration time.Duration
-
-	// Set default values
-	if retries == 0 {
-		retries = 10
-	}
-
-	if timeout == 0 {
-		timeoutDuration = 10 * time.Second
-	} else {
-		timeoutDuration = time.Duration(timeout) * time.Second
-
-	}
 
 	// Register our custom encoder
 	nats.RegisterEncoder("sdp", &sdp.ENCODER)
 
-	// Get the hostname to use as the connection name
-	hostname, _ = os.Hostname()
+	// Create server list as comme separated
+	servers = strings.Join(no.URLs, ",")
 
-	servers = strings.Join(urls, ",")
+	// Configure options
+	options := []nats.Option{
+		nats.Name(no.ConnectionName),
+		nats.Timeout(no.ConnectTimeout),
+	}
+
+	if no.CAFile != "" {
+		options = append(options, nats.RootCAs(no.CAFile))
+	}
+
+	if no.NkeyFile != "" && no.JWTFile != "" {
+		options = append(options, nats.UserCredentials(no.JWTFile, no.NkeyFile))
+	}
 
 	// Loop until we have a connection
-	for tries <= retries {
+	for tries <= no.NumRetries {
 		log.WithFields(log.Fields{
 			"servers": servers,
 		}).Info("Connecting to NATS")
@@ -350,9 +347,8 @@ func ConnectToNats(urls []string, retries int, timeout int) *nats.EncodedConn {
 		// TODO: Make these options more configurable
 		// https://docs.nats.io/developing-with-nats/connecting/pingpong
 		nc, err := nats.Connect(
-			servers,                       // The servers to connect to
-			nats.Name(hostname),           // The connection name
-			nats.Timeout(timeoutDuration), // Connection timeout (per server)
+			servers,
+			options...,
 		)
 
 		if err == nil {
@@ -361,10 +357,10 @@ func ConnectToNats(urls []string, retries int, timeout int) *nats.EncodedConn {
 			enc, err = nats.NewEncodedConn(nc, "sdp")
 
 			if err != nil {
-				panic("could not find sdp encoder")
+				return nil, err
 			}
 
-			return enc
+			return enc, nil
 		}
 
 		// Increment tries
@@ -379,7 +375,8 @@ func ConnectToNats(urls []string, retries int, timeout int) *nats.EncodedConn {
 		time.Sleep(5 * time.Second)
 	}
 
-	panic("Could not connect to NATS, giving up")
+	return nil, fmt.Errorf("could not connect after %v tries", tries)
+
 }
 
 // NewItemRequestServer returns a server that processes item requests and responds to

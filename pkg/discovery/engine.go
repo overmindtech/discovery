@@ -24,6 +24,29 @@ const DefaultBackendPriority = 50
 // unless it is overridden in the backend of the config
 const DefaultBackendCacheDurationSeconds = 1800
 
+type NATSOptions struct {
+	// The list of URLs to use for connecting to NATS
+	URLs []string
+
+	// The name given to the connection, useful in logging
+	ConnectionName string
+
+	// How long to wait when trying to connect to each NATS server
+	ConnectTimeout time.Duration
+
+	// How many times to retry if there was an error when connecting
+	NumRetries int
+
+	// Path to the customer CA file to use when using TLS (if required)
+	CAFile string
+
+	// Path to the NKey seed file
+	NkeyFile string
+
+	// Path to the JWT
+	JWTFile string
+}
+
 // Engine is the main discovery engine. This is where all of the Sources and
 // sources are stored and is responsible for calling out to the right sources to
 // discover everything
@@ -31,14 +54,16 @@ const DefaultBackendCacheDurationSeconds = 1800
 // Note that an engine that does not have a connected NATS connection will
 // simply not communicate over NATS
 type Engine struct {
-	NATSConnection *nats.EncodedConn
-	Assistants     map[string]*Assistant
+	// Options for connecting to NATS
+	NATSOptions *NATSOptions
 
 	BackendPackages []func() ([]sources.Backend, error)
 
-	// This callback is used to check if the engine has a working NATS
-	// connection
-	connectionCallback func() bool
+	// The NATS connection
+	natsConnection *nats.EncodedConn
+
+	// Storage for the assistants that are created
+	assistants map[string]*Assistant
 
 	// These are called when the local linker is executed
 	linkedItemCallbacks []func(*sdp.Item)
@@ -46,30 +71,27 @@ type Engine struct {
 
 // Start performs all of the initialisation steps required for the engine to
 // work
-func (e *Engine) Start() {
+func (e *Engine) Start() error {
 	// Create slices and maps
-	e.Assistants = make(map[string]*Assistant)
+	e.assistants = make(map[string]*Assistant)
 	e.linkedItemCallbacks = make([]func(*sdp.Item), 0)
 
-	// Check if we have a NATS connection and set up handling if we don't
-	if e.NATSConnection == nil {
-		e.connectionCallback = func() bool {
-			// If we don't have a pointer to a NATS connection object then we
-			// will never have a connection so always return false
-			return false
+	// Try to connect to NATS
+	if no := e.NATSOptions; no != nil {
+		enc, err := ConnectToNats(*no)
+
+		if err != nil {
+			return err
 		}
-	} else {
-		// If we do have a connection then link this callback to the actual NATS
-		// IsConnected method so that it's always up to date instead of just
-		// setting it once when we start the engine
-		e.connectionCallback = e.NATSConnection.Conn.IsConnected
+
+		e.natsConnection = enc
 	}
 
 	if e.IsNATSConnected() {
 		log.WithFields(log.Fields{
-			"Addr":     e.NATSConnection.Conn.ConnectedAddr(),
-			"ServerID": e.NATSConnection.Conn.ConnectedServerId(),
-			"URL:":     e.NATSConnection.Conn.ConnectedUrl(),
+			"Addr":     e.natsConnection.Conn.ConnectedAddr(),
+			"ServerID": e.natsConnection.Conn.ConnectedServerId(),
+			"URL:":     e.natsConnection.Conn.ConnectedUrl(),
 		}).Info("Starting engine with NATS connection")
 	} else {
 		log.Info("Starting engine without NATS connection")
@@ -134,29 +156,31 @@ func (e *Engine) Start() {
 		assistant.StartWithPermissions(pool)
 
 		// Save the assistant
-		e.Assistants[context] = &assistant
+		e.assistants[context] = &assistant
 	}
 
 	if e.IsNATSConnected() {
 		// Create listeners for each assistant
-		for context, assistant := range e.Assistants {
+		for context, assistant := range e.assistants {
 			// Next step is to create listeners on all of the topics that we care about
 			// There won't need to be any communication between these threads as all
 			// they will do is get a command from the thing they are listening to and
 			// respond
 			// Subscribe to requests on `request.all`
-			if _, err := e.NATSConnection.QueueSubscribe("request.all", fmt.Sprintf("primary.daemon.%v", context), assistant.NewItemRequestServer(e.NATSConnection)); err != nil {
+			if _, err := e.natsConnection.QueueSubscribe("request.all", fmt.Sprintf("primary.daemon.%v", context), assistant.NewItemRequestServer(e.natsConnection)); err != nil {
 				log.Fatal(err)
 			}
 
 			// Subscribe to context specific requests on request.context.{context}
 			subject := "request.context." + context
 
-			if _, err := e.NATSConnection.QueueSubscribe(subject, fmt.Sprintf("primary.daemon.%v", context), assistant.NewItemRequestServer(e.NATSConnection)); err != nil {
+			if _, err := e.natsConnection.QueueSubscribe(subject, fmt.Sprintf("primary.daemon.%v", context), assistant.NewItemRequestServer(e.natsConnection)); err != nil {
 				log.Fatal(err)
 			}
 		}
 	}
+
+	return nil
 }
 
 // FindAll will do the following:
@@ -180,7 +204,7 @@ func (e *Engine) FindAll() []*sdp.Item {
 		itemsDone <- true
 	}()
 
-	for _, assistant := range e.Assistants {
+	for _, assistant := range e.assistants {
 		wg.Add(1)
 
 		rh := RequestHandlerV2{
@@ -225,7 +249,13 @@ func (e *Engine) FindAll() []*sdp.Item {
 
 // IsNATSConnected returns whether the engine is connected to NATS
 func (e *Engine) IsNATSConnected() bool {
-	return e.connectionCallback()
+	if enc := e.natsConnection; enc != nil {
+		if conn := enc.Conn; conn != nil {
+			return conn.IsConnected()
+		}
+		return false
+	}
+	return false
 }
 
 // RegisterLinkedItemCallback Allows users to add callback functions that will
