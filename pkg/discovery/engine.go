@@ -57,7 +57,7 @@ type Engine struct {
 	// Options for connecting to NATS
 	NATSOptions *NATSOptions
 
-	BackendPackages []func() ([]sources.Backend, error)
+	BackendLoaders []func() (sources.Backend, error)
 
 	// The NATS connection
 	natsConnection *nats.EncodedConn
@@ -100,24 +100,20 @@ func (e *Engine) Start() error {
 	contextBackends := make(map[string][]*sources.BackendInfo)
 
 	// Loop over all backend packages
-	for _, backendFunction := range e.BackendPackages {
+	for _, backendFunction := range e.BackendLoaders {
 		// Load backends from the package
-		packageBackends, err := backendFunction()
+		be, err := backendFunction()
 
 		if err == nil {
-			// If it didn't fail then create a backend info object for each
-			// discovered backed
-			for _, be := range packageBackends {
-				bi := sources.BackendInfo{
-					Backend:       be,
-					Priority:      GetBackendPriority(be),
-					CacheDuration: GetBackendCacheDuration(be),
-					Context:       GetBackendContext(be),
-				}
-
-				// Save this to the backend group for each context
-				contextBackends[bi.Context] = append(contextBackends[bi.Context], &bi)
+			bi := sources.BackendInfo{
+				Backend:       be,
+				Priority:      GetBackendPriority(be),
+				CacheDuration: GetBackendCacheDuration(be),
+				Context:       GetBackendContext(be),
 			}
+
+			// Save this to the backend group for each context
+			contextBackends[bi.Context] = append(contextBackends[bi.Context], &bi)
 		} else {
 			// TODO: This doesn't log the backend package that it was sourced from
 			log.WithFields(log.Fields{
