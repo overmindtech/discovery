@@ -1,8 +1,8 @@
-name: Basic Compile
+name: Tests
 on: push
 jobs:
-  build:
-    name: Build
+  test:
+    name: test
     runs-on: ubuntu-latest
     steps:
 
@@ -18,8 +18,5 @@ jobs:
       run: |
         go get -v -t -d ./...
   
-    - name: Build
-      run: go build -v .
-
     - name: Test
-      run: go test ./...
+      run: go test -v ./...
