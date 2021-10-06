@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dylanratcliffe/sdp-go"
+	"github.com/dylanratcliffe/source-go/pkg/sdpcache"
 
 	"github.com/nats-io/nats.go"
 
@@ -54,6 +55,9 @@ type Engine struct {
 	NATSOptions *NATSOptions
 
 	// TODO: Throttling
+
+	// Cache that is used for storing SDP items in memory
+	cache sdpcache.Cache
 
 	// The NATS connection
 	natsConnection *nats.EncodedConn

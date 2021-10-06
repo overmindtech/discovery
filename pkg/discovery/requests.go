@@ -102,6 +102,8 @@ func (e *Engine) ExecuteRequest(req *sdp.ItemRequest) ([]*sdp.Item, error) {
 
 	requestItems := make([]*sdp.Item, 0)
 
+	// TODO: Thread safety
+
 	// Make the request of all sources
 	switch req.GetMethod() {
 	case sdp.RequestMethod_GET:

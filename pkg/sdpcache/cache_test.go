@@ -1,4 +1,4 @@
-package sources
+package sdpcache
 
 import (
 	"errors"
@@ -40,10 +40,9 @@ var goodItem = &sdp.Item{
 	Type:            "furniture",
 	UniqueAttribute: "serialNumber",
 	Metadata: &sdp.Metadata{
-		BackendName:            "test",
-		BackendDuration:        durationpb.New(time.Millisecond),
-		BackendDurationPerItem: durationpb.New(time.Millisecond),
-		BackendPackage:         "test-package",
+		SourceName:            "test",
+		SourceDuration:        durationpb.New(time.Millisecond),
+		SourceDurationPerItem: durationpb.New(time.Millisecond),
 		SourceRequest: &sdp.ItemRequest{
 			Type:            "furniture",
 			Method:          sdp.RequestMethod_GET,
@@ -477,13 +476,12 @@ func TestItemPointerDuplication(t *testing.T) {
 		goodItem.Attributes.Set("modified", "modified")
 
 		// Metadata
-		goodItem.Metadata.BackendName = "modified"
+		goodItem.Metadata.SourceName = "modified"
 		goodItem.Metadata.SourceRequest.Context = "modified"
 		goodItem.Metadata.SourceRequest.Method = sdp.RequestMethod_SEARCH
 		goodItem.Metadata.Timestamp = timestamppb.New(time.Unix(0, 0))
-		goodItem.Metadata.BackendDuration = durationpb.New(10 * time.Second)
-		goodItem.Metadata.BackendDurationPerItem = durationpb.New(10 * time.Second)
-		goodItem.Metadata.BackendPackage = "modified"
+		goodItem.Metadata.SourceDuration = durationpb.New(10 * time.Second)
+		goodItem.Metadata.SourceDurationPerItem = durationpb.New(10 * time.Second)
 		goodItem.Context = "modified"
 
 		// Links
@@ -541,8 +539,8 @@ func TestItemPointerDuplication(t *testing.T) {
 			}
 		})
 		t.Run("Check Metadata", func(t *testing.T) {
-			if cachedItem.GetMetadata().GetBackendName() == "modified" {
-				t.Error("Item Metadata BackendName was modififed")
+			if cachedItem.GetMetadata().GetSourceName() == "modified" {
+				t.Error("Item Metadata SourceName was modififed")
 			}
 			if cachedItem.GetMetadata().GetSourceRequest().GetContext() != "testContext" {
 				t.Error("Item Metadata SourceRequest Context was modififed")
@@ -553,14 +551,11 @@ func TestItemPointerDuplication(t *testing.T) {
 			if cachedItem.GetMetadata().GetTimestamp().AsTime().Before(time.Unix(0, 1)) {
 				t.Error("Item Metadata Timestamp was modififed")
 			}
-			if cachedItem.GetMetadata().GetBackendDuration().AsDuration() > time.Millisecond {
-				t.Error("Item Metadata BackendDuration was modififed")
+			if cachedItem.GetMetadata().GetSourceDuration().AsDuration() > time.Millisecond {
+				t.Error("Item Metadata SourceDuration was modififed")
 			}
-			if cachedItem.GetMetadata().GetBackendDurationPerItem().AsDuration() > time.Millisecond {
-				t.Error("Item Metadata BackendDurationPerItem was modififed")
-			}
-			if cachedItem.GetMetadata().GetBackendPackage() == "modified" {
-				t.Error("Item Metadata BackendPackage was modififed")
+			if cachedItem.GetMetadata().GetSourceDurationPerItem().AsDuration() > time.Millisecond {
+				t.Error("Item Metadata SourceDurationPerItem was modififed")
 			}
 
 		})

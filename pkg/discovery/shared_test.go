@@ -4,7 +4,30 @@ import (
 	"sync"
 
 	"github.com/dylanratcliffe/sdp-go"
+	"google.golang.org/protobuf/types/known/structpb"
 )
+
+var item = sdp.Item{
+	Type:            "person",
+	Context:         "global",
+	UniqueAttribute: "name",
+	Attributes: &sdp.ItemAttributes{
+		AttrStruct: &structpb.Struct{
+			Fields: map[string]*structpb.Value{
+				"name": structpb.NewStringValue("Dylan"),
+				"age":  structpb.NewNumberValue(28),
+			},
+		},
+	},
+	LinkedItemRequests: []*sdp.ItemRequest{
+		{
+			Type:    "dog",
+			Method:  sdp.RequestMethod_GET,
+			Query:   "Manny",
+			Context: "global",
+		},
+	},
+}
 
 type TestSource struct {
 	ReturnContexts []string
