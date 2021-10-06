@@ -4,7 +4,7 @@ go 1.17
 
 // Direct dependencies of my codebase
 require (
-	github.com/dylanratcliffe/sdp-go v0.0.0-20210908153727-27480e1f019c
+	github.com/dylanratcliffe/sdp-go v0.0.0-20211005135352-7a2adf49336a
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats.go v1.12.1
 	github.com/sirupsen/logrus v1.8.1

@@ -1,28 +1,18 @@
 package discovery
 
 import (
+	"errors"
 	"fmt"
-	"runtime"
-	"sync"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/dylanratcliffe/sdp-go"
-
-	"github.com/dylanratcliffe/source-go/pkg/sources"
-	"github.com/spf13/viper"
 
 	"github.com/nats-io/nats.go"
 
 	log "github.com/sirupsen/logrus"
 )
-
-// DefaultBackendPriority The default priority value for all backends that do
-// not define their own default and are not overridden in config
-const DefaultBackendPriority = 50
-
-// DefaultBackendCacheDurationSeconds The number of seconds to cache each item
-// unless it is overridden in the backend of the config
-const DefaultBackendCacheDurationSeconds = 1800
 
 type NATSOptions struct {
 	// The list of URLs to use for connecting to NATS
@@ -45,6 +35,9 @@ type NATSOptions struct {
 
 	// Path to the JWT
 	JWTFile string
+
+	// The name of the queue to join when subscribing to subjects
+	QueueName string
 }
 
 // Engine is the main discovery engine. This is where all of the Sources and
@@ -54,193 +47,229 @@ type NATSOptions struct {
 // Note that an engine that does not have a connected NATS connection will
 // simply not communicate over NATS
 type Engine struct {
+	// Descriptive name of this engine. Used as responder name in SDP responses
+	Name string
+
 	// Options for connecting to NATS
 	NATSOptions *NATSOptions
 
-	BackendLoaders []func() (sources.Backend, error)
+	// TODO: Throttling
 
 	// The NATS connection
 	natsConnection *nats.EncodedConn
 
-	// Storage for the assistants that are created
-	assistants map[string]*Assistant
+	// List of all current subscriptions
+	subscriptions []*nats.Subscription
 
-	// These are called when the local linker is executed
-	linkedItemCallbacks []func(*sdp.Item)
+	// Map of types to all sources for that type
+	sourceMap map[string][]Source
+}
+
+// AddSources Adds a source to this engine
+func (e *Engine) AddSources(sources ...Source) {
+	if e.sourceMap == nil {
+		e.sourceMap = make(map[string][]Source)
+	}
+
+	for _, src := range sources {
+		allSources := append(e.sourceMap[src.Type()], src)
+
+		sort.Slice(allSources, func(i, j int) bool {
+			iSource := allSources[i]
+			jSource := allSources[j]
+
+			// Sort by weight, highest first
+			return iSource.Weight() > jSource.Weight()
+		})
+
+		e.sourceMap[src.Type()] = append(e.sourceMap[src.Type()], src)
+	}
+}
+
+// Sources Returns a slice of all known sources
+func (e *Engine) Sources() []Source {
+	sources := make([]Source, 0)
+
+	for _, typeSources := range e.sourceMap {
+		sources = append(sources, typeSources...)
+	}
+
+	return sources
+}
+
+// SourcesForType Returns a sorted slice of sources for a given type, with the
+// highest weighted source first
+func (e *Engine) SourcesForType(typ string) []Source {
+	return e.sourceMap[typ]
+}
+
+// Connect Connects to NATS
+func (e *Engine) Connect() error {
+	// Try to connect to NATS
+	if no := e.NATSOptions; no != nil {
+		var tries int
+		var servers string
+
+		// Register our custom encoder
+		nats.RegisterEncoder("sdp", &sdp.ENCODER)
+
+		// Create server list as comme separated
+		servers = strings.Join(no.URLs, ",")
+
+		// Configure options
+		options := []nats.Option{
+			nats.Name(no.ConnectionName),
+			nats.Timeout(no.ConnectTimeout),
+		}
+
+		if no.CAFile != "" {
+			options = append(options, nats.RootCAs(no.CAFile))
+		}
+
+		if no.NkeyFile != "" && no.JWTFile != "" {
+			options = append(options, nats.UserCredentials(no.JWTFile, no.NkeyFile))
+		}
+
+		// Loop until we have a connection
+		for tries <= no.NumRetries {
+			log.WithFields(log.Fields{
+				"servers": servers,
+			}).Info("Connecting to NATS")
+
+			// TODO: Make these options more configurable
+			// https://docs.nats.io/developing-with-nats/connecting/pingpong
+			nc, err := nats.Connect(
+				servers,
+				options...,
+			)
+
+			if err == nil {
+				var enc *nats.EncodedConn
+
+				enc, err = nats.NewEncodedConn(nc, "sdp")
+
+				if err != nil {
+					return err
+				}
+
+				e.natsConnection = enc
+
+				log.WithFields(log.Fields{
+					"Addr":     e.natsConnection.Conn.ConnectedAddr(),
+					"ServerID": e.natsConnection.Conn.ConnectedServerId(),
+					"URL:":     e.natsConnection.Conn.ConnectedUrl(),
+				}).Info("NATS connected")
+
+				return nil
+			}
+
+			// Increment tries
+			tries++
+
+			log.WithFields(log.Fields{
+				"servers": servers,
+				"err":     err,
+			}).Info("Connection failed")
+
+			// TODO: Add a configurable backoff here
+			time.Sleep(5 * time.Second)
+		}
+
+		return fmt.Errorf("could not connect after %v tries", tries)
+	}
+
+	return errors.New("no NATSOptions struct provided")
 }
 
 // Start performs all of the initialisation steps required for the engine to
-// work
+// work. Note that this creates NATS subscriptions for all available sources so
+// modifying the Sources value after an engine has been started will not have
+// any effect until the engine is restarted
 func (e *Engine) Start() error {
-	// Create slices and maps
-	e.assistants = make(map[string]*Assistant)
-	e.linkedItemCallbacks = make([]func(*sdp.Item), 0)
+	var subscription *nats.Subscription
+	var err error
 
-	// Try to connect to NATS
-	if no := e.NATSOptions; no != nil {
-		enc, err := ConnectToNats(*no)
+	subject := "request.all"
+
+	log.WithFields(log.Fields{
+		"queueName":  e.NATSOptions.QueueName,
+		"subject":    subject,
+		"engineName": e.Name,
+	}).Debug("creating NATS subscription")
+
+	// Subscribe to "requests.all" since this is relevant for all sources
+	if e.NATSOptions.QueueName == "" {
+		subscription, err = e.natsConnection.Subscribe(subject, e.NewItemRequestHandler(e.Sources()))
+	} else {
+		subscription, err = e.natsConnection.QueueSubscribe(subject, e.NATSOptions.QueueName, e.NewItemRequestHandler(e.Sources()))
+	}
+
+	if err != nil {
+		return err
+	}
+
+	e.subscriptions = append(e.subscriptions, subscription)
+
+	// Now group sources by the subscriptions they require based on their
+	// supported contexts. Each key represnets a subscription, and the value is
+	// the list of sources that are capable of responding to requests on that
+	// subscription
+	subscriptionMap := make(map[string][]Source)
+
+	for _, src := range e.Sources() {
+		for _, itemContext := range src.Contexts() {
+			var subject string
+
+			if itemContext == AllContexts {
+				subject = "request.context.>"
+			} else {
+				subject = fmt.Sprintf("request.context.%v", itemContext)
+			}
+
+			if sources, ok := subscriptionMap[subject]; ok {
+				subscriptionMap[subject] = append(sources, src)
+			} else {
+				subscriptionMap[subject] = []Source{src}
+			}
+		}
+	}
+
+	// Now actually create the required subscriptions
+	for subject, sources := range subscriptionMap {
+		log.WithFields(log.Fields{
+			"queueName":  e.NATSOptions.QueueName,
+			"subject":    subject,
+			"engineName": e.Name,
+		}).Debug("creating NATS subscription")
+
+		// Subscribe to "requests.all" since this is relevant for all sources
+		if e.NATSOptions.QueueName == "" {
+			subscription, err = e.natsConnection.Subscribe(subject, e.NewItemRequestHandler(sources))
+		} else {
+			subscription, err = e.natsConnection.QueueSubscribe(subject, e.NATSOptions.QueueName, e.NewItemRequestHandler(sources))
+		}
 
 		if err != nil {
 			return err
 		}
 
-		e.natsConnection = enc
-	}
-
-	if e.IsNATSConnected() {
-		log.WithFields(log.Fields{
-			"Addr":     e.natsConnection.Conn.ConnectedAddr(),
-			"ServerID": e.natsConnection.Conn.ConnectedServerId(),
-			"URL:":     e.natsConnection.Conn.ConnectedUrl(),
-		}).Info("Starting engine with NATS connection")
-	} else {
-		log.Info("Starting engine without NATS connection")
-	}
-
-	contextBackends := make(map[string][]*sources.BackendInfo)
-
-	// Loop over all backend packages
-	for _, backendFunction := range e.BackendLoaders {
-		// Load backends from the package
-		be, err := backendFunction()
-
-		if err == nil {
-			bi := sources.BackendInfo{
-				Backend:       be,
-				Priority:      GetBackendPriority(be),
-				CacheDuration: GetBackendCacheDuration(be),
-				Context:       GetBackendContext(be),
-			}
-
-			// Save this to the backend group for each context
-			contextBackends[bi.Context] = append(contextBackends[bi.Context], &bi)
-		} else {
-			// TODO: This doesn't log the backend package that it was sourced from
-			log.WithFields(log.Fields{
-				"error":           err,
-				"backendFunction": backendFunction,
-			}).Info("Failed to load some backends")
-		}
-	}
-
-	// Worker settings
-	viper.SetDefault("workers", runtime.NumCPU())
-	workers := viper.GetInt("workers")
-
-	// Create a permissions pool for all workers
-	pool := NewPermissionPool(workers)
-
-	// Generate assistants and register backends
-	for context, backends := range contextBackends {
-		log.WithFields(log.Fields{
-			"context":     context,
-			"numBackends": len(backends),
-		}).Debug("Creating assistant")
-
-		// Create the assistant
-		assistant := NewAssistant()
-
-		// Set the context
-		assistant.Context = context
-
-		// Register backends
-		for _, backend := range backends {
-			assistant.RegisterBackend(backend)
-		}
-
-		// Add permissions
-		assistant.StartWithPermissions(pool)
-
-		// Save the assistant
-		e.assistants[context] = &assistant
-	}
-
-	if e.IsNATSConnected() {
-		// Create listeners for each assistant
-		for context, assistant := range e.assistants {
-			// Next step is to create listeners on all of the topics that we care about
-			// There won't need to be any communication between these threads as all
-			// they will do is get a command from the thing they are listening to and
-			// respond
-			// Subscribe to requests on `request.all`
-			if _, err := e.natsConnection.QueueSubscribe("request.all", fmt.Sprintf("primary.daemon.%v", context), assistant.NewItemRequestServer(e.natsConnection)); err != nil {
-				log.Fatal(err)
-			}
-
-			// Subscribe to context specific requests on request.context.{context}
-			subject := "request.context." + context
-
-			if _, err := e.natsConnection.QueueSubscribe(subject, fmt.Sprintf("primary.daemon.%v", context), assistant.NewItemRequestServer(e.natsConnection)); err != nil {
-				log.Fatal(err)
-			}
-		}
+		e.subscriptions = append(e.subscriptions, subscription)
 	}
 
 	return nil
 }
 
-// FindAll will do the following:
-//
-//   * Send a `FIND` request to every backend that the engine has
-//   * Process all results and return the items
-//
-// Linking can be toggled based on the `Link` attribute of the enging itself
-//
-func (e *Engine) FindAll() []*sdp.Item {
-	var wg sync.WaitGroup
-	itemsFound := make([]*sdp.Item, 0)
-	itemsChan := make(chan *sdp.Item)
-	itemsDone := make(chan bool)
+// Stop Stops the engine running, draining all connections
+func (e *Engine) Stop() error {
+	for _, c := range e.subscriptions {
+		err := c.Drain()
 
-	// Create a thread to constantly read from the channel
-	go func() {
-		for item := range itemsChan {
-			itemsFound = append(itemsFound, item)
+		if err != nil {
+			return err
 		}
-		itemsDone <- true
-	}()
-
-	for _, assistant := range e.assistants {
-		wg.Add(1)
-
-		rh := RequestHandlerV2{
-			Assistant: assistant,
-		}
-
-		for typ := range assistant.Sources {
-			// Get all items that we can find
-			r := sdp.ItemRequest{
-				Type:      typ,
-				Method:    sdp.RequestMethod_FIND,
-				Context:   assistant.Context,
-				LinkDepth: 65535,
-			}
-
-			rh.Requests = append(rh.Requests, &r)
-		}
-
-		go func(handler *RequestHandlerV2, i chan *sdp.Item) {
-			defer wg.Done()
-
-			// Execute the find request
-			foundItems, _ := rh.Run()
-
-			// Place all found items onto the channel for collection
-			for _, foundItem := range foundItems {
-				i <- foundItem
-			}
-		}(&rh, itemsChan)
 	}
 
-	wg.Wait()
-
-	close(itemsChan)
-
-	// Wait for things to be added to memory
-	<-itemsDone
-	close(itemsDone)
-
-	return itemsFound
+	return nil
 }
 
 // IsNATSConnected returns whether the engine is connected to NATS
@@ -254,75 +283,9 @@ func (e *Engine) IsNATSConnected() bool {
 	return false
 }
 
-// RegisterLinkedItemCallback Allows users to add callback functions that will
-// be called whenever an item has finished being linked. This will be called
-// regardless if whether the item had any LinkedItemRequests or not
-func (e *Engine) RegisterLinkedItemCallback(cb func(*sdp.Item)) {
-	e.linkedItemCallbacks = append(e.linkedItemCallbacks, cb)
-}
-
-// GetBackendPriority Gets the priority of a backend from config
-// (backends.package_name.priority) or defaults to the default set by the backend, or
-// DefaultBackendPriority
-func GetBackendPriority(backend sources.Backend) int {
-	var priority int
-
-	// Get the priority from the config
-	p, ok := backend.(sources.PriorityDefiner)
-
-	if ok {
-		priority = p.DefaultPriority()
-	} else {
-		priority = DefaultBackendPriority
-	}
-
-	viper.SetDefault(fmt.Sprintf("backends.%v.priority", backend.BackendPackage()), priority)
-	return viper.GetInt(fmt.Sprintf("backends.%v.priority", backend.BackendPackage()))
-}
-
-// GetBackendCacheDuration Gets the duration of the caching for items produced
-// by a backend from config (backends.package_name.cache_duration) or defaults to the
-// default set by the backend, or DefaultBackendCacheDurationSeconds
-func GetBackendCacheDuration(backend sources.Backend) time.Duration {
-	var durationSeconds int
-	var duration time.Duration
-
-	// Check if the backend has a default duration
-	c, ok := backend.(sources.CacheDefiner)
-
-	if ok {
-		durationSeconds = int(c.DefaultCacheDuration().Seconds())
-	} else {
-		durationSeconds = DefaultBackendCacheDurationSeconds
-	}
-
-	viper.SetDefault(fmt.Sprintf("backends.%v.cache_duration", backend.BackendPackage()), durationSeconds)
-	durationSeconds = viper.GetInt(fmt.Sprintf("backends.%v.cache_duration", backend.BackendPackage()))
-	duration = time.Duration(durationSeconds) * time.Second
-	return duration
-}
-
-// GetBackendContext returns the context of a given backend. If the backend
-// doesn't have the ability to determine its own context then it returns
-// sources.DefaultContext()
-func GetBackendContext(backend sources.Backend) string {
-	// Calculate the context that the item was found in. This is the
-	// default context or whatever the backend says if the backend is
-	// capable of determining contexts
-	if i, hasContext := backend.(sources.Contextual); hasContext {
-		return i.Context()
-	}
-
-	return sources.LocalContext()
-}
-
-// deleteItemRequest Deletes an item request from a slice
-func deleteItemRequest(requests []*sdp.ItemRequest, remove *sdp.ItemRequest) []*sdp.ItemRequest {
-	finalRequests := make([]*sdp.ItemRequest, 0)
-	for _, request := range requests {
-		if request != remove {
-			finalRequests = append(finalRequests, request)
-		}
-	}
-	return finalRequests
+// IsWildcard checks if a string is the wildcard. Use this instead of
+// implementing the wildcard check everwhere so that if we need to change the
+// woldcard at a later date we can do so here
+func IsWildcard(s string) bool {
+	return s == "*"
 }

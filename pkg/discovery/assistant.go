@@ -214,10 +214,3 @@ func NewAssistant() Assistant {
 		Sources: make(sources.SourceMap),
 	}
 }
-
-// IsWildcard checks if a string is the wildcard. Use this instead of
-// implementing the wildcard check everwhere so that if we need to change the
-// woldcard at a later date we can do so here
-func IsWildcard(s string) bool {
-	return s == "*"
-}
