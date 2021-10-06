@@ -110,7 +110,7 @@ func (e *Engine) ExecuteRequest(req *sdp.ItemRequest) ([]*sdp.Item, error) {
 	case sdp.RequestMethod_FIND:
 		requestItems, requestError = e.Find(req.GetType(), req.GetContext())
 	case sdp.RequestMethod_SEARCH:
-		requestItems, requestError = e.Search(req.GetType(), req.GetContext())
+		requestItems, requestError = e.Search(req.GetType(), req.GetContext(), req.GetQuery())
 	}
 
 	// If there was an error in the request then simply return

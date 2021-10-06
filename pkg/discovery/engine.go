@@ -97,12 +97,6 @@ func (e *Engine) Sources() []Source {
 	return sources
 }
 
-// SourcesForType Returns a sorted slice of sources for a given type, with the
-// highest weighted source first
-func (e *Engine) SourcesForType(typ string) []Source {
-	return e.sourceMap[typ]
-}
-
 // Connect Connects to NATS
 func (e *Engine) Connect() error {
 	// Try to connect to NATS
