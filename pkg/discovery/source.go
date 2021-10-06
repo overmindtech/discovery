@@ -95,8 +95,6 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 		}
 	}
 
-	errors := make([]error, 0)
-
 	// TODO: Throttling
 	// TODO: Logging
 	for _, src := range relevantSources {
@@ -128,7 +126,6 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 				// TODO: Re-implement the GetFindMutex
 				// s.GetFindMutex.GetUnlock()
 
-				errors = append(errors, err)
 				continue
 			}
 		case nil:
@@ -204,7 +201,6 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 		}
 
 		// s.GetFindMutex.GetUnlock()
-		errors = append(errors, err)
 	}
 
 	// If we don't find anything then we should raise an error
@@ -326,7 +322,7 @@ func (e *Engine) Find(typ string, context string) ([]*sdp.Item, error) {
 					Timestamp:             timestamppb.New(time.Now()),
 					SourceDuration:        durationpb.New(findDuration),
 					SourceDurationPerItem: durationpb.New(time.Duration(findDuration.Nanoseconds() / int64(len(items)))),
-					SourceName:            src.Name(),
+					SourceName:            source.Name(),
 				}
 
 				// Cache the item
@@ -479,7 +475,7 @@ func (e *Engine) Search(typ string, context string, query string) ([]*sdp.Item, 
 					Timestamp:             timestamppb.New(time.Now()),
 					SourceDuration:        durationpb.New(searchDuration),
 					SourceDurationPerItem: durationpb.New(time.Duration(searchDuration.Nanoseconds() / int64(len(items)))),
-					SourceName:            src.Name(),
+					SourceName:            source.Name(),
 				}
 
 				// Cache the item
