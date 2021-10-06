@@ -1,7 +1,6 @@
 package discovery
 
 import (
-	"sync"
 	"testing"
 
 	"github.com/dylanratcliffe/sdp-go"
@@ -20,67 +19,6 @@ var item = sdp.Item{
 			},
 		},
 	},
-}
-
-type TestSource struct {
-	ReturnContexts []string
-	ReturnType     string
-	GetCalls       [][]string
-	FindCalls      [][]string
-	SearchCalls    [][]string
-	mutex          sync.Mutex
-}
-
-func (s *TestSource) Type() string {
-	if s.ReturnType != "" {
-		return s.ReturnType
-	}
-
-	return "person"
-}
-
-func (s *TestSource) Name() string {
-	return "testSource"
-}
-
-func (s *TestSource) Contexts() []string {
-	if len(s.ReturnContexts) > 0 {
-		return s.ReturnContexts
-	}
-
-	return []string{"test"}
-}
-
-func (s *TestSource) Get(itemContext string, query string) (*sdp.Item, error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	s.GetCalls = append(s.GetCalls, []string{itemContext, query})
-
-	return &item, nil
-}
-
-func (s *TestSource) Find(itemContext string) ([]*sdp.Item, error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.FindCalls = append(s.GetCalls, []string{itemContext})
-
-	return []*sdp.Item{&item}, nil
-
-}
-
-func (s *TestSource) Search(itemContext string, query string) ([]*sdp.Item, error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	s.SearchCalls = append(s.GetCalls, []string{itemContext, query})
-
-	return []*sdp.Item{&item}, nil
-
-}
-
-func (s *TestSource) Weight() int {
-	return 10
 }
 
 func TestFilterSources(t *testing.T) {
@@ -106,25 +44,29 @@ func TestFilterSources(t *testing.T) {
 		},
 	)
 
-	// Right type wrong context
-	if s := e.FilterSources("person", "wrong"); len(s) != 1 {
-		t.Error("expected only wildcard context to match")
-	}
+	t.Run("Right type wrong context", func(t *testing.T) {
+		if s := e.FilterSources("person", "wrong"); len(s) != 1 {
+			t.Error("expected only wildcard context to match")
+		}
+	})
 
-	// Right context wrong type
-	if s := e.FilterSources("wrong", "test"); len(s) != 0 {
-		t.Error("found source when expecting no filter results")
-	}
+	t.Run("Right context wrong type", func(t *testing.T) {
+		if s := e.FilterSources("wrong", "test"); len(s) != 0 {
+			t.Error("found source when expecting no filter results")
+		}
+	})
 
-	// Right both
-	if x := len(e.FilterSources("person", "test")); x != 2 {
-		t.Errorf("expected to find 2 sources, found %v", x)
-	}
+	t.Run("Right both", func(t *testing.T) {
+		if x := len(e.FilterSources("person", "test")); x != 2 {
+			t.Errorf("expected to find 2 sources, found %v", x)
+		}
+	})
 
-	// Multi-context
-	if x := len(e.FilterSources("chair", "testB")); x != 1 {
-		t.Errorf("expected to find 1 source, found %v", x)
-	}
+	t.Run("Multi-context", func(t *testing.T) {
+		if x := len(e.FilterSources("chair", "testB")); x != 1 {
+			t.Errorf("expected to find 1 source, found %v", x)
+		}
+	})
 }
 
 func TestSourceAdd(t *testing.T) {

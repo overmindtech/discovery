@@ -66,7 +66,11 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 	relevantSources := e.FilterSources(typ, context)
 
 	if len(relevantSources) == 0 {
-		return nil, fmt.Errorf("no sources found for type %v and context %v", typ, context)
+		return nil, &sdp.ItemRequestError{
+			ErrorType:   sdp.ItemRequestError_NOCONTEXT,
+			ErrorString: fmt.Sprintf("no sources found for type %v and context %v", typ, context),
+			Context:     context,
+		}
 	}
 
 	errors := make([]error, 0)
@@ -96,7 +100,11 @@ func (e *Engine) Find(typ string, context string) ([]*sdp.Item, error) {
 	relevantSources := e.FilterSources(typ, context)
 
 	if len(relevantSources) == 0 {
-		return nil, fmt.Errorf("no sources found for type %v and context %v", typ, context)
+		return nil, &sdp.ItemRequestError{
+			ErrorType:   sdp.ItemRequestError_NOCONTEXT,
+			ErrorString: fmt.Sprintf("no sources found for type %v and context %v", typ, context),
+			Context:     context,
+		}
 	}
 
 	items := make([]*sdp.Item, 0)
@@ -150,7 +158,11 @@ func (e *Engine) Search(typ string, context string, query string) ([]*sdp.Item, 
 	}
 
 	if len(searchableSources) == 0 {
-		return nil, fmt.Errorf("no sources found for type %v and context %v that support searching", typ, context)
+		return nil, &sdp.ItemRequestError{
+			ErrorType:   sdp.ItemRequestError_NOCONTEXT,
+			ErrorString: fmt.Sprintf("no sources found for type %v and context %v that support searching", typ, context),
+			Context:     context,
+		}
 	}
 
 	items := make([]*sdp.Item, 0)
