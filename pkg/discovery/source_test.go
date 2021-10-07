@@ -2,6 +2,9 @@ package discovery
 
 import (
 	"testing"
+	"time"
+
+	"github.com/dylanratcliffe/sdp-go"
 )
 
 func TestFilterSources(t *testing.T) {
@@ -75,17 +78,59 @@ func TestGet(t *testing.T) {
 
 	e.AddSources(&src)
 
-	e.Get("person", "test", "three")
+	t.Run("Basic test", func(t *testing.T) {
+		e.Get("person", "test", "three")
 
-	if x := len(src.GetCalls); x != 1 {
-		t.Fatalf("Expected 1 get call, got %v", x)
-	}
+		if x := len(src.GetCalls); x != 1 {
+			t.Fatalf("Expected 1 get call, got %v", x)
+		}
 
-	firstCall := src.GetCalls[0]
+		firstCall := src.GetCalls[0]
 
-	if firstCall[0] != "test" || firstCall[1] != "three" {
-		t.Fatalf("First get call parameters unexpected: %v", firstCall)
-	}
+		if firstCall[0] != "test" || firstCall[1] != "three" {
+			t.Fatalf("First get call parameters unexpected: %v", firstCall)
+		}
+	})
+
+	t.Run("Test caching", func(t *testing.T) {
+		var item1 *sdp.Item
+		var item2 *sdp.Item
+		var item3 *sdp.Item
+		var err error
+
+		e.cache.StartPurger()
+		e.cache.MinWaitTime = (10 * time.Millisecond)
+
+		item1, err = e.Get("person", "test", "Dylan")
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		time.Sleep(10 * time.Millisecond)
+
+		item2, err = e.Get("person", "test", "Dylan")
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if item1.Metadata.Timestamp.String() != item2.Metadata.Timestamp.String() {
+			t.Error("Get requests 10ms apart had different timestamps, caching not working")
+		}
+
+		time.Sleep(200 * time.Millisecond)
+
+		item3, err = e.Get("person", "test", "Dylan")
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if item2.Metadata.Timestamp.String() == item3.Metadata.Timestamp.String() {
+			t.Error("Get requests 200ms apart had the same timestamps, cache not expiring")
+		}
+	})
 }
 
 func TestFind(t *testing.T) {

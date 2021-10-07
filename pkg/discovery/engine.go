@@ -187,6 +187,9 @@ func (e *Engine) Start() error {
 	var subscription *nats.Subscription
 	var err error
 
+	// Start purging cache
+	e.cache.StartPurger()
+
 	subject := "request.all"
 
 	log.WithFields(log.Fields{

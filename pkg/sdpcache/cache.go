@@ -359,7 +359,7 @@ func (c *Cache) StartPurger() {
 		// We want this process to be efficient with how often it runs. To this end
 		// we will make sure that it is able to dynamically increase and decrease
 		// its frequency depending on the duration of the caches. The logic we will
-		// use is that the Purgeing frequency will be the shortest cache duration
+		// use is that the purging frequency will be the shortest cache duration
 		// divided by ten. Meaning that if there is an item in the cache with a
 		// cache duration of 10 seconds, the Purger will run every second. If
 		// however this item is removed and the rest of the items are to be cached
@@ -372,7 +372,7 @@ func (c *Cache) StartPurger() {
 			// If the shortest cache time is zero this means that there is
 			// nothing left in the cache. In this cache we want to still sleep
 			// otherwise we would end up looping like crazy
-			if stats.ShortestCacheRemaining == 0 {
+			if stats.ShortestCacheRemaining != 0 {
 				sleepTime = stats.ShortestCacheRemaining / 10
 
 				// Check that we aren't below the minimum wait time

@@ -96,7 +96,6 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 	}
 
 	// TODO: Throttling
-	// TODO: Logging
 	for _, src := range relevantSources {
 		tags := sdpcache.Tags{
 			"sourceName":           src.Name(),
@@ -321,7 +320,7 @@ func (e *Engine) Find(typ string, context string) ([]*sdp.Item, error) {
 				item.Metadata = &sdp.Metadata{
 					Timestamp:             timestamppb.New(time.Now()),
 					SourceDuration:        durationpb.New(findDuration),
-					SourceDurationPerItem: durationpb.New(time.Duration(findDuration.Nanoseconds() / int64(len(items)))),
+					SourceDurationPerItem: durationpb.New(time.Duration(findDuration.Nanoseconds() / int64(len(finds)))),
 					SourceName:            source.Name(),
 				}
 
@@ -334,7 +333,7 @@ func (e *Engine) Find(typ string, context string) ([]*sdp.Item, error) {
 			// s.GetFindMutex.FindUnlock()
 
 			storageMutex.Lock()
-			items = append(items, items...)
+			items = append(items, finds...)
 			errors = append(errors, err)
 			storageMutex.Unlock()
 		}(src)
@@ -474,7 +473,7 @@ func (e *Engine) Search(typ string, context string, query string) ([]*sdp.Item, 
 				item.Metadata = &sdp.Metadata{
 					Timestamp:             timestamppb.New(time.Now()),
 					SourceDuration:        durationpb.New(searchDuration),
-					SourceDurationPerItem: durationpb.New(time.Duration(searchDuration.Nanoseconds() / int64(len(items)))),
+					SourceDurationPerItem: durationpb.New(time.Duration(searchDuration.Nanoseconds() / int64(len(searchItems)))),
 					SourceName:            source.Name(),
 				}
 
