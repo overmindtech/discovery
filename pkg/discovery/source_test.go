@@ -186,6 +186,7 @@ func TestFindSearchCaching(t *testing.T) {
 		ReturnContexts: []string{
 			"test",
 			"empty",
+			"error",
 		},
 	}
 
@@ -273,14 +274,95 @@ func TestFindSearchCaching(t *testing.T) {
 	})
 
 	t.Run("caching with successful search", func(t *testing.T) {
+		t.Cleanup(func() {
+			src.ClearCalls()
+		})
 
+		var finds1 []*sdp.Item
+		var finds2 []*sdp.Item
+		var finds3 []*sdp.Item
+		var err error
+
+		finds1, err = e.Search("person", "test", "query")
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		time.Sleep(10 * time.Millisecond)
+
+		finds2, err = e.Search("person", "test", "query")
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if finds1[0].Metadata.Timestamp.String() != finds2[0].Metadata.Timestamp.String() {
+			t.Error("Find requests 10ms apart had different timestamps, caching not working")
+		}
+
+		time.Sleep(200 * time.Millisecond)
+
+		finds3, err = e.Search("person", "test", "query")
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if finds2[0].Metadata.Timestamp.String() == finds3[0].Metadata.Timestamp.String() {
+			t.Error("Find requests 200ms apart had the same timestamps, cache not expiring")
+		}
 	})
+
 	t.Run("empty search", func(t *testing.T) {
+		t.Cleanup(func() {
+			src.ClearCalls()
+		})
 
+		var err error
+
+		_, err = e.Search("person", "empty", "query")
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		time.Sleep(10 * time.Millisecond)
+
+		_, err = e.Search("person", "empty", "query")
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if l := len(src.SearchCalls); l != 1 {
+			t.Errorf("Exected only 1 find call, got %v, cache not working", l)
+		}
+
+		time.Sleep(200 * time.Millisecond)
+
+		_, err = e.Search("person", "empty", "query")
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if l := len(src.SearchCalls); l != 2 {
+			t.Errorf("Exected 2 find calls, got %v, cache not clearing", l)
+		}
 	})
 
-	t.Run("caching of errors", func(t *testing.T) {
+	t.Run("non-caching of OTHER errors", func(t *testing.T) {
+		t.Cleanup(func() {
+			src.ClearCalls()
+		})
 
+		e.Get("person", "error", "query")
+		e.Get("person", "error", "query")
+
+		if l := len(src.GetCalls); l != 2 {
+			t.Errorf("Exected 2 get calls, got %v, OTHER errors should nto be cached", l)
+		}
 	})
 
 }

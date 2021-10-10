@@ -78,7 +78,22 @@ func (s *TestSource) Get(itemContext string, query string) (*sdp.Item, error) {
 
 	s.GetCalls = append(s.GetCalls, []string{itemContext, query})
 
-	return NewTestItem(), nil
+	switch itemContext {
+	case "empty":
+		return nil, &sdp.ItemRequestError{
+			ErrorType:   sdp.ItemRequestError_NOTFOUND,
+			ErrorString: "not found (test)",
+			Context:     itemContext,
+		}
+	case "error":
+		return nil, &sdp.ItemRequestError{
+			ErrorType:   sdp.ItemRequestError_OTHER,
+			ErrorString: "Error for testing",
+			Context:     itemContext,
+		}
+	default:
+		return NewTestItem(), nil
+	}
 }
 
 func (s *TestSource) Find(itemContext string) ([]*sdp.Item, error) {
@@ -86,10 +101,18 @@ func (s *TestSource) Find(itemContext string) ([]*sdp.Item, error) {
 	defer s.mutex.Unlock()
 	s.FindCalls = append(s.FindCalls, []string{itemContext})
 
-	if itemContext == "test" {
+	switch itemContext {
+	case "empty":
+		return nil, nil
+	case "error":
+		return nil, &sdp.ItemRequestError{
+			ErrorType:   sdp.ItemRequestError_OTHER,
+			ErrorString: "Error for testing",
+			Context:     itemContext,
+		}
+	default:
 		return []*sdp.Item{NewTestItem()}, nil
 	}
-	return nil, nil
 }
 
 func (s *TestSource) Search(itemContext string, query string) ([]*sdp.Item, error) {
@@ -98,10 +121,18 @@ func (s *TestSource) Search(itemContext string, query string) ([]*sdp.Item, erro
 
 	s.SearchCalls = append(s.SearchCalls, []string{itemContext, query})
 
-	if itemContext == "test" {
+	switch itemContext {
+	case "empty":
+		return nil, nil
+	case "error":
+		return nil, &sdp.ItemRequestError{
+			ErrorType:   sdp.ItemRequestError_OTHER,
+			ErrorString: "Error for testing",
+			Context:     itemContext,
+		}
+	default:
 		return []*sdp.Item{NewTestItem()}, nil
 	}
-	return nil, nil
 }
 
 func (s *TestSource) Weight() int {

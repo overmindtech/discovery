@@ -387,7 +387,6 @@ func (e *Engine) Search(typ string, context string, query string) ([]*sdp.Item, 
 	errors := make([]error, 0)
 
 	// TODO: Throttling
-	// TODO: Logging
 	for _, src := range searchableSources {
 		workingSources.Add(1)
 		go func(source SearchableSource) {
