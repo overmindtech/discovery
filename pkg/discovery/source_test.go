@@ -74,11 +74,20 @@ func TestGet(t *testing.T) {
 		Name: "testEngine",
 	}
 
-	src := TestSource{}
+	src := TestSource{
+		ReturnContexts: []string{
+			"test",
+			"empty",
+		},
+	}
 
 	e.AddSources(&src)
 
 	t.Run("Basic test", func(t *testing.T) {
+		t.Cleanup(func() {
+			src.ClearCalls()
+		})
+
 		e.Get("person", "test", "three")
 
 		if x := len(src.GetCalls); x != 1 {
@@ -93,6 +102,10 @@ func TestGet(t *testing.T) {
 	})
 
 	t.Run("Test caching", func(t *testing.T) {
+		t.Cleanup(func() {
+			src.ClearCalls()
+		})
+
 		var finds1 *sdp.Item
 		var item2 *sdp.Item
 		var item3 *sdp.Item
@@ -129,6 +142,19 @@ func TestGet(t *testing.T) {
 
 		if item2.Metadata.Timestamp.String() == item3.Metadata.Timestamp.String() {
 			t.Error("Get requests 200ms apart had the same timestamps, cache not expiring")
+		}
+	})
+
+	t.Run("Test Get() caching errors", func(t *testing.T) {
+		t.Cleanup(func() {
+			src.ClearCalls()
+		})
+
+		e.Get("person", "empty", "query")
+		e.Get("person", "empty", "query")
+
+		if l := len(src.GetCalls); l != 1 {
+			t.Errorf("Expected 1 Get call due to caching og NOTFOUND errors, got %v", l)
 		}
 	})
 }
