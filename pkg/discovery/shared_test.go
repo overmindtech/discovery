@@ -41,6 +41,13 @@ type TestSource struct {
 	mutex          sync.Mutex
 }
 
+// ClearCalls Clears the call counters between tests
+func (s *TestSource) ClearCalls() {
+	s.FindCalls = make([][]string, 0)
+	s.SearchCalls = make([][]string, 0)
+	s.GetCalls = make([][]string, 0)
+}
+
 func (s *TestSource) Type() string {
 	if s.ReturnType != "" {
 		return s.ReturnType
@@ -77,20 +84,24 @@ func (s *TestSource) Get(itemContext string, query string) (*sdp.Item, error) {
 func (s *TestSource) Find(itemContext string) ([]*sdp.Item, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	s.FindCalls = append(s.GetCalls, []string{itemContext})
+	s.FindCalls = append(s.FindCalls, []string{itemContext})
 
-	return []*sdp.Item{NewTestItem()}, nil
-
+	if itemContext == "test" {
+		return []*sdp.Item{NewTestItem()}, nil
+	}
+	return nil, nil
 }
 
 func (s *TestSource) Search(itemContext string, query string) ([]*sdp.Item, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.SearchCalls = append(s.GetCalls, []string{itemContext, query})
+	s.SearchCalls = append(s.SearchCalls, []string{itemContext, query})
 
-	return []*sdp.Item{NewTestItem()}, nil
-
+	if itemContext == "test" {
+		return []*sdp.Item{NewTestItem()}, nil
+	}
+	return nil, nil
 }
 
 func (s *TestSource) Weight() int {

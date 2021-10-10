@@ -101,6 +101,7 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 			"sourceName":           src.Name(),
 			"uniqueAttributeValue": query,
 			"type":                 typ,
+			"context":              context,
 		}
 
 		logFields := log.Fields{
@@ -230,7 +231,6 @@ func (e *Engine) Find(typ string, context string) ([]*sdp.Item, error) {
 	errors := make([]error, 0)
 
 	// TODO: Throttling
-	// TODO: Logging
 	for _, src := range relevantSources {
 		workingSources.Add(1)
 		go func(source Source) {
@@ -239,6 +239,7 @@ func (e *Engine) Find(typ string, context string) ([]*sdp.Item, error) {
 			tags := sdpcache.Tags{
 				"method":     "find",
 				"sourceName": source.Name(),
+				"context":    context,
 			}
 
 			logFields := log.Fields{
@@ -350,7 +351,11 @@ func (e *Engine) Find(typ string, context string) ([]*sdp.Item, error) {
 		}
 	}
 
-	return items, errors[0]
+	if len(errors) > 0 {
+		return items, errors[0]
+	}
+
+	return items, nil
 }
 
 // Search executes Search() on all sources for a given type, returning the merged
@@ -392,6 +397,7 @@ func (e *Engine) Search(typ string, context string, query string) ([]*sdp.Item, 
 				"method":     "find",
 				"sourceName": source.Name(),
 				"query":      query,
+				"context":    context,
 			}
 
 			logFields := log.Fields{
@@ -499,7 +505,11 @@ func (e *Engine) Search(typ string, context string, query string) ([]*sdp.Item, 
 		}
 	}
 
-	return items, errors[0]
+	if len(errors) > 0 {
+		return items, errors[0]
+	}
+
+	return items, nil
 }
 
 // timeOperation Times how lon an operation takes and stores it in the first

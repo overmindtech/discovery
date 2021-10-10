@@ -93,7 +93,7 @@ func TestGet(t *testing.T) {
 	})
 
 	t.Run("Test caching", func(t *testing.T) {
-		var item1 *sdp.Item
+		var finds1 *sdp.Item
 		var item2 *sdp.Item
 		var item3 *sdp.Item
 		var err error
@@ -101,7 +101,7 @@ func TestGet(t *testing.T) {
 		e.cache.StartPurger()
 		e.cache.MinWaitTime = (10 * time.Millisecond)
 
-		item1, err = e.Get("person", "test", "Dylan")
+		finds1, err = e.Get("person", "test", "Dylan")
 
 		if err != nil {
 			t.Error(err)
@@ -115,7 +115,7 @@ func TestGet(t *testing.T) {
 			t.Error(err)
 		}
 
-		if item1.Metadata.Timestamp.String() != item2.Metadata.Timestamp.String() {
+		if finds1.Metadata.Timestamp.String() != item2.Metadata.Timestamp.String() {
 			t.Error("Get requests 10ms apart had different timestamps, caching not working")
 		}
 
@@ -175,4 +175,112 @@ func TestSearch(t *testing.T) {
 	if firstCall[0] != "test" || firstCall[1] != "query" {
 		t.Fatalf("First Search call parameters unexpected: %v", firstCall)
 	}
+}
+
+func TestFindSearchCaching(t *testing.T) {
+	e := Engine{
+		Name: "testEngine",
+	}
+
+	src := TestSource{
+		ReturnContexts: []string{
+			"test",
+			"empty",
+		},
+	}
+
+	e.AddSources(&src)
+	e.cache.MinWaitTime = (10 * time.Millisecond)
+	e.cache.StartPurger()
+
+	t.Run("caching with successful find", func(t *testing.T) {
+		t.Cleanup(func() {
+			src.ClearCalls()
+		})
+
+		var finds1 []*sdp.Item
+		var finds2 []*sdp.Item
+		var finds3 []*sdp.Item
+		var err error
+
+		finds1, err = e.Find("person", "test")
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		time.Sleep(10 * time.Millisecond)
+
+		finds2, err = e.Find("person", "test")
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if finds1[0].Metadata.Timestamp.String() != finds2[0].Metadata.Timestamp.String() {
+			t.Error("Find requests 10ms apart had different timestamps, caching not working")
+		}
+
+		time.Sleep(200 * time.Millisecond)
+
+		finds3, err = e.Find("person", "test")
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if finds2[0].Metadata.Timestamp.String() == finds3[0].Metadata.Timestamp.String() {
+			t.Error("Find requests 200ms apart had the same timestamps, cache not expiring")
+		}
+	})
+
+	t.Run("empty find", func(t *testing.T) {
+		t.Cleanup(func() {
+			src.ClearCalls()
+		})
+
+		var err error
+
+		_, err = e.Find("person", "empty")
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		time.Sleep(10 * time.Millisecond)
+
+		_, err = e.Find("person", "empty")
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if l := len(src.FindCalls); l != 1 {
+			t.Errorf("Exected only 1 find call, got %v, cache not working", l)
+		}
+
+		time.Sleep(200 * time.Millisecond)
+
+		_, err = e.Find("person", "empty")
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if l := len(src.FindCalls); l != 2 {
+			t.Errorf("Exected 2 find calls, got %v, cache not clearing", l)
+		}
+	})
+
+	t.Run("caching with successful search", func(t *testing.T) {
+
+	})
+	t.Run("empty search", func(t *testing.T) {
+
+	})
+
+	t.Run("caching of errors", func(t *testing.T) {
+
+	})
+
 }
