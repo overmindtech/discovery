@@ -98,9 +98,7 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 	}
 
 	e.gfm.GetLock()
-	defer e.gfm.GetUnlock()
 
-	// TODO: Throttling
 	for _, src := range relevantSources {
 		tags := sdpcache.Tags{
 			"sourceName":           src.Name(),
@@ -128,9 +126,6 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 				// again and just return a blank result
 				log.WithFields(logFields).Debug("Was not found previously, skipping")
 
-				// TODO: Re-implement the GetFindMutex
-				// s.GetFindMutex.GetUnlock()
-
 				continue
 			}
 		case nil:
@@ -138,7 +133,7 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 				// If the cache found something then just return that
 				log.WithFields(logFields).Debug("Found item from cache")
 
-				// s.GetFindMutex.GetUnlock()
+				e.gfm.GetUnlock()
 
 				return cached[0], nil
 			}
@@ -150,6 +145,7 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 			e.cache.Delete(tags)
 		}
 
+		e.throttle.Lock()
 		log.WithFields(logFields).Debug("Executing get for backend")
 
 		var getDuration time.Duration
@@ -159,6 +155,8 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 		getDuration = timeOperation(func() {
 			item, err = src.Get(context, query)
 		})
+
+		e.throttle.Unlock()
 
 		logFields["itemFound"] = (err == nil)
 		logFields["error"] = err
@@ -200,12 +198,12 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 			// Store the new item in the cache
 			e.cache.StoreItem(item, GetCacheDuration(src), tags)
 
-			// s.GetFindMutex.GetUnlock()
+			e.gfm.GetUnlock()
 
 			return item, nil
 		}
 
-		// s.GetFindMutex.GetUnlock()
+		e.gfm.GetUnlock()
 	}
 
 	// If we don't find anything then we should raise an error
@@ -238,7 +236,6 @@ func (e *Engine) Find(typ string, context string) ([]*sdp.Item, error) {
 	items := make([]*sdp.Item, 0)
 	errors := make([]error, 0)
 
-	// TODO: Throttling
 	for _, src := range relevantSources {
 		workingSources.Add(1)
 		go func(source Source) {
@@ -284,6 +281,7 @@ func (e *Engine) Find(typ string, context string) ([]*sdp.Item, error) {
 				}
 			}
 
+			e.throttle.Lock()
 			log.WithFields(logFields).Debug("Executing find")
 
 			finds := make([]*sdp.Item, 0)
@@ -292,6 +290,8 @@ func (e *Engine) Find(typ string, context string) ([]*sdp.Item, error) {
 			findDuration := timeOperation(func() {
 				finds, err = source.Find(context)
 			})
+
+			e.throttle.Unlock()
 
 			logFields["items"] = len(finds)
 			logFields["error"] = err
@@ -336,10 +336,6 @@ func (e *Engine) Find(typ string, context string) ([]*sdp.Item, error) {
 				// Cache the item
 				e.cache.StoreItem(item, GetCacheDuration(source), tags)
 			}
-
-			// Unlock the  mutex to allow other operations to resume while we
-			// continue with the housekeeping
-			// s.GetFindMutex.FindUnlock()
 
 			storageMutex.Lock()
 			items = append(items, finds...)
@@ -397,7 +393,6 @@ func (e *Engine) Search(typ string, context string, query string) ([]*sdp.Item, 
 	items := make([]*sdp.Item, 0)
 	errors := make([]error, 0)
 
-	// TODO: Throttling
 	for _, src := range searchableSources {
 		workingSources.Add(1)
 		go func(source SearchableSource) {
@@ -444,6 +439,7 @@ func (e *Engine) Search(typ string, context string, query string) ([]*sdp.Item, 
 				}
 			}
 
+			e.throttle.Lock()
 			log.WithFields(logFields).Debug("Executing search")
 
 			var searchItems []*sdp.Item
@@ -452,6 +448,8 @@ func (e *Engine) Search(typ string, context string, query string) ([]*sdp.Item, 
 			searchDuration := timeOperation(func() {
 				searchItems, err = source.Search(context, query)
 			})
+
+			e.throttle.Unlock()
 
 			logFields["items"] = len(searchItems)
 			logFields["error"] = err
