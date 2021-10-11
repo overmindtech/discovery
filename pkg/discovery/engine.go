@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/dylanratcliffe/sdp-go"
-	"github.com/dylanratcliffe/source-go/pkg/sdpcache"
+	"github.com/dylanratcliffe/sdpcache"
 
 	"github.com/nats-io/nats.go"
 

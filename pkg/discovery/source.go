@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/dylanratcliffe/sdp-go"
-	"github.com/dylanratcliffe/source-go/pkg/sdpcache"
+	"github.com/dylanratcliffe/sdpcache"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
