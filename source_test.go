@@ -53,6 +53,12 @@ func TestFilterSources(t *testing.T) {
 			t.Errorf("expected to find 1 source, found %v", x)
 		}
 	})
+
+	t.Run("Wildcard context", func(t *testing.T) {
+		if x := len(e.FilterSources("person", "*")); x != 2 {
+			t.Errorf("expected to find 2 sources, found %v", x)
+		}
+	})
 }
 
 func TestSourceAdd(t *testing.T) {
