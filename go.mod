@@ -1,4 +1,4 @@
-module github.com/dylanratcliffe/source-go
+module github.com/dylanratcliffe/discovery
 
 go 1.17
 
