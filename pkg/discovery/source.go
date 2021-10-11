@@ -100,7 +100,6 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 	e.gfm.GetLock()
 	defer e.gfm.GetUnlock()
 
-	// TODO: Throttling
 	for _, src := range relevantSources {
 		tags := sdpcache.Tags{
 			"sourceName":           src.Name(),
@@ -150,6 +149,7 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 			e.cache.Delete(tags)
 		}
 
+		e.throttle.Lock()
 		log.WithFields(logFields).Debug("Executing get for backend")
 
 		var getDuration time.Duration
@@ -159,6 +159,8 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 		getDuration = timeOperation(func() {
 			item, err = src.Get(context, query)
 		})
+
+		e.throttle.Unlock()
 
 		logFields["itemFound"] = (err == nil)
 		logFields["error"] = err
@@ -238,7 +240,6 @@ func (e *Engine) Find(typ string, context string) ([]*sdp.Item, error) {
 	items := make([]*sdp.Item, 0)
 	errors := make([]error, 0)
 
-	// TODO: Throttling
 	for _, src := range relevantSources {
 		workingSources.Add(1)
 		go func(source Source) {
@@ -284,6 +285,7 @@ func (e *Engine) Find(typ string, context string) ([]*sdp.Item, error) {
 				}
 			}
 
+			e.throttle.Lock()
 			log.WithFields(logFields).Debug("Executing find")
 
 			finds := make([]*sdp.Item, 0)
@@ -292,6 +294,8 @@ func (e *Engine) Find(typ string, context string) ([]*sdp.Item, error) {
 			findDuration := timeOperation(func() {
 				finds, err = source.Find(context)
 			})
+
+			e.throttle.Unlock()
 
 			logFields["items"] = len(finds)
 			logFields["error"] = err
@@ -397,7 +401,6 @@ func (e *Engine) Search(typ string, context string, query string) ([]*sdp.Item, 
 	items := make([]*sdp.Item, 0)
 	errors := make([]error, 0)
 
-	// TODO: Throttling
 	for _, src := range searchableSources {
 		workingSources.Add(1)
 		go func(source SearchableSource) {
@@ -444,6 +447,7 @@ func (e *Engine) Search(typ string, context string, query string) ([]*sdp.Item, 
 				}
 			}
 
+			e.throttle.Lock()
 			log.WithFields(logFields).Debug("Executing search")
 
 			var searchItems []*sdp.Item
@@ -452,6 +456,8 @@ func (e *Engine) Search(typ string, context string, query string) ([]*sdp.Item, 
 			searchDuration := timeOperation(func() {
 				searchItems, err = source.Search(context, query)
 			})
+
+			e.throttle.Unlock()
 
 			logFields["items"] = len(searchItems)
 			logFields["error"] = err

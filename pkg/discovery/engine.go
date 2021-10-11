@@ -3,6 +3,7 @@ package discovery
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -54,7 +55,12 @@ type Engine struct {
 	// Options for connecting to NATS
 	NATSOptions *NATSOptions
 
-	// TODO: Throttling
+	// The maximum number of queries that can be executing in parallel. Defaults
+	// to the number of CPUs
+	MaxParallelExecutions int
+
+	// Internal throttle used to limit MaxParallelExecutions
+	throttle Throttle
 
 	// Cache that is used for storing SDP items in memory
 	cache sdpcache.Cache
@@ -190,6 +196,11 @@ func (e *Engine) Start() error {
 	var subscription *nats.Subscription
 	var err error
 
+	e.setDefaultMaxParallelExecutions()
+	e.throttle = Throttle{
+		NumParallel: e.MaxParallelExecutions,
+	}
+
 	// Start purging cache
 	e.cache.StartPurger()
 
@@ -285,6 +296,14 @@ func (e *Engine) IsNATSConnected() bool {
 		return false
 	}
 	return false
+}
+
+// setDefaultMaxParallelExecutions Sets MaxParallelExecutions to the number of
+// CPUs if not already set
+func (e *Engine) setDefaultMaxParallelExecutions() {
+	if e.MaxParallelExecutions == 0 {
+		e.MaxParallelExecutions = runtime.NumCPU()
+	}
 }
 
 // IsWildcard checks if a string is the wildcard. Use this instead of
