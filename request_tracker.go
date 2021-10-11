@@ -191,6 +191,10 @@ func (r *RequestTracker) Execute() ([]*sdp.Item, error) {
 	var errorsMutex sync.Mutex
 	var requestsWait sync.WaitGroup
 
+	if r.unlinkedItems == nil {
+		r.unlinkedItems = make(chan *sdp.Item)
+	}
+
 	// Populate the waitgroup with the initial number of requests
 	requestsWait.Add(len(r.Requests))
 
