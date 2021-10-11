@@ -98,7 +98,6 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 	}
 
 	e.gfm.GetLock()
-	defer e.gfm.GetUnlock()
 
 	for _, src := range relevantSources {
 		tags := sdpcache.Tags{
@@ -127,9 +126,6 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 				// again and just return a blank result
 				log.WithFields(logFields).Debug("Was not found previously, skipping")
 
-				// TODO: Re-implement the GetFindMutex
-				// s.GetFindMutex.GetUnlock()
-
 				continue
 			}
 		case nil:
@@ -137,7 +133,7 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 				// If the cache found something then just return that
 				log.WithFields(logFields).Debug("Found item from cache")
 
-				// s.GetFindMutex.GetUnlock()
+				e.gfm.GetUnlock()
 
 				return cached[0], nil
 			}
@@ -202,12 +198,12 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 			// Store the new item in the cache
 			e.cache.StoreItem(item, GetCacheDuration(src), tags)
 
-			// s.GetFindMutex.GetUnlock()
+			e.gfm.GetUnlock()
 
 			return item, nil
 		}
 
-		// s.GetFindMutex.GetUnlock()
+		e.gfm.GetUnlock()
 	}
 
 	// If we don't find anything then we should raise an error
@@ -340,10 +336,6 @@ func (e *Engine) Find(typ string, context string) ([]*sdp.Item, error) {
 				// Cache the item
 				e.cache.StoreItem(item, GetCacheDuration(source), tags)
 			}
-
-			// Unlock the  mutex to allow other operations to resume while we
-			// continue with the housekeeping
-			// s.GetFindMutex.FindUnlock()
 
 			storageMutex.Lock()
 			items = append(items, finds...)

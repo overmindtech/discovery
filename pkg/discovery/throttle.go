@@ -26,8 +26,13 @@ func (t *Throttle) Unlock() {
 	t.permissionChan <- true
 }
 
-// ensureSetup ensures that the underlying chan setup is initialised
+// ensureSetup ensures that the underlying chan setup is initialised. It also
+// ensures that NumParallel is set to at least 1
 func (t *Throttle) ensureSetup() {
+	if t.NumParallel < 1 {
+		t.NumParallel = 1
+	}
+
 	if t.permissionChan == nil {
 		t.permissionChan = make(chan bool, t.NumParallel)
 
