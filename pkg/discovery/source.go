@@ -97,6 +97,9 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 		}
 	}
 
+	e.gfm.GetLock()
+	defer e.gfm.GetUnlock()
+
 	// TODO: Throttling
 	for _, src := range relevantSources {
 		tags := sdpcache.Tags{
@@ -228,6 +231,9 @@ func (e *Engine) Find(typ string, context string) ([]*sdp.Item, error) {
 			Context:     context,
 		}
 	}
+
+	e.gfm.FindLock()
+	defer e.gfm.FindUnlock()
 
 	items := make([]*sdp.Item, 0)
 	errors := make([]error, 0)
@@ -384,6 +390,9 @@ func (e *Engine) Search(typ string, context string, query string) ([]*sdp.Item, 
 			Context:     context,
 		}
 	}
+
+	e.gfm.GetLock()
+	defer e.gfm.GetUnlock()
 
 	items := make([]*sdp.Item, 0)
 	errors := make([]error, 0)

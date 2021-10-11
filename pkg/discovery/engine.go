@@ -67,6 +67,9 @@ type Engine struct {
 
 	// Map of types to all sources for that type
 	sourceMap map[string][]Source
+
+	// GetFindMutex used for locking
+	gfm GetFindMutex
 }
 
 // AddSources Adds a source to this engine
