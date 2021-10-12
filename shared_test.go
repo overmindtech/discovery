@@ -8,10 +8,10 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func NewTestItem() *sdp.Item {
+func (s *TestSource) NewTestItem(itemContext string) *sdp.Item {
 	return &sdp.Item{
-		Type:            "person",
-		Context:         "test",
+		Type:            s.Type(),
+		Context:         itemContext,
 		UniqueAttribute: "name",
 		Attributes: &sdp.ItemAttributes{
 			AttrStruct: &structpb.Struct{
@@ -26,7 +26,7 @@ func NewTestItem() *sdp.Item {
 				Type:    "dog",
 				Method:  sdp.RequestMethod_GET,
 				Query:   "Manny",
-				Context: "test",
+				Context: itemContext,
 			},
 		},
 	}
@@ -92,7 +92,7 @@ func (s *TestSource) Get(itemContext string, query string) (*sdp.Item, error) {
 			Context:     itemContext,
 		}
 	default:
-		return NewTestItem(), nil
+		return s.NewTestItem(itemContext), nil
 	}
 }
 
@@ -111,7 +111,7 @@ func (s *TestSource) Find(itemContext string) ([]*sdp.Item, error) {
 			Context:     itemContext,
 		}
 	default:
-		return []*sdp.Item{NewTestItem()}, nil
+		return []*sdp.Item{s.NewTestItem(itemContext)}, nil
 	}
 }
 
@@ -131,7 +131,7 @@ func (s *TestSource) Search(itemContext string, query string) ([]*sdp.Item, erro
 			Context:     itemContext,
 		}
 	default:
-		return []*sdp.Item{NewTestItem()}, nil
+		return []*sdp.Item{s.NewTestItem(itemContext)}, nil
 	}
 }
 

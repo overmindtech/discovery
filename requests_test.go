@@ -144,3 +144,35 @@ func TestExecuteRequest(t *testing.T) {
 	})
 
 }
+
+// func TestNewItemRequestHandler(t *testing.T) {
+// 	e := Engine{
+// 		Name: "test",
+// 	}
+
+// 	src := TestSource{
+// 		ReturnType:     "person",
+// 		ReturnContexts: []string{
+// 			"test1",
+// 			"test2",
+// 		},
+// 	}
+
+// 	e.AddSources(
+// 		&TestSource{
+// 			ReturnType:     "person",
+// 			ReturnContexts: []string{
+// 				"test1",
+// 				"test2",
+// 			},
+// 		},
+// 		&TestSource{
+// 			ReturnType: "dog",
+// 			ReturnContexts: []string{
+// 				"testA",
+// 				"testB",
+// 			},
+// 		}
+// 	)
+
+// }
