@@ -55,8 +55,18 @@ func TestFilterSources(t *testing.T) {
 	})
 
 	t.Run("Wildcard context", func(t *testing.T) {
-		if x := len(e.FilterSources("person", "*")); x != 2 {
+		if x := len(e.FilterSources("person", WILDCARD)); x != 2 {
 			t.Errorf("expected to find 2 sources, found %v", x)
+		}
+
+		if x := len(e.FilterSources("chair", WILDCARD)); x != 1 {
+			t.Errorf("expected to find 1 sources, found %v", x)
+		}
+	})
+
+	t.Run("Wildcard both", func(t *testing.T) {
+		if x := len(e.FilterSources(WILDCARD, WILDCARD)); x != 3 {
+			t.Errorf("expected to find 3 sources, found %v", x)
 		}
 	})
 }

@@ -72,6 +72,7 @@ func TestGetLock(t *testing.T) {
 
 	t.Run("active gets block finds", func(t *testing.T) {
 		var gfm GetFindMutex
+		var actionWG sync.WaitGroup
 		ctx, cancel := context.WithTimeout(context.Background(), (1 * time.Second))
 
 		order := make([]string, 0)
@@ -122,14 +123,19 @@ func TestGetLock(t *testing.T) {
 
 		}()
 
+		actionWG.Add(1)
+
 		go func() {
 			for action := range actionChan {
 				order = append(order, action)
 			}
+			actionWG.Done()
 		}()
 
 		go func(t *testing.T) {
 			wg.Wait()
+			close(actionChan)
+			actionWG.Wait()
 
 			// The expected order is: Firstly getLock1 since nothing else is waiting
 			// for a lock. While this one is working there is a request for a

@@ -30,8 +30,16 @@ func (e *Engine) NewItemRequestHandler(sources []Source) func(req *sdp.ItemReque
 			ResponseSubject: itemRequest.ResponseSubject,
 		}
 
+		var pub sdp.EncodedPublisher
+
+		if e.IsNATSConnected() {
+			pub = e.natsConnection
+		} else {
+			pub = NilPublisher{}
+		}
+
 		responder.Start(
-			e.natsConnection,
+			pub,
 			e.Name,
 		)
 
@@ -143,28 +151,42 @@ func (e *Engine) ExecuteRequest(req *sdp.ItemRequest) ([]*sdp.Item, error) {
 	return requestItems, requestError
 }
 
-// expandRequest Expands requests with wildcards to be list of requests, one for
-// each type that the engine supports
+// expandRequest Expands requests with wildcards to no longer contain wildcards.
+// Meaning that if we support 5 types, and a request comes in with a wildcard
+// type, this function will expand that request into 5 requests, one for each
+// type.
+//
+// The same goes for contexts, if we have a request with a wildcard context, and
+// a single source that supports 5 contexts, we will end up with 5 requests. The
+// exception to this is if we have a source that supports all contexts, but is
+// unable to list them. In this case there will still be some requests with
+// wildcard contexts as they can't be expanded
 func (e *Engine) expandRequest(request *sdp.ItemRequest) []*sdp.ItemRequest {
-	if IsWildcard(request.GetType()) {
-		requests := make([]*sdp.ItemRequest, 0)
+	// Filter to just sources that are capable of responding
+	relevantSources := e.FilterSources(request.Type, request.Context)
 
-		for typ := range e.sourceMap {
-			newRequest := sdp.ItemRequest{
-				Type:            typ,
-				Method:          request.GetMethod(),
-				Query:           request.GetQuery(),
-				Context:         request.GetContext(),
-				ItemSubject:     request.GetItemSubject(),
-				ResponseSubject: request.GetResponseSubject(),
-				LinkDepth:       request.GetLinkDepth(),
+	requests := make([]*sdp.ItemRequest, 0)
+
+	for _, src := range relevantSources {
+		for _, ctx := range src.Contexts() {
+			// Create a new request if:
+			//
+			// * The source supports all contexts, or
+			// * The request context is a wildcard, or
+			// * The request context matches source context
+			if IsWildcard(ctx) || IsWildcard(request.Context) || ctx == request.Context {
+				requests = append(requests, &sdp.ItemRequest{
+					Type:            src.Type(),
+					Method:          request.Method,
+					Query:           request.Query,
+					Context:         ctx,
+					ItemSubject:     request.ItemSubject,
+					ResponseSubject: request.ResponseSubject,
+					LinkDepth:       request.LinkDepth,
+				})
 			}
-
-			requests = append(requests, &newRequest)
 		}
-
-		return requests
 	}
 
-	return []*sdp.ItemRequest{request}
+	return requests
 }

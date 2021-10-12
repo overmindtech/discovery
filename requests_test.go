@@ -145,34 +145,85 @@ func TestExecuteRequest(t *testing.T) {
 
 }
 
-// func TestNewItemRequestHandler(t *testing.T) {
-// 	e := Engine{
-// 		Name: "test",
-// 	}
+func TestNewItemRequestHandler(t *testing.T) {
+	e := Engine{
+		Name: "test",
+	}
 
-// 	src := TestSource{
-// 		ReturnType:     "person",
-// 		ReturnContexts: []string{
-// 			"test1",
-// 			"test2",
-// 		},
-// 	}
+	personSource := TestSource{
+		ReturnType: "person",
+		ReturnContexts: []string{
+			"test1",
+			"test2",
+		},
+	}
 
-// 	e.AddSources(
-// 		&TestSource{
-// 			ReturnType:     "person",
-// 			ReturnContexts: []string{
-// 				"test1",
-// 				"test2",
-// 			},
-// 		},
-// 		&TestSource{
-// 			ReturnType: "dog",
-// 			ReturnContexts: []string{
-// 				"testA",
-// 				"testB",
-// 			},
-// 		}
-// 	)
+	dogSource := TestSource{
+		ReturnType: "dog",
+		ReturnContexts: []string{
+			"test1",
+			"testA",
+			"testB",
+		},
+	}
 
-// }
+	e.AddSources(&personSource, &dogSource)
+
+	t.Run("Wildcard type should be expanded", func(t *testing.T) {
+		t.Cleanup(func() {
+			personSource.ClearCalls()
+			dogSource.ClearCalls()
+		})
+
+		req := sdp.ItemRequest{
+			Type:      WILDCARD,
+			Method:    sdp.RequestMethod_GET,
+			Query:     "Dylan",
+			Context:   "test1",
+			LinkDepth: 0,
+		}
+
+		handler := e.NewItemRequestHandler(e.Sources())
+
+		// Run the handler
+		handler(&req)
+
+		// I'm expecting both sources to get a request since the type was *
+		if l := len(personSource.GetCalls); l != 1 {
+			t.Errorf("expected person backend to have 1 Get call, got %v", l)
+		}
+
+		if l := len(dogSource.GetCalls); l != 1 {
+			t.Errorf("expected dog backend to have 1 Get call, got %v", l)
+		}
+	})
+
+	t.Run("Wildcard context should be expanded", func(t *testing.T) {
+		t.Cleanup(func() {
+			personSource.ClearCalls()
+			dogSource.ClearCalls()
+		})
+
+		req := sdp.ItemRequest{
+			Type:      "person",
+			Method:    sdp.RequestMethod_GET,
+			Query:     "Dylan",
+			Context:   WILDCARD,
+			LinkDepth: 0,
+		}
+
+		handler := e.NewItemRequestHandler(e.Sources())
+
+		// Run the handler
+		handler(&req)
+
+		if l := len(personSource.GetCalls); l != 2 {
+			t.Errorf("expected person backend to have 2 Get calls, got %v", l)
+		}
+
+		if l := len(dogSource.GetCalls); l != 0 {
+			t.Errorf("expected dog backend to have 0 Get calls, got %v", l)
+		}
+	})
+
+}

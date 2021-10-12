@@ -67,16 +67,26 @@ func GetCacheDuration(s Source) time.Duration {
 }
 
 // FilterSources returns the set of sources that match the supplied type and
-// context. Supports a wildcard context but the type must be accurate
+// context. Supports wildcards in either position
 func (e *Engine) FilterSources(typ string, context string) []Source {
+	var checkSources []Source
+
+	if IsWildcard(typ) {
+		// If the type is a wildcard then check all sources for matching context
+		checkSources = e.Sources()
+	} else {
+		checkSources = e.sourceMap[typ]
+	}
+
 	sources := make([]Source, 0)
 
 	// Get all sources that match the supplied type
-	for _, source := range e.sourceMap[typ] {
+	for _, source := range checkSources {
 		// Filter by matching context
 		for _, sourceContext := range source.Contexts() {
 			if sourceContext == context || IsWildcard(sourceContext) || IsWildcard(context) {
 				sources = append(sources, source)
+				break
 			}
 		}
 	}
