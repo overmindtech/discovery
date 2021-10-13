@@ -8,7 +8,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func (s *TestSource) NewTestItem(itemContext string) *sdp.Item {
+func (s *TestSource) NewTestItem(itemContext string, query string) *sdp.Item {
 	return &sdp.Item{
 		Type:            s.Type(),
 		Context:         itemContext,
@@ -16,16 +16,16 @@ func (s *TestSource) NewTestItem(itemContext string) *sdp.Item {
 		Attributes: &sdp.ItemAttributes{
 			AttrStruct: &structpb.Struct{
 				Fields: map[string]*structpb.Value{
-					"name": structpb.NewStringValue("Dylan"),
+					"name": structpb.NewStringValue(query),
 					"age":  structpb.NewNumberValue(28),
 				},
 			},
 		},
 		LinkedItemRequests: []*sdp.ItemRequest{
 			{
-				Type:    "dog",
+				Type:    "person",
 				Method:  sdp.RequestMethod_GET,
-				Query:   "Manny",
+				Query:   RandomName(),
 				Context: itemContext,
 			},
 		},
@@ -92,7 +92,7 @@ func (s *TestSource) Get(itemContext string, query string) (*sdp.Item, error) {
 			Context:     itemContext,
 		}
 	default:
-		return s.NewTestItem(itemContext), nil
+		return s.NewTestItem(itemContext, query), nil
 	}
 }
 
@@ -111,7 +111,7 @@ func (s *TestSource) Find(itemContext string) ([]*sdp.Item, error) {
 			Context:     itemContext,
 		}
 	default:
-		return []*sdp.Item{s.NewTestItem(itemContext)}, nil
+		return []*sdp.Item{s.NewTestItem(itemContext, "Dylan")}, nil
 	}
 }
 
@@ -131,7 +131,7 @@ func (s *TestSource) Search(itemContext string, query string) ([]*sdp.Item, erro
 			Context:     itemContext,
 		}
 	default:
-		return []*sdp.Item{s.NewTestItem(itemContext)}, nil
+		return []*sdp.Item{s.NewTestItem(itemContext, "Dylan")}, nil
 	}
 }
 
