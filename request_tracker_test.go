@@ -21,26 +21,58 @@ func TestExecute(t *testing.T) {
 
 	engine.AddSources(&src)
 
-	rt := RequestTracker{
-		Engine: &engine,
-		Requests: []*sdp.ItemRequest{
-			{
-				Type:      "person",
-				Method:    sdp.RequestMethod_GET,
-				Query:     "Dylan",
-				LinkDepth: 1,
-				Context:   "test",
+	t.Run("Without linking", func(t *testing.T) {
+		t.Parallel()
+
+		rt := RequestTracker{
+			Engine: &engine,
+			Requests: []*sdp.ItemRequest{
+				{
+					Type:      "person",
+					Method:    sdp.RequestMethod_GET,
+					Query:     "Dylan",
+					LinkDepth: 0,
+					Context:   "test",
+				},
 			},
-		},
-	}
+		}
 
-	items, err := rt.Execute()
+		items, err := rt.Execute()
 
-	if err != nil {
-		t.Error(err)
-	}
+		if err != nil {
+			t.Error(err)
+		}
 
-	if l := len(items); l != 1 {
-		t.Errorf("expected 1 items, got %v", l)
-	}
+		if l := len(items); l != 1 {
+			t.Errorf("expected 1 items, got %v", l)
+		}
+	})
+
+	t.Run("With linking", func(t *testing.T) {
+		t.Parallel()
+
+		rt := RequestTracker{
+			Engine: &engine,
+			Requests: []*sdp.ItemRequest{
+				{
+					Type:      "person",
+					Method:    sdp.RequestMethod_GET,
+					Query:     "Dylan",
+					LinkDepth: 10,
+					Context:   "test",
+				},
+			},
+		}
+
+		items, err := rt.Execute()
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if l := len(items); l != 11 {
+			t.Errorf("expected 10 items, got %v", l)
+		}
+	})
+
 }
