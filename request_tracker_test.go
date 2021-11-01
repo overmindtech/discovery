@@ -57,8 +57,6 @@ func (s *SpeedTestSource) Get(itemContext string, query string) (*sdp.Item, erro
 }
 
 func (s *SpeedTestSource) Find(itemContext string) ([]*sdp.Item, error) {
-	time.Sleep(s.QueryDelay)
-
 	item, err := s.Get(itemContext, "dylan")
 
 	return []*sdp.Item{item}, err
@@ -69,7 +67,7 @@ func (s *SpeedTestSource) Weight() int {
 }
 
 func TestExecuteParallel(t *testing.T) {
-	queryDelay := (200 * time.Millisecond)
+	queryDelay := (1000 * time.Millisecond)
 	numSources := 10
 	sources := make([]Source, numSources)
 
@@ -90,6 +88,7 @@ func TestExecuteParallel(t *testing.T) {
 		}
 
 		engine.AddSources(sources...)
+		engine.SetupThrottle()
 
 		tracker := RequestTracker{
 			Engine: &engine,
@@ -129,6 +128,7 @@ func TestExecuteParallel(t *testing.T) {
 		}
 
 		engine.AddSources(sources...)
+		engine.SetupThrottle()
 
 		tracker := RequestTracker{
 			Engine: &engine,
@@ -155,7 +155,7 @@ func TestExecuteParallel(t *testing.T) {
 		expectedTime := (queryDelay * 2) // Double it give us some wiggle room
 
 		if timeTaken > expectedTime {
-			t.Errorf("Query with no parallelism took > %v. This means it must not have run in parallel", expectedTime)
+			t.Errorf("Query with no parallelism took %v which is > than the expected max of %v. This means it must not have run in parallel", timeTaken, expectedTime)
 		}
 	})
 }
