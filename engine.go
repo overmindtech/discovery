@@ -78,6 +78,18 @@ type Engine struct {
 	gfm GetFindMutex
 }
 
+// SetupThrottle Sets up the throttling based on MaxParallelExecutions,
+// including ensuring that it's not set to zero
+func (e *Engine) SetupThrottle() {
+	if e.MaxParallelExecutions == 0 {
+		e.MaxParallelExecutions = runtime.NumCPU()
+	}
+
+	e.throttle = Throttle{
+		NumParallel: e.MaxParallelExecutions,
+	}
+}
+
 // AddSources Adds a source to this engine
 func (e *Engine) AddSources(sources ...Source) {
 	if e.sourceMap == nil {
@@ -196,10 +208,7 @@ func (e *Engine) Start() error {
 	var subscription *nats.Subscription
 	var err error
 
-	e.setDefaultMaxParallelExecutions()
-	e.throttle = Throttle{
-		NumParallel: e.MaxParallelExecutions,
-	}
+	e.SetupThrottle()
 
 	// Start purging cache
 	e.cache.StartPurger()
@@ -296,14 +305,6 @@ func (e *Engine) IsNATSConnected() bool {
 		return false
 	}
 	return false
-}
-
-// setDefaultMaxParallelExecutions Sets MaxParallelExecutions to the number of
-// CPUs if not already set
-func (e *Engine) setDefaultMaxParallelExecutions() {
-	if e.MaxParallelExecutions == 0 {
-		e.MaxParallelExecutions = runtime.NumCPU()
-	}
 }
 
 // WILDCARD Used for requests that are relevant to many contexts or types
