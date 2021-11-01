@@ -14,12 +14,38 @@ func TestGetLock(t *testing.T) {
 		doneChan := make(chan bool)
 
 		go func() {
-			gfm.GetLock()
-			gfm.GetLock()
-			gfm.GetLock()
-			gfm.GetUnlock()
-			gfm.GetUnlock()
-			gfm.GetUnlock()
+			gfm.GetLock("testContext", "testType")
+			gfm.GetLock("testContext", "testType")
+			gfm.GetLock("testContext", "testType")
+			gfm.GetUnlock("testContext", "testType")
+			gfm.GetUnlock("testContext", "testType")
+			gfm.GetUnlock("testContext", "testType")
+			doneChan <- true
+		}()
+
+		select {
+		case <-ctx.Done():
+			t.Error("Timeout")
+		case <-doneChan:
+		}
+
+		cancel()
+	})
+
+	t.Run("many find locks from different types and contexts can be held at once", func(t *testing.T) {
+		var gfm GetFindMutex
+		ctx, cancel := context.WithTimeout(context.Background(), (1 * time.Second))
+		doneChan := make(chan bool)
+
+		go func() {
+			gfm.FindLock("testContext1", "testType1")
+			gfm.FindLock("testContext1", "testType2")
+			gfm.FindLock("testContext2", "testType")
+			gfm.FindLock("testContext3", "testType")
+			gfm.FindUnlock("testContext1", "testType1")
+			gfm.FindUnlock("testContext1", "testType2")
+			gfm.FindUnlock("testContext2", "testType")
+			gfm.FindUnlock("testContext3", "testType")
 			doneChan <- true
 		}()
 
@@ -38,15 +64,15 @@ func TestGetLock(t *testing.T) {
 		getChan := make(chan bool)
 		findChan := make(chan bool)
 
-		gfm.FindLock()
+		gfm.FindLock("testContext", "testType")
 
 		go func() {
-			gfm.GetLock()
-			gfm.GetLock()
-			gfm.GetLock()
-			gfm.GetUnlock()
-			gfm.GetUnlock()
-			gfm.GetUnlock()
+			gfm.GetLock("testContext", "testType")
+			gfm.GetLock("testContext", "testType")
+			gfm.GetLock("testContext", "testType")
+			gfm.GetUnlock("testContext", "testType")
+			gfm.GetUnlock("testContext", "testType")
+			gfm.GetUnlock("testContext", "testType")
 			getChan <- true
 		}()
 
@@ -83,13 +109,13 @@ func TestGetLock(t *testing.T) {
 
 		go func() {
 			defer wg.Done()
-			gfm.GetLock()
+			gfm.GetLock("testContext", "testType")
 			actionChan <- "getLock1"
 
 			// do some work
 			time.Sleep(50 * time.Millisecond)
 
-			gfm.GetUnlock()
+			gfm.GetUnlock("testContext", "testType")
 
 		}()
 
@@ -97,14 +123,14 @@ func TestGetLock(t *testing.T) {
 			defer wg.Done()
 			time.Sleep(10 * time.Millisecond)
 
-			gfm.FindLock()
+			gfm.FindLock("testContext", "testType")
 
 			actionChan <- "findLock1"
 
 			// do some work
 			time.Sleep(50 * time.Millisecond)
 
-			gfm.FindUnlock()
+			gfm.FindUnlock("testContext", "testType")
 
 		}()
 
@@ -112,14 +138,14 @@ func TestGetLock(t *testing.T) {
 			defer wg.Done()
 			time.Sleep(20 * time.Millisecond)
 
-			gfm.GetLock()
+			gfm.GetLock("testContext", "testType")
 
 			actionChan <- "getLock2"
 
 			// do some work
 			time.Sleep(50 * time.Millisecond)
 
-			gfm.GetUnlock()
+			gfm.GetUnlock("testContext", "testType")
 
 		}()
 

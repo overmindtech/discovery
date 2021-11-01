@@ -107,7 +107,7 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 		}
 	}
 
-	e.gfm.GetLock()
+	e.gfm.GetLock(context, typ)
 
 	for _, src := range relevantSources {
 		tags := sdpcache.Tags{
@@ -143,7 +143,7 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 				// If the cache found something then just return that
 				log.WithFields(logFields).Debug("Found item from cache")
 
-				e.gfm.GetUnlock()
+				e.gfm.GetUnlock(context, typ)
 
 				return cached[0], nil
 			}
@@ -208,12 +208,12 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 			// Store the new item in the cache
 			e.cache.StoreItem(item, GetCacheDuration(src), tags)
 
-			e.gfm.GetUnlock()
+			e.gfm.GetUnlock(context, typ)
 
 			return item, nil
 		}
 
-		e.gfm.GetUnlock()
+		e.gfm.GetUnlock(context, typ)
 	}
 
 	// If we don't find anything then we should raise an error
@@ -240,8 +240,8 @@ func (e *Engine) Find(typ string, context string) ([]*sdp.Item, error) {
 		}
 	}
 
-	e.gfm.FindLock()
-	defer e.gfm.FindUnlock()
+	e.gfm.FindLock(context, typ)
+	defer e.gfm.FindUnlock(context, typ)
 
 	items := make([]*sdp.Item, 0)
 	errors := make([]error, 0)
@@ -397,8 +397,8 @@ func (e *Engine) Search(typ string, context string, query string) ([]*sdp.Item, 
 		}
 	}
 
-	e.gfm.GetLock()
-	defer e.gfm.GetUnlock()
+	e.gfm.GetLock(context, typ)
+	defer e.gfm.GetUnlock(context, typ)
 
 	items := make([]*sdp.Item, 0)
 	errors := make([]error, 0)
