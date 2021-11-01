@@ -67,7 +67,7 @@ func (s *SpeedTestSource) Weight() int {
 }
 
 func TestExecuteParallel(t *testing.T) {
-	queryDelay := (1000 * time.Millisecond)
+	queryDelay := (200 * time.Millisecond)
 	numSources := 10
 	sources := make([]Source, numSources)
 
