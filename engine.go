@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dylanratcliffe/sdp-go"
-	"github.com/dylanratcliffe/sdpcache"
+	"github.com/overmindtech/sdp-go"
+	"github.com/overmindtech/sdpcache"
 
 	"github.com/nats-io/nats.go"
 

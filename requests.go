@@ -1,7 +1,7 @@
 package discovery
 
 import (
-	"github.com/dylanratcliffe/sdp-go"
+	"github.com/overmindtech/sdp-go"
 	log "github.com/sirupsen/logrus"
 )
 

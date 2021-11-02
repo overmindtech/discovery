@@ -3,7 +3,7 @@ package discovery
 import (
 	"testing"
 
-	"github.com/dylanratcliffe/sdp-go"
+	"github.com/overmindtech/sdp-go"
 )
 
 func TestExecuteRequest(t *testing.T) {

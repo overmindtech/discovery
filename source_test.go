@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dylanratcliffe/sdp-go"
+	"github.com/overmindtech/sdp-go"
 )
 
 func TestFilterSources(t *testing.T) {

@@ -6,8 +6,8 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/dylanratcliffe/sdp-go"
 	"github.com/goombaio/namegenerator"
+	"github.com/overmindtech/sdp-go"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 

@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dylanratcliffe/sdp-go"
+	"github.com/overmindtech/sdp-go"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
