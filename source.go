@@ -56,6 +56,15 @@ type CacheDefiner interface {
 	DefaultCacheDuration() time.Duration
 }
 
+// HiddenSource Sources that define a `Hidden()` method are able to tell whether
+// or not the items they produce should be marked as hidden within the metadata.
+// Hidden items will not be shown in GUIs or stored in databases and are used
+// for gathering data as part of other proccesses such as remotely executed
+// secondary sources
+type HiddenSource interface {
+	Hidden() bool
+}
+
 // GetCacheDuration Gets the cache duration for a specific source, or a default
 // value
 func GetCacheDuration(s Source) time.Duration {
@@ -205,6 +214,11 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 				SourceName:            src.Name(),
 			}
 
+			// Mark the item as hidden if the source is a hidden source
+			if hs, ok := src.(HiddenSource); ok {
+				item.Metadata.Hidden = hs.Hidden()
+			}
+
 			// Store the new item in the cache
 			e.cache.StoreItem(item, GetCacheDuration(src), tags)
 
@@ -341,6 +355,11 @@ func (e *Engine) Find(typ string, context string) ([]*sdp.Item, error) {
 					SourceDuration:        durationpb.New(findDuration),
 					SourceDurationPerItem: durationpb.New(time.Duration(findDuration.Nanoseconds() / int64(len(finds)))),
 					SourceName:            source.Name(),
+				}
+
+				// Mark the item as hidden if the source is a hidden source
+				if hs, ok := source.(HiddenSource); ok {
+					item.Metadata.Hidden = hs.Hidden()
 				}
 
 				// Cache the item
@@ -499,6 +518,11 @@ func (e *Engine) Search(typ string, context string, query string) ([]*sdp.Item, 
 					SourceDuration:        durationpb.New(searchDuration),
 					SourceDurationPerItem: durationpb.New(time.Duration(searchDuration.Nanoseconds() / int64(len(searchItems)))),
 					SourceName:            source.Name(),
+				}
+
+				// Mark the item as hidden if the source is a hidden source
+				if hs, ok := source.(HiddenSource); ok {
+					item.Metadata.Hidden = hs.Hidden()
 				}
 
 				// Cache the item
