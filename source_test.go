@@ -136,7 +136,7 @@ func TestGet(t *testing.T) {
 			t.Error(err)
 		}
 
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(20 * time.Millisecond)
 
 		item2, err = e.Get("person", "test", "Dylan")
 
@@ -145,7 +145,7 @@ func TestGet(t *testing.T) {
 		}
 
 		if finds1.Metadata.Timestamp.String() != item2.Metadata.Timestamp.String() {
-			t.Error("Get requests 10ms apart had different timestamps, caching not working")
+			t.Errorf("Get requests 10ms apart had different timestamps, caching not working. %v != %v", finds1.Metadata.Timestamp.String(), item2.Metadata.Timestamp.String())
 		}
 
 		time.Sleep(200 * time.Millisecond)
@@ -172,6 +172,50 @@ func TestGet(t *testing.T) {
 		if l := len(src.GetCalls); l != 1 {
 			t.Errorf("Expected 1 Get call due to caching og NOTFOUND errors, got %v", l)
 		}
+	})
+
+	t.Run("Hidden items", func(t *testing.T) {
+		t.Cleanup(func() {
+			src.ClearCalls()
+		})
+
+		src.IsHidden = true
+
+		t.Run("Get", func(t *testing.T) {
+			item, err := e.Get("person", "test", "three")
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !item.Metadata.Hidden {
+				t.Fatal("Item was not marked as hidden in metedata")
+			}
+		})
+
+		t.Run("Find", func(t *testing.T) {
+			items, err := e.Find("person", "test")
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !items[0].Metadata.Hidden {
+				t.Fatal("Item was not marked as hidden in metedata")
+			}
+		})
+
+		t.Run("Search", func(t *testing.T) {
+			items, err := e.Search("person", "test", "three")
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !items[0].Metadata.Hidden {
+				t.Fatal("Item was not marked as hidden in metedata")
+			}
+		})
 	})
 }
 

@@ -38,6 +38,7 @@ type TestSource struct {
 	GetCalls       [][]string
 	FindCalls      [][]string
 	SearchCalls    [][]string
+	IsHidden       bool
 	mutex          sync.Mutex
 }
 
@@ -70,6 +71,10 @@ func (s *TestSource) Contexts() []string {
 	}
 
 	return []string{"test"}
+}
+
+func (s *TestSource) Hidden() bool {
+	return s.IsHidden
 }
 
 func (s *TestSource) Get(itemContext string, query string) (*sdp.Item, error) {
