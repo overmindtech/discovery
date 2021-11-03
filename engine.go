@@ -122,6 +122,26 @@ func (e *Engine) Sources() []Source {
 	return sources
 }
 
+// NonHiddenSources Returns a slice of all known sources excliding hidden ones
+func (e *Engine) NonHiddenSources() []Source {
+	allSources := e.Sources()
+	nonHiddenSources := make([]Source, 0)
+
+	// Add all sources unless they are hidden
+	for _, source := range allSources {
+		if hs, ok := source.(HiddenSource); ok {
+			if hs.Hidden() {
+				// If the source is hidden, continue without adding it
+				continue
+			}
+		}
+
+		nonHiddenSources = append(nonHiddenSources, source)
+	}
+
+	return nonHiddenSources
+}
+
 // Connect Connects to NATS
 func (e *Engine) Connect() error {
 	// Try to connect to NATS

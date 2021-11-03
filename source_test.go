@@ -18,6 +18,10 @@ func TestFilterSources(t *testing.T) {
 			ReturnType:     "person",
 		},
 		&TestSource{
+			ReturnContexts: []string{"test"},
+			ReturnType:     "fish",
+		},
+		&TestSource{
 			ReturnContexts: []string{AllContexts},
 			ReturnType:     "person",
 		},
@@ -27,6 +31,11 @@ func TestFilterSources(t *testing.T) {
 				"testB",
 			},
 			ReturnType: "chair",
+		},
+		&TestSource{
+			ReturnContexts: []string{"test"},
+			ReturnType:     "hidden_person",
+			IsHidden:       true,
 		},
 	)
 
@@ -64,9 +73,25 @@ func TestFilterSources(t *testing.T) {
 		}
 	})
 
-	t.Run("Wildcard both", func(t *testing.T) {
-		if x := len(e.FilterSources(WILDCARD, WILDCARD)); x != 3 {
+	t.Run("Wildcard type", func(t *testing.T) {
+		if x := len(e.FilterSources(WILDCARD, "test")); x != 3 {
 			t.Errorf("expected to find 3 sources, found %v", x)
+		}
+	})
+
+	t.Run("Wildcard both", func(t *testing.T) {
+		if x := len(e.FilterSources(WILDCARD, WILDCARD)); x != 4 {
+			t.Errorf("expected to find 4 sources, found %v", x)
+		}
+	})
+
+	t.Run("Finding hidden source with wildcard context", func(t *testing.T) {
+		if x := len(e.FilterSources("hidden_person", WILDCARD)); x != 0 {
+			t.Errorf("expected to find 0 sources, found %v", x)
+		}
+
+		if x := len(e.FilterSources("hidden_person", "test")); x != 1 {
+			t.Errorf("expected to find 1 sources, found %v", x)
 		}
 	})
 }

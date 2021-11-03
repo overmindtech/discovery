@@ -82,7 +82,8 @@ func (e *Engine) FilterSources(typ string, context string) []Source {
 
 	if IsWildcard(typ) {
 		// If the type is a wildcard then check all sources for matching context
-		checkSources = e.Sources()
+		// except hidden ones
+		checkSources = e.NonHiddenSources()
 	} else {
 		checkSources = e.sourceMap[typ]
 	}
@@ -91,9 +92,22 @@ func (e *Engine) FilterSources(typ string, context string) []Source {
 
 	// Get all sources that match the supplied type
 	for _, source := range checkSources {
+		// Calculate if the source is hidden
+		var isHidden bool
+
+		if hs, ok := source.(HiddenSource); ok {
+			isHidden = hs.Hidden()
+		}
+
 		// Filter by matching context
 		for _, sourceContext := range source.Contexts() {
-			if sourceContext == context || IsWildcard(sourceContext) || IsWildcard(context) {
+			// Should should be included if:
+			//
+			// * The source has the same context as requested
+			// * The source supports all contexts (wildcard)
+			// * The request of for a wildcard AND the source isn't hidden
+			//
+			if sourceContext == context || IsWildcard(sourceContext) || (IsWildcard(context) && !isHidden) {
 				sources = append(sources, source)
 				break
 			}
