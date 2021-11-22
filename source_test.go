@@ -129,7 +129,11 @@ func TestGet(t *testing.T) {
 			src.ClearCalls()
 		})
 
-		e.Get("person", "test", "three")
+		e.Get(&sdp.ItemRequest{
+			Type:    "person",
+			Context: "test",
+			Query:   "three",
+		})
 
 		if x := len(src.GetCalls); x != 1 {
 			t.Fatalf("Expected 1 get call, got %v", x)
@@ -154,8 +158,13 @@ func TestGet(t *testing.T) {
 
 		e.cache.StartPurger()
 		e.cache.MinWaitTime = (10 * time.Millisecond)
+		req := sdp.ItemRequest{
+			Type:    "person",
+			Context: "test",
+			Query:   "Dylan",
+		}
 
-		finds1, err = e.Get("person", "test", "Dylan")
+		finds1, err = e.Get(&req)
 
 		if err != nil {
 			t.Error(err)
@@ -163,7 +172,7 @@ func TestGet(t *testing.T) {
 
 		time.Sleep(20 * time.Millisecond)
 
-		item2, err = e.Get("person", "test", "Dylan")
+		item2, err = e.Get(&req)
 
 		if err != nil {
 			t.Error(err)
@@ -175,7 +184,7 @@ func TestGet(t *testing.T) {
 
 		time.Sleep(200 * time.Millisecond)
 
-		item3, err = e.Get("person", "test", "Dylan")
+		item3, err = e.Get(&req)
 
 		if err != nil {
 			t.Error(err)
@@ -191,8 +200,14 @@ func TestGet(t *testing.T) {
 			src.ClearCalls()
 		})
 
-		e.Get("person", "empty", "query")
-		e.Get("person", "empty", "query")
+		req := sdp.ItemRequest{
+			Type:    "person",
+			Context: "empty",
+			Query:   "query",
+		}
+
+		e.Get(&req)
+		e.Get(&req)
 
 		if l := len(src.GetCalls); l != 1 {
 			t.Errorf("Expected 1 Get call due to caching og NOTFOUND errors, got %v", l)
@@ -207,7 +222,11 @@ func TestGet(t *testing.T) {
 		src.IsHidden = true
 
 		t.Run("Get", func(t *testing.T) {
-			item, err := e.Get("person", "test", "three")
+			item, err := e.Get(&sdp.ItemRequest{
+				Type:    "person",
+				Context: "test",
+				Query:   "three",
+			})
 
 			if err != nil {
 				t.Fatal(err)
@@ -219,7 +238,10 @@ func TestGet(t *testing.T) {
 		})
 
 		t.Run("Find", func(t *testing.T) {
-			items, err := e.Find("person", "test")
+			items, err := e.Find(&sdp.ItemRequest{
+				Type:    "person",
+				Context: "test",
+			})
 
 			if err != nil {
 				t.Fatal(err)
@@ -231,7 +253,11 @@ func TestGet(t *testing.T) {
 		})
 
 		t.Run("Search", func(t *testing.T) {
-			items, err := e.Search("person", "test", "three")
+			items, err := e.Search(&sdp.ItemRequest{
+				Type:    "person",
+				Context: "test",
+				Query:   "three",
+			})
 
 			if err != nil {
 				t.Fatal(err)
@@ -253,7 +279,10 @@ func TestFind(t *testing.T) {
 
 	e.AddSources(&src)
 
-	e.Find("person", "test")
+	e.Find(&sdp.ItemRequest{
+		Type:    "person",
+		Context: "test",
+	})
 
 	if x := len(src.FindCalls); x != 1 {
 		t.Fatalf("Expected 1 find call, got %v", x)
@@ -275,7 +304,11 @@ func TestSearch(t *testing.T) {
 
 	e.AddSources(&src)
 
-	e.Search("person", "test", "query")
+	e.Search(&sdp.ItemRequest{
+		Type:    "person",
+		Context: "test",
+		Query:   "query",
+	})
 
 	if x := len(src.SearchCalls); x != 1 {
 		t.Fatalf("Expected 1 Search call, got %v", x)
@@ -314,8 +347,12 @@ func TestFindSearchCaching(t *testing.T) {
 		var finds2 []*sdp.Item
 		var finds3 []*sdp.Item
 		var err error
+		req := sdp.ItemRequest{
+			Type:    "person",
+			Context: "test",
+		}
 
-		finds1, err = e.Find("person", "test")
+		finds1, err = e.Find(&req)
 
 		if err != nil {
 			t.Error(err)
@@ -323,7 +360,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(10 * time.Millisecond)
 
-		finds2, err = e.Find("person", "test")
+		finds2, err = e.Find(&req)
 
 		if err != nil {
 			t.Error(err)
@@ -335,7 +372,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(200 * time.Millisecond)
 
-		finds3, err = e.Find("person", "test")
+		finds3, err = e.Find(&req)
 
 		if err != nil {
 			t.Error(err)
@@ -352,8 +389,12 @@ func TestFindSearchCaching(t *testing.T) {
 		})
 
 		var err error
+		req := sdp.ItemRequest{
+			Type:    "person",
+			Context: "empty",
+		}
 
-		_, err = e.Find("person", "empty")
+		_, err = e.Find(&req)
 
 		if err != nil {
 			t.Error(err)
@@ -361,7 +402,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(10 * time.Millisecond)
 
-		_, err = e.Find("person", "empty")
+		_, err = e.Find(&req)
 
 		if err != nil {
 			t.Error(err)
@@ -373,7 +414,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(200 * time.Millisecond)
 
-		_, err = e.Find("person", "empty")
+		_, err = e.Find(&req)
 
 		if err != nil {
 			t.Error(err)
@@ -393,8 +434,13 @@ func TestFindSearchCaching(t *testing.T) {
 		var finds2 []*sdp.Item
 		var finds3 []*sdp.Item
 		var err error
+		req := sdp.ItemRequest{
+			Type:    "person",
+			Context: "test",
+			Query:   "query",
+		}
 
-		finds1, err = e.Search("person", "test", "query")
+		finds1, err = e.Search(&req)
 
 		if err != nil {
 			t.Error(err)
@@ -402,7 +448,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(10 * time.Millisecond)
 
-		finds2, err = e.Search("person", "test", "query")
+		finds2, err = e.Search(&req)
 
 		if err != nil {
 			t.Error(err)
@@ -414,7 +460,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(200 * time.Millisecond)
 
-		finds3, err = e.Search("person", "test", "query")
+		finds3, err = e.Search(&req)
 
 		if err != nil {
 			t.Error(err)
@@ -431,8 +477,13 @@ func TestFindSearchCaching(t *testing.T) {
 		})
 
 		var err error
+		req := sdp.ItemRequest{
+			Type:    "person",
+			Context: "empty",
+			Query:   "query",
+		}
 
-		_, err = e.Search("person", "empty", "query")
+		_, err = e.Search(&req)
 
 		if err != nil {
 			t.Error(err)
@@ -440,7 +491,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(10 * time.Millisecond)
 
-		_, err = e.Search("person", "empty", "query")
+		_, err = e.Search(&req)
 
 		if err != nil {
 			t.Error(err)
@@ -452,7 +503,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(200 * time.Millisecond)
 
-		_, err = e.Search("person", "empty", "query")
+		_, err = e.Search(&req)
 
 		if err != nil {
 			t.Error(err)
@@ -468,11 +519,48 @@ func TestFindSearchCaching(t *testing.T) {
 			src.ClearCalls()
 		})
 
-		e.Get("person", "error", "query")
-		e.Get("person", "error", "query")
+		req := sdp.ItemRequest{
+			Type:    "person",
+			Context: "error",
+			Query:   "query",
+		}
+
+		e.Get(&req)
+		e.Get(&req)
 
 		if l := len(src.GetCalls); l != 2 {
-			t.Errorf("Exected 2 get calls, got %v, OTHER errors should nto be cached", l)
+			t.Errorf("Exected 2 get calls, got %v, OTHER errors should not be cached", l)
+		}
+	})
+
+	t.Run("non-caching when ignoreCache is specified", func(t *testing.T) {
+		t.Cleanup(func() {
+			src.ClearCalls()
+		})
+
+		req := sdp.ItemRequest{
+			Type:    "person",
+			Context: "error",
+			Query:   "query",
+		}
+
+		e.Get(&req)
+		e.Get(&req)
+		e.Find(&req)
+		e.Find(&req)
+		e.Search(&req)
+		e.Search(&req)
+
+		if l := len(src.GetCalls); l != 2 {
+			t.Errorf("Exected 2 get calls, got %v", l)
+		}
+
+		if l := len(src.FindCalls); l != 2 {
+			t.Errorf("Exected 2 Find calls, got %v", l)
+		}
+
+		if l := len(src.SearchCalls); l != 2 {
+			t.Errorf("Exected 2 Search calls, got %v", l)
 		}
 	})
 
