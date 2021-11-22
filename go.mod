@@ -6,7 +6,7 @@ go 1.17
 require (
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats.go v1.13.1-0.20211018182449-f2416a8b1483
-	github.com/overmindtech/sdp-go v0.3.0
+	github.com/overmindtech/sdp-go v0.3.1
 	github.com/overmindtech/sdpcache v0.1.4
 	github.com/sirupsen/logrus v1.8.1
 	google.golang.org/protobuf v1.27.1

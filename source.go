@@ -12,9 +12,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// TODO: Update SDP then replace this with sdp.WILDCARD
-const AllContexts = "*"
-
 // Source is capable of finding information about items
 type Source interface {
 	// Type The type of items that this source is capable of finding
@@ -24,7 +21,7 @@ type Source interface {
 	Name() string
 
 	// List of contexts that this source is capable of find items for. If the
-	// source supports all contexts the special value `AllContexts` ("*")
+	// source supports all contexts the special value "*"
 	// should be used
 	Contexts() []string
 

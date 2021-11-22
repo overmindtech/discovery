@@ -176,7 +176,7 @@ func TestNewItemRequestHandler(t *testing.T) {
 		})
 
 		req := sdp.ItemRequest{
-			Type:      WILDCARD,
+			Type:      sdp.WILDCARD,
 			Method:    sdp.RequestMethod_GET,
 			Query:     "Dylan",
 			Context:   "test1",
@@ -208,7 +208,7 @@ func TestNewItemRequestHandler(t *testing.T) {
 			Type:      "person",
 			Method:    sdp.RequestMethod_GET,
 			Query:     "Dylan1",
-			Context:   WILDCARD,
+			Context:   sdp.WILDCARD,
 			LinkDepth: 0,
 		}
 

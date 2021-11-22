@@ -264,7 +264,7 @@ func (e *Engine) Start() error {
 		for _, itemContext := range src.Contexts() {
 			var subject string
 
-			if itemContext == AllContexts {
+			if itemContext == sdp.WILDCARD {
 				subject = "request.context.>"
 			} else {
 				subject = fmt.Sprintf("request.context.%v", itemContext)
@@ -327,12 +327,9 @@ func (e *Engine) IsNATSConnected() bool {
 	return false
 }
 
-// WILDCARD Used for requests that are relevant to many contexts or types
-const WILDCARD = "*"
-
 // IsWildcard checks if a string is the wildcard. Use this instead of
 // implementing the wildcard check everwhere so that if we need to change the
 // woldcard at a later date we can do so here
 func IsWildcard(s string) bool {
-	return s == WILDCARD
+	return s == sdp.WILDCARD
 }
