@@ -229,4 +229,18 @@ func TestExecute(t *testing.T) {
 		}
 	})
 
+	t.Run("With no requests", func(t *testing.T) {
+		t.Parallel()
+
+		rt := RequestTracker{
+			Engine: &engine,
+		}
+
+		_, err := rt.Execute()
+
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
 }

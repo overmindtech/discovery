@@ -187,6 +187,10 @@ func (r *RequestTracker) stopLinking() {
 }
 
 func (r *RequestTracker) Execute() ([]*sdp.Item, error) {
+	if len(r.Requests) == 0 {
+		return nil, nil
+	}
+
 	var errors []error
 	var errorsMutex sync.Mutex
 	var requestsWait sync.WaitGroup
