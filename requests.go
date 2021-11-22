@@ -9,20 +9,9 @@ import (
 // request. This includes responses, linking etc.
 func (e *Engine) NewItemRequestHandler(sources []Source) func(req *sdp.ItemRequest) {
 	return func(itemRequest *sdp.ItemRequest) {
-		if !IsWildcard(itemRequest.GetType()) {
-			// Check that we actually have a source for that type
-			hasType := false
-
-			for _, source := range sources {
-				if source.Type() == itemRequest.GetType() {
-					hasType = true
-				}
-			}
-
-			if !hasType {
-				// If we don't have a relevant type, just exit
-				return
-			}
+		if len(e.FilterSources(itemRequest.Type, itemRequest.Context)) == 0 {
+			// If we don't have any relevant sources, exit
+			return
 		}
 
 		// Respond saying we've got it
