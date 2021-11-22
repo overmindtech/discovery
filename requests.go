@@ -104,12 +104,12 @@ func (e *Engine) ExecuteRequest(req *sdp.ItemRequest) ([]*sdp.Item, error) {
 	// Make the request of all sources
 	switch req.GetMethod() {
 	case sdp.RequestMethod_GET:
-		requestItem, requestError = e.Get(req.GetType(), req.GetContext(), req.GetQuery())
+		requestItem, requestError = e.Get(req)
 		requestItems = append(requestItems, requestItem)
 	case sdp.RequestMethod_FIND:
-		requestItems, requestError = e.Find(req.GetType(), req.GetContext())
+		requestItems, requestError = e.Find(req)
 	case sdp.RequestMethod_SEARCH:
-		requestItems, requestError = e.Search(req.GetType(), req.GetContext(), req.GetQuery())
+		requestItems, requestError = e.Search(req)
 	}
 
 	// If there was an error in the request then simply return

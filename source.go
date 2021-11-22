@@ -12,10 +12,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// TODO: Implement GetFindMutex
-
-const AllContexts = "*"
-
 // Source is capable of finding information about items
 type Source interface {
 	// Type The type of items that this source is capable of finding
@@ -25,7 +21,7 @@ type Source interface {
 	Name() string
 
 	// List of contexts that this source is capable of find items for. If the
-	// source supports all contexts the special value `AllContexts` ("*")
+	// source supports all contexts the special value "*"
 	// should be used
 	Contexts() []string
 
@@ -119,63 +115,65 @@ func (e *Engine) FilterSources(typ string, context string) []Source {
 
 // Get Runs a get query against known sources in priority order. If nothing was
 // found, returns the first error
-func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error) {
-	relevantSources := e.FilterSources(typ, context)
+func (e *Engine) Get(r *sdp.ItemRequest) (*sdp.Item, error) {
+	relevantSources := e.FilterSources(r.Type, r.Context)
 
 	if len(relevantSources) == 0 {
 		return nil, &sdp.ItemRequestError{
 			ErrorType:   sdp.ItemRequestError_NOCONTEXT,
-			ErrorString: fmt.Sprintf("no sources found for type %v and context %v", typ, context),
-			Context:     context,
+			ErrorString: fmt.Sprintf("no sources found for type %v and context %v", r.Type, r.Context),
+			Context:     r.Context,
 		}
 	}
 
-	e.gfm.GetLock(context, typ)
+	e.gfm.GetLock(r.Context, r.Type)
 
 	for _, src := range relevantSources {
 		tags := sdpcache.Tags{
 			"sourceName":           src.Name(),
-			"uniqueAttributeValue": query,
-			"type":                 typ,
-			"context":              context,
+			"uniqueAttributeValue": r.Query,
+			"type":                 r.Type,
+			"context":              r.Context,
 		}
 
 		logFields := log.Fields{
 			"sourceName":   src.Name(),
 			"sourceWeight": src.Weight(),
-			"type":         typ,
-			"context":      context,
-			"query":        query,
+			"type":         r.Type,
+			"context":      r.Context,
+			"query":        r.Query,
 		}
 
-		cached, cacheErr := e.cache.Search(tags)
+		if !r.IgnoreCache {
+			cached, cacheErr := e.cache.Search(tags)
 
-		switch err := cacheErr.(type) {
-		case sdpcache.CacheNotFoundError:
-			// If the item/error wasn't found in the cache then just continue on
-		case *sdp.ItemRequestError:
-			if err.ErrorType == sdp.ItemRequestError_NOTFOUND {
-				// If the item wasn't found, but we've already looked then don't look
-				// again and just return a blank result
-				log.WithFields(logFields).Debug("Was not found previously, skipping")
+			switch err := cacheErr.(type) {
+			case sdpcache.CacheNotFoundError:
+				// If the item/error wasn't found in the cache then just continue on
+			case *sdp.ItemRequestError:
+				if err.ErrorType == sdp.ItemRequestError_NOTFOUND {
+					// If the item wasn't found, but we've already looked then don't look
+					// again and just return a blank result
+					log.WithFields(logFields).Debug("Was not found previously, skipping")
 
-				continue
+					continue
+				}
+			case nil:
+				if len(cached) == 1 {
+					// If the cache found something then just return that
+					log.WithFields(logFields).Debug("Found item from cache")
+
+					e.gfm.GetUnlock(r.Context, r.Type)
+
+					return cached[0], nil
+				}
+
+				// If we got a weird number of stuff from the cache then
+				// something is wrong
+				log.WithFields(logFields).Error("Cache returned >1 value, purging and continuing")
+
+				e.cache.Delete(tags)
 			}
-		case nil:
-			if len(cached) == 1 {
-				// If the cache found something then just return that
-				log.WithFields(logFields).Debug("Found item from cache")
-
-				e.gfm.GetUnlock(context, typ)
-
-				return cached[0], nil
-			}
-
-			// If we got a weird number of stuff from the cache then
-			// something is wrong
-			log.WithFields(logFields).Error("Cache returned >1 value, purging and continuing")
-
-			e.cache.Delete(tags)
 		}
 
 		e.throttle.Lock()
@@ -186,7 +184,7 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 		var err error
 
 		getDuration = timeOperation(func() {
-			item, err = src.Get(context, query)
+			item, err = src.Get(r.Context, r.Query)
 		})
 
 		e.throttle.Unlock()
@@ -236,12 +234,12 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 			// Store the new item in the cache
 			e.cache.StoreItem(item, GetCacheDuration(src), tags)
 
-			e.gfm.GetUnlock(context, typ)
+			e.gfm.GetUnlock(r.Context, r.Type)
 
 			return item, nil
 		}
 
-		e.gfm.GetUnlock(context, typ)
+		e.gfm.GetUnlock(r.Context, r.Type)
 	}
 
 	// If we don't find anything then we should raise an error
@@ -254,22 +252,22 @@ func (e *Engine) Get(typ string, context string, query string) (*sdp.Item, error
 // Find executes Find() on all sources for a given type, returning the merged
 // results. Only returns an error if all sources fail, in which case returns the
 // first error
-func (e *Engine) Find(typ string, context string) ([]*sdp.Item, error) {
+func (e *Engine) Find(r *sdp.ItemRequest) ([]*sdp.Item, error) {
 	var storageMutex sync.Mutex
 	var workingSources sync.WaitGroup
 
-	relevantSources := e.FilterSources(typ, context)
+	relevantSources := e.FilterSources(r.Type, r.Context)
 
 	if len(relevantSources) == 0 {
 		return nil, &sdp.ItemRequestError{
 			ErrorType:   sdp.ItemRequestError_NOCONTEXT,
-			ErrorString: fmt.Sprintf("no sources found for type %v and context %v", typ, context),
-			Context:     context,
+			ErrorString: fmt.Sprintf("no sources found for type %v and context %v", r.Type, r.Context),
+			Context:     r.Context,
 		}
 	}
 
-	e.gfm.FindLock(context, typ)
-	defer e.gfm.FindUnlock(context, typ)
+	e.gfm.FindLock(r.Context, r.Type)
+	defer e.gfm.FindUnlock(r.Context, r.Type)
 
 	items := make([]*sdp.Item, 0)
 	errors := make([]error, 0)
@@ -282,40 +280,42 @@ func (e *Engine) Find(typ string, context string) ([]*sdp.Item, error) {
 			tags := sdpcache.Tags{
 				"method":     "find",
 				"sourceName": source.Name(),
-				"context":    context,
+				"context":    r.Context,
 			}
 
 			logFields := log.Fields{
 				"sourceName": source.Name(),
-				"type":       typ,
-				"context":    context,
+				"type":       r.Type,
+				"context":    r.Context,
 			}
 
-			cachedItems, err := e.cache.Search(tags)
+			if !r.IgnoreCache {
+				cachedItems, err := e.cache.Search(tags)
 
-			switch err := err.(type) {
-			case sdpcache.CacheNotFoundError:
-				// If the item/error wasn't found in the cache then just
-				// continue on
-			case *sdp.ItemRequestError:
-				if err.ErrorType == sdp.ItemRequestError_NOTFOUND {
-					log.WithFields(logFields).Debug("Found cached empty FIND, not executing")
+				switch err := err.(type) {
+				case sdpcache.CacheNotFoundError:
+					// If the item/error wasn't found in the cache then just
+					// continue on
+				case *sdp.ItemRequestError:
+					if err.ErrorType == sdp.ItemRequestError_NOTFOUND {
+						log.WithFields(logFields).Debug("Found cached empty FIND, not executing")
 
-					return
-				}
-			default:
-				// If we get a result from the cache then return that
-				if len(cachedItems) > 0 {
-					logFields["items"] = len(cachedItems)
+						return
+					}
+				default:
+					// If we get a result from the cache then return that
+					if len(cachedItems) > 0 {
+						logFields["items"] = len(cachedItems)
 
-					log.WithFields(logFields).Debug("Found items from cache")
+						log.WithFields(logFields).Debug("Found items from cache")
 
-					storageMutex.Lock()
-					items = append(items, cachedItems...)
-					errors = append(errors, err)
-					storageMutex.Unlock()
+						storageMutex.Lock()
+						items = append(items, cachedItems...)
+						errors = append(errors, err)
+						storageMutex.Unlock()
 
-					return
+						return
+					}
 				}
 			}
 
@@ -323,10 +323,10 @@ func (e *Engine) Find(typ string, context string) ([]*sdp.Item, error) {
 			log.WithFields(logFields).Debug("Executing find")
 
 			finds := make([]*sdp.Item, 0)
-			err = nil
+			var err error
 
 			findDuration := timeOperation(func() {
-				finds, err = source.Find(context)
+				finds, err = source.Find(r.Context)
 			})
 
 			e.throttle.Unlock()
@@ -408,11 +408,11 @@ func (e *Engine) Find(typ string, context string) ([]*sdp.Item, error) {
 // Search executes Search() on all sources for a given type, returning the merged
 // results. Only returns an error if all sources fail, in which case returns the
 // first error
-func (e *Engine) Search(typ string, context string, query string) ([]*sdp.Item, error) {
+func (e *Engine) Search(r *sdp.ItemRequest) ([]*sdp.Item, error) {
 	var storageMutex sync.Mutex
 	var workingSources sync.WaitGroup
 
-	relevantSources := e.FilterSources(typ, context)
+	relevantSources := e.FilterSources(r.Type, r.Context)
 	searchableSources := make([]SearchableSource, 0)
 
 	// Filter further by searchability
@@ -425,13 +425,13 @@ func (e *Engine) Search(typ string, context string, query string) ([]*sdp.Item, 
 	if len(searchableSources) == 0 {
 		return nil, &sdp.ItemRequestError{
 			ErrorType:   sdp.ItemRequestError_NOCONTEXT,
-			ErrorString: fmt.Sprintf("no sources found for type %v and context %v that support searching", typ, context),
-			Context:     context,
+			ErrorString: fmt.Sprintf("no sources found for type %v and context %v that support searching", r.Type, r.Context),
+			Context:     r.Context,
 		}
 	}
 
-	e.gfm.GetLock(context, typ)
-	defer e.gfm.GetUnlock(context, typ)
+	e.gfm.GetLock(r.Context, r.Type)
+	defer e.gfm.GetUnlock(r.Context, r.Type)
 
 	items := make([]*sdp.Item, 0)
 	errors := make([]error, 0)
@@ -444,41 +444,43 @@ func (e *Engine) Search(typ string, context string, query string) ([]*sdp.Item, 
 			tags := sdpcache.Tags{
 				"method":     "find",
 				"sourceName": source.Name(),
-				"query":      query,
-				"context":    context,
+				"query":      r.Query,
+				"context":    r.Context,
 			}
 
 			logFields := log.Fields{
 				"sourceName": source.Name(),
-				"type":       typ,
-				"context":    context,
+				"type":       r.Type,
+				"context":    r.Context,
 			}
 
-			cachedItems, err := e.cache.Search(tags)
+			if !r.IgnoreCache {
+				cachedItems, err := e.cache.Search(tags)
 
-			switch err := err.(type) {
-			case sdpcache.CacheNotFoundError:
-				// If the item/error wasn't found in the cache then just
-				// continue on
-			case *sdp.ItemRequestError:
-				if err.ErrorType == sdp.ItemRequestError_NOTFOUND {
-					log.WithFields(logFields).Debug("Found cached empty result, not executing")
+				switch err := err.(type) {
+				case sdpcache.CacheNotFoundError:
+					// If the item/error wasn't found in the cache then just
+					// continue on
+				case *sdp.ItemRequestError:
+					if err.ErrorType == sdp.ItemRequestError_NOTFOUND {
+						log.WithFields(logFields).Debug("Found cached empty result, not executing")
 
-					return
-				}
-			default:
-				// If we get a result from the cache then return that
-				if len(cachedItems) > 0 {
-					logFields["items"] = len(cachedItems)
+						return
+					}
+				default:
+					// If we get a result from the cache then return that
+					if len(cachedItems) > 0 {
+						logFields["items"] = len(cachedItems)
 
-					log.WithFields(logFields).Debug("Found items from cache")
+						log.WithFields(logFields).Debug("Found items from cache")
 
-					storageMutex.Lock()
-					items = append(items, cachedItems...)
-					errors = append(errors, err)
-					storageMutex.Unlock()
+						storageMutex.Lock()
+						items = append(items, cachedItems...)
+						errors = append(errors, err)
+						storageMutex.Unlock()
 
-					return
+						return
+					}
 				}
 			}
 
@@ -486,10 +488,10 @@ func (e *Engine) Search(typ string, context string, query string) ([]*sdp.Item, 
 			log.WithFields(logFields).Debug("Executing search")
 
 			var searchItems []*sdp.Item
-			err = nil
+			var err error
 
 			searchDuration := timeOperation(func() {
-				searchItems, err = source.Search(context, query)
+				searchItems, err = source.Search(r.Context, r.Query)
 			})
 
 			e.throttle.Unlock()
