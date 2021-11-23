@@ -1,6 +1,8 @@
 package discovery
 
 import (
+	"context"
+
 	"github.com/overmindtech/sdp-go"
 	log "github.com/sirupsen/logrus"
 )
@@ -41,8 +43,8 @@ func (e *Engine) NewItemRequestHandler(sources []Source) func(req *sdp.ItemReque
 		}).Info("Received request")
 
 		requestTracker := RequestTracker{
-			Requests: e.expandRequest(itemRequest), // Expand type wildcard if required
-			Engine:   e,
+			Request: itemRequest,
+			Engine:  e,
 		}
 
 		_, err := requestTracker.Execute()
@@ -93,7 +95,11 @@ func (e *Engine) NewItemRequestHandler(sources []Source) func(req *sdp.ItemReque
 
 // ExecuteRequest Executes a single request and returns the results without any
 // linking
-func (e *Engine) ExecuteRequest(req *sdp.ItemRequest) ([]*sdp.Item, error) {
+func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest) ([]*sdp.Item, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
 	var requestItem *sdp.Item
 	var requestError error
 
@@ -104,12 +110,12 @@ func (e *Engine) ExecuteRequest(req *sdp.ItemRequest) ([]*sdp.Item, error) {
 	// Make the request of all sources
 	switch req.GetMethod() {
 	case sdp.RequestMethod_GET:
-		requestItem, requestError = e.Get(req)
+		requestItem, requestError = e.Get(ctx, req)
 		requestItems = append(requestItems, requestItem)
 	case sdp.RequestMethod_FIND:
-		requestItems, requestError = e.Find(req)
+		requestItems, requestError = e.Find(ctx, req)
 	case sdp.RequestMethod_SEARCH:
-		requestItems, requestError = e.Search(req)
+		requestItems, requestError = e.Search(ctx, req)
 	}
 
 	// If there was an error in the request then simply return
@@ -125,9 +131,12 @@ func (e *Engine) ExecuteRequest(req *sdp.ItemRequest) ([]*sdp.Item, error) {
 		// won't be executing them
 		if req.GetLinkDepth() > 0 {
 			for _, lir := range i.LinkedItemRequests {
-				lir.LinkDepth = req.GetLinkDepth() - 1
-				lir.ItemSubject = req.GetItemSubject()
-				lir.ResponseSubject = req.GetResponseSubject()
+				lir.LinkDepth = req.LinkDepth - 1
+				lir.ItemSubject = req.ItemSubject
+				lir.ResponseSubject = req.ResponseSubject
+				lir.IgnoreCache = req.IgnoreCache
+				lir.Timeout = req.Timeout
+				lir.UUID = req.UUID
 			}
 		}
 
@@ -140,7 +149,7 @@ func (e *Engine) ExecuteRequest(req *sdp.ItemRequest) ([]*sdp.Item, error) {
 	return requestItems, requestError
 }
 
-// expandRequest Expands requests with wildcards to no longer contain wildcards.
+// ExpandRequest Expands requests with wildcards to no longer contain wildcards.
 // Meaning that if we support 5 types, and a request comes in with a wildcard
 // type, this function will expand that request into 5 requests, one for each
 // type.
@@ -150,7 +159,7 @@ func (e *Engine) ExecuteRequest(req *sdp.ItemRequest) ([]*sdp.Item, error) {
 // exception to this is if we have a source that supports all contexts, but is
 // unable to list them. In this case there will still be some requests with
 // wildcard contexts as they can't be expanded
-func (e *Engine) expandRequest(request *sdp.ItemRequest) []*sdp.ItemRequest {
+func (e *Engine) ExpandRequest(request *sdp.ItemRequest) []*sdp.ItemRequest {
 	// Filter to just sources that are capable of responding
 	relevantSources := e.FilterSources(request.Type, request.Context)
 

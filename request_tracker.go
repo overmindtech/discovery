@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -15,7 +16,7 @@ import (
 // that result from linking
 type RequestTracker struct {
 	// The list of requests to track
-	Requests []*sdp.ItemRequest
+	Request *sdp.ItemRequest
 
 	// The engine that this is connected to, used for sending NATS messages
 	Engine *Engine
@@ -75,53 +76,62 @@ func (r *RequestTracker) registerLinkedItem(i *sdp.Item) error {
 // relevant NATS subject. Linking can be started and stopped using
 // `startLinking()` and `stopLinking()`
 func (r *RequestTracker) queueUnlinkedItem(i *sdp.Item) {
-	r.unlinkedItemsWG.Add(1)
-	r.unlinkedItems <- i
+	if i != nil {
+		r.unlinkedItemsWG.Add(1)
+		r.unlinkedItems <- i
+	}
 }
 
 // startLinking Starts linking items that have been added to the queue using
 // `queueUnlinkedItem()`. Once an item is fully linked it will be published ot
 // NATS
-func (r *RequestTracker) startLinking() {
+func (r *RequestTracker) startLinking(ctx context.Context) {
 	// Link items
 	go func() {
-		for unlinkedItem := range r.unlinkedItems {
-			go func(i *sdp.Item) {
-				defer r.unlinkedItemsWG.Done()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case unlinkedItem := <-r.unlinkedItems:
+				if unlinkedItem != nil {
+					go func(i *sdp.Item) {
+						defer r.unlinkedItemsWG.Done()
 
-				// Register the item with the handler to ensure that we aren't being called
-				// in a recursive manner. If this fails it means the item has already been
-				// found and we should stop doing what we're doing in order to avoid
-				// duplicates
-				//
-				// Note that we are only storing pointers to the items so we can still edit
-				// them in other goroutines as long as we are locking appropriately to avoid
-				// race conditions
-				if err := r.registerLinkedItem(i); err != nil {
-					// If the item is already registered that's okay. We just don't want
-					// to continue
-					return
+						// Register the item with the handler to ensure that we aren't being called
+						// in a recursive manner. If this fails it means the item has already been
+						// found and we should stop doing what we're doing in order to avoid
+						// duplicates
+						//
+						// Note that we are only storing pointers to the items so we can still edit
+						// them in other goroutines as long as we are locking appropriately to avoid
+						// race conditions
+						if err := r.registerLinkedItem(i); err != nil {
+							// If the item is already registered that's okay. We just don't want
+							// to continue
+							return
+						}
+
+						if i.GetMetadata().GetSourceRequest().GetLinkDepth() > 0 {
+							// Resolve links
+							r.linkItem(ctx, i)
+						}
+
+						// Send the fully linked item back onto the network
+						if r.Engine.IsNATSConnected() {
+							// Respond with the Item
+							err := r.Engine.natsConnection.Publish(i.Metadata.SourceRequest.ItemSubject, i)
+
+							if err != nil {
+								// TODO: I probably shouldn't be logging directly here but I
+								// don't want the error to be lost
+								log.WithFields(log.Fields{
+									"error": err,
+								}).Error("Response publishing error")
+							}
+						}
+					}(unlinkedItem)
 				}
-
-				if i.GetMetadata().GetSourceRequest().GetLinkDepth() > 0 {
-					// Resolve links
-					r.linkItem(i)
-				}
-
-				// Send the fully linked item back onto the network
-				if r.Engine.IsNATSConnected() {
-					// Respond with the Item
-					err := r.Engine.natsConnection.Publish(i.Metadata.SourceRequest.ItemSubject, i)
-
-					if err != nil {
-						// TODO: I probably shouldn't be logging directly here but I
-						// don't want the error to be lost
-						log.WithFields(log.Fields{
-							"error": err,
-						}).Error("Response publishing error")
-					}
-				}
-			}(unlinkedItem)
+			}
 		}
 	}()
 }
@@ -129,7 +139,11 @@ func (r *RequestTracker) startLinking() {
 // linkItem should run all linkedItemRequests that it can and modify the passed
 // item with the results. Removing any linked item requests that were able to
 // execute
-func (r *RequestTracker) linkItem(parent *sdp.Item) {
+func (r *RequestTracker) linkItem(ctx context.Context, parent *sdp.Item) {
+	if ctx.Err() != nil {
+		return
+	}
+
 	var lirWG sync.WaitGroup
 	var itemMutex sync.RWMutex
 
@@ -142,7 +156,7 @@ func (r *RequestTracker) linkItem(parent *sdp.Item) {
 		go func(p *sdp.Item, req *sdp.ItemRequest) {
 			defer lirWG.Done()
 
-			linkedItems, err := r.Engine.ExecuteRequest(req)
+			linkedItems, err := r.Engine.ExecuteRequest(ctx, req)
 
 			if err == nil {
 				itemMutex.Lock()
@@ -163,8 +177,8 @@ func (r *RequestTracker) linkItem(parent *sdp.Item) {
 				itemMutex.Unlock()
 			} else {
 				if sdpErr, ok := err.(*sdp.ItemRequestError); ok {
-					if sdpErr.GetErrorType() == sdp.ItemRequestError_NOCONTEXT {
-						// If there was no context, leave it for the remote linker
+					if sdpErr.ErrorType == sdp.ItemRequestError_NOCONTEXT || sdpErr.ErrorType == sdp.ItemRequestError_TIMEOUT {
+						// If there was no context or it timed out, leave it for the remote linker
 						return
 					}
 				}
@@ -187,30 +201,38 @@ func (r *RequestTracker) stopLinking() {
 }
 
 func (r *RequestTracker) Execute() ([]*sdp.Item, error) {
-	if len(r.Requests) == 0 {
-		return nil, nil
-	}
-
 	var errors []error
 	var errorsMutex sync.Mutex
 	var requestsWait sync.WaitGroup
+	var expandedRequests []*sdp.ItemRequest
 
 	if r.unlinkedItems == nil {
 		r.unlinkedItems = make(chan *sdp.Item)
 	}
 
-	// Populate the waitgroup with the initial number of requests
-	requestsWait.Add(len(r.Requests))
+	if r.Request == nil {
+		return nil, nil
+	}
 
-	r.startLinking()
+	// Expand wildcards based on what the engine can provide
+	expandedRequests = r.Engine.ExpandRequest(r.Request)
+
+	// Create context to enforce timeouts
+	ctx, cancel := r.Request.TimeoutContext()
+	defer cancel()
+
+	// Populate the waitgroup with the initial number of requests
+	requestsWait.Add(len(expandedRequests))
+
+	r.startLinking(ctx)
 
 	// Process requests
-	for _, request := range r.Requests {
+	for _, request := range expandedRequests {
 		go func(req *sdp.ItemRequest) {
 			defer requestsWait.Done()
 
 			// Run the request
-			items, err := r.Engine.ExecuteRequest(req)
+			items, err := r.Engine.ExecuteRequest(ctx, req)
 
 			// If it worked, put the items in the unlinked queue for linking
 			if err == nil {
@@ -232,11 +254,11 @@ func (r *RequestTracker) Execute() ([]*sdp.Item, error) {
 	r.stopLinking()
 
 	// If everything has failed then just stop here
-	if len(errors) == len(r.Requests) {
+	if len(errors) == len(expandedRequests) {
 		return nil, errors[0]
 	}
 
-	return r.LinkedItems(), nil
+	return r.LinkedItems(), ctx.Err()
 }
 
 // deleteItemRequest Deletes an item request from a slice
