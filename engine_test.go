@@ -9,13 +9,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/nats-io/nats.go"
 	"github.com/overmindtech/sdp-go"
 )
 
 const NatsHost = "nats"
 const NatsPort = "4222"
-
-type TestBackend struct{}
 
 func TestDeleteItemRequest(t *testing.T) {
 	one := &sdp.ItemRequest{
@@ -177,6 +176,166 @@ func TestNats(t *testing.T) {
 		}
 
 		err = e.Start()
+
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	t.Run("Handling a basic request", func(t *testing.T) {
+		t.Cleanup(func() {
+			src.ClearCalls()
+		})
+
+		conn := e.natsConnection
+
+		req := sdp.ItemRequest{
+			Type:            "person",
+			Method:          sdp.RequestMethod_GET,
+			Query:           "dylan",
+			LinkDepth:       0,
+			Context:         "test",
+			ResponseSubject: nats.NewInbox(),
+		}
+
+		progress := sdp.NewRequestProgress()
+
+		conn.Subscribe(req.ResponseSubject, progress.ProcessResponse)
+
+		err := conn.Publish("request.all", &req)
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		<-progress.Done()
+
+		if len(src.GetCalls) != 1 {
+			t.Errorf("expected 1 get call, got %v: %v", len(src.GetCalls), src.GetCalls)
+		}
+	})
+
+	t.Run("Handling a deeply linking request", func(t *testing.T) {
+		t.Cleanup(func() {
+			src.ClearCalls()
+		})
+
+		conn := e.natsConnection
+
+		req := sdp.ItemRequest{
+			Type:            "person",
+			Method:          sdp.RequestMethod_GET,
+			Query:           "dylan",
+			LinkDepth:       10,
+			Context:         "test",
+			ResponseSubject: nats.NewInbox(),
+		}
+
+		progress := sdp.NewRequestProgress()
+
+		conn.Subscribe(req.ResponseSubject, progress.ProcessResponse)
+
+		err := conn.Publish("request.all", &req)
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		<-progress.Done()
+
+		if len(src.GetCalls) != 10 {
+			t.Errorf("expected 10 get calls, got %v: %v", len(src.GetCalls), src.GetCalls)
+		}
+	})
+
+	t.Run("stopping", func(t *testing.T) {
+		err := e.Stop()
+
+		if err != nil {
+			t.Error(err)
+		}
+	})
+}
+
+func TestNatsCancel(t *testing.T) {
+	SkipWithoutNats(t)
+
+	e := Engine{
+		Name: "nats-test",
+		NATSOptions: &NATSOptions{
+			URLs: []string{
+				"nats://nats:4222",
+			},
+			ConnectionName: "test-connection",
+			ConnectTimeout: time.Second,
+			NumRetries:     5,
+			QueueName:      "test",
+		},
+		MaxParallelExecutions: 1,
+	}
+
+	src := SpeedTestSource{
+		QueryDelay:     250 * time.Millisecond,
+		ReturnType:     "person",
+		ReturnContexts: []string{"test"},
+	}
+
+	e.AddSources(&src)
+
+	t.Run("Starting", func(t *testing.T) {
+		err := e.Connect()
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		err = e.Start()
+
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	t.Run("Cancelling requests", func(t *testing.T) {
+		conn := e.natsConnection
+		u := uuid.New()
+
+		req := sdp.ItemRequest{
+			Type:            "person",
+			Method:          sdp.RequestMethod_GET,
+			Query:           "foo",
+			LinkDepth:       100,
+			Context:         "test",
+			ResponseSubject: nats.NewInbox(),
+			ItemSubject:     "items.bin",
+			UUID:            u[:],
+		}
+
+		progress := sdp.NewRequestProgress()
+
+		conn.Subscribe(req.ResponseSubject, progress.ProcessResponse)
+
+		err := conn.Publish("request.all", &req)
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		time.Sleep(1 * time.Second)
+
+		conn.Publish("cancel.all", &sdp.CancelItemRequest{
+			UUID: u[:],
+		})
+
+		<-progress.Done()
+
+		if progress.NumCancelled() != 1 {
+			t.Errorf("Expected query to be cancelled, got\n%v", progress.String())
+		}
+	})
+
+	t.Run("stopping", func(t *testing.T) {
+		err := e.Stop()
 
 		if err != nil {
 			t.Error(err)

@@ -47,7 +47,7 @@ func (e *Engine) ItemRequestHandler(itemRequest *sdp.ItemRequest) {
 		Engine:  e,
 	}
 
-	if u, err := uuid.FromBytes(itemRequest.UUID); err != nil {
+	if u, err := uuid.FromBytes(itemRequest.UUID); err == nil {
 		e.TrackRequest(u, &requestTracker)
 	}
 
@@ -58,13 +58,18 @@ func (e *Engine) ItemRequestHandler(itemRequest *sdp.ItemRequest) {
 		if ire, ok := err.(*sdp.ItemRequestError); ok {
 			responder.Error(ire)
 		} else {
-			ire = &sdp.ItemRequestError{
-				ErrorType:   sdp.ItemRequestError_OTHER,
-				ErrorString: err.Error(),
-				Context:     itemRequest.Context,
-			}
+			switch err {
+			case context.Canceled:
+				responder.Cancel()
+			default:
+				ire = &sdp.ItemRequestError{
+					ErrorType:   sdp.ItemRequestError_OTHER,
+					ErrorString: err.Error(),
+					Context:     itemRequest.Context,
+				}
 
-			responder.Error(ire)
+				responder.Error(ire)
+			}
 		}
 
 		logEntry := log.WithFields(log.Fields{
