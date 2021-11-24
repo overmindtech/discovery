@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -13,6 +14,13 @@ import (
 )
 
 // Source is capable of finding information about items
+//
+// Sources must implement all of the methods to satisfy this interface in order
+// to be able to used as an SDP source. Note that the `context.Context` value
+// that is passed to the Get(), Find() and Search() (optional) methods needs to
+// handled by each source individually. Source authors should make an effort
+// ensure that expensive operations that the source undertakes can be cancelled
+// if the context `ctx` is cancelled
 type Source interface {
 	// Type The type of items that this source is capable of finding
 	Type() string
@@ -26,11 +34,21 @@ type Source interface {
 	Contexts() []string
 
 	// Get Get a single item with a given context and query. The item returned
-	// should have a UniqueAttributeValue that matches the `query` parameter
-	Get(itemContext string, query string) (*sdp.Item, error)
+	// should have a UniqueAttributeValue that matches the `query` parameter.
+	//
+	// Note that the itemContext parameter represents the context of the item
+	// from the perspective of State Description Protocol (SDP), whereas the
+	// `context.Context` value is a golang context which is used for
+	// cancellations and timeouts
+	Get(ctx context.Context, itemContext string, query string) (*sdp.Item, error)
 
 	// Find Finds all items in a given context
-	Find(itemContext string) ([]*sdp.Item, error)
+	//
+	// Note that the itemContext parameter represents the context of the item
+	// from the perspective of State Description Protocol (SDP), whereas the
+	// `context.Context` value is a golang context which is used for
+	// cancellations and timeouts
+	Find(ctx context.Context, itemContext string) ([]*sdp.Item, error)
 
 	// Weight Returns the priority weighting of items returned by this source.
 	// This is used to resolve conflicts where two sources of the same type
@@ -42,7 +60,16 @@ type Source interface {
 // SearchableItemSource Is a source of items that supports searching
 type SearchableSource interface {
 	Source
-	Search(itemContext string, query string) ([]*sdp.Item, error)
+	// Search executes a specific search and returns zero or many items as a
+	// result (and optionally an error). The specific format of the query that
+	// needs to be provided to Search is dependant on the source itself as each
+	// source will respond to searches differently
+	//
+	// Note that the itemContext parameter represents the context of the item
+	// from the perspective of State Description Protocol (SDP), whereas the
+	// `context.Context` value is a golang context which is used for
+	// cancellations and timeouts
+	Search(ctx context.Context, itemContext string, query string) ([]*sdp.Item, error)
 }
 
 // CacheDefiner Some backends may implement the CacheDefiner interface which
@@ -115,7 +142,7 @@ func (e *Engine) FilterSources(typ string, context string) []Source {
 
 // Get Runs a get query against known sources in priority order. If nothing was
 // found, returns the first error
-func (e *Engine) Get(r *sdp.ItemRequest) (*sdp.Item, error) {
+func (e *Engine) Get(ctx context.Context, r *sdp.ItemRequest) (*sdp.Item, error) {
 	relevantSources := e.FilterSources(r.Type, r.Context)
 
 	if len(relevantSources) == 0 {
@@ -127,6 +154,8 @@ func (e *Engine) Get(r *sdp.ItemRequest) (*sdp.Item, error) {
 	}
 
 	e.gfm.GetLock(r.Context, r.Type)
+
+	var err error
 
 	for _, src := range relevantSources {
 		tags := sdpcache.Tags{
@@ -181,10 +210,10 @@ func (e *Engine) Get(r *sdp.ItemRequest) (*sdp.Item, error) {
 
 		var getDuration time.Duration
 		var item *sdp.Item
-		var err error
+		err = nil
 
 		getDuration = timeOperation(func() {
-			item, err = src.Get(r.Context, r.Query)
+			item, err = src.Get(ctx, r.Context, r.Query)
 		})
 
 		e.throttle.Unlock()
@@ -243,16 +272,13 @@ func (e *Engine) Get(r *sdp.ItemRequest) (*sdp.Item, error) {
 	}
 
 	// If we don't find anything then we should raise an error
-	return &sdp.Item{}, &sdp.ItemRequestError{
-		ErrorType:   sdp.ItemRequestError_NOTFOUND,
-		ErrorString: fmt.Sprintf("No item found in %v sources", len(relevantSources)),
-	}
+	return &sdp.Item{}, err
 }
 
 // Find executes Find() on all sources for a given type, returning the merged
 // results. Only returns an error if all sources fail, in which case returns the
 // first error
-func (e *Engine) Find(r *sdp.ItemRequest) ([]*sdp.Item, error) {
+func (e *Engine) Find(ctx context.Context, r *sdp.ItemRequest) ([]*sdp.Item, error) {
 	var storageMutex sync.Mutex
 	var workingSources sync.WaitGroup
 
@@ -326,7 +352,7 @@ func (e *Engine) Find(r *sdp.ItemRequest) ([]*sdp.Item, error) {
 			var err error
 
 			findDuration := timeOperation(func() {
-				finds, err = source.Find(r.Context)
+				finds, err = source.Find(ctx, r.Context)
 			})
 
 			e.throttle.Unlock()
@@ -408,7 +434,7 @@ func (e *Engine) Find(r *sdp.ItemRequest) ([]*sdp.Item, error) {
 // Search executes Search() on all sources for a given type, returning the merged
 // results. Only returns an error if all sources fail, in which case returns the
 // first error
-func (e *Engine) Search(r *sdp.ItemRequest) ([]*sdp.Item, error) {
+func (e *Engine) Search(ctx context.Context, r *sdp.ItemRequest) ([]*sdp.Item, error) {
 	var storageMutex sync.Mutex
 	var workingSources sync.WaitGroup
 
@@ -491,7 +517,7 @@ func (e *Engine) Search(r *sdp.ItemRequest) ([]*sdp.Item, error) {
 			var err error
 
 			searchDuration := timeOperation(func() {
-				searchItems, err = source.Search(r.Context, r.Query)
+				searchItems, err = source.Search(ctx, r.Context, r.Query)
 			})
 
 			e.throttle.Unlock()

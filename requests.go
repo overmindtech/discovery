@@ -1,57 +1,67 @@
 package discovery
 
 import (
+	"context"
+
+	"github.com/google/uuid"
 	"github.com/overmindtech/sdp-go"
 	log "github.com/sirupsen/logrus"
 )
 
 // NewItemRequestHandler Returns a function whose job is to handle a single
 // request. This includes responses, linking etc.
-func (e *Engine) NewItemRequestHandler(sources []Source) func(req *sdp.ItemRequest) {
-	return func(itemRequest *sdp.ItemRequest) {
-		if len(e.FilterSources(itemRequest.Type, itemRequest.Context)) == 0 {
-			// If we don't have any relevant sources, exit
-			return
-		}
+func (e *Engine) ItemRequestHandler(itemRequest *sdp.ItemRequest) {
+	if len(e.FilterSources(itemRequest.Type, itemRequest.Context)) == 0 {
+		// If we don't have any relevant sources, exit
+		return
+	}
 
-		// Respond saying we've got it
-		responder := sdp.ResponseSender{
-			ResponseSubject: itemRequest.ResponseSubject,
-		}
+	// Respond saying we've got it
+	responder := sdp.ResponseSender{
+		ResponseSubject: itemRequest.ResponseSubject,
+	}
 
-		var pub sdp.EncodedPublisher
+	var pub sdp.EncodedPublisher
 
-		if e.IsNATSConnected() {
-			pub = e.natsConnection
+	if e.IsNATSConnected() {
+		pub = e.natsConnection
+	} else {
+		pub = NilPublisher{}
+	}
+
+	responder.Start(
+		pub,
+		e.Name,
+	)
+
+	log.WithFields(log.Fields{
+		"type":      itemRequest.Type,
+		"method":    itemRequest.Method,
+		"query":     itemRequest.Query,
+		"linkDepth": itemRequest.LinkDepth,
+		"context":   itemRequest.Context,
+	}).Info("Received request")
+
+	requestTracker := RequestTracker{
+		Request: itemRequest,
+		Engine:  e,
+	}
+
+	if u, err := uuid.FromBytes(itemRequest.UUID); err == nil {
+		e.TrackRequest(u, &requestTracker)
+	}
+
+	_, err := requestTracker.Execute()
+
+	// If all failed then return an error
+	if err != nil {
+		if ire, ok := err.(*sdp.ItemRequestError); ok {
+			responder.Error(ire)
 		} else {
-			pub = NilPublisher{}
-		}
-
-		responder.Start(
-			pub,
-			e.Name,
-		)
-
-		log.WithFields(log.Fields{
-			"type":      itemRequest.Type,
-			"method":    itemRequest.Method,
-			"query":     itemRequest.Query,
-			"linkDepth": itemRequest.LinkDepth,
-			"context":   itemRequest.Context,
-		}).Info("Received request")
-
-		requestTracker := RequestTracker{
-			Requests: e.expandRequest(itemRequest), // Expand type wildcard if required
-			Engine:   e,
-		}
-
-		_, err := requestTracker.Execute()
-
-		// If all failed then return an error
-		if err != nil {
-			if ire, ok := err.(*sdp.ItemRequestError); ok {
-				responder.Error(ire)
-			} else {
+			switch err {
+			case context.Canceled:
+				responder.Cancel()
+			default:
 				ire = &sdp.ItemRequestError{
 					ErrorType:   sdp.ItemRequestError_OTHER,
 					ErrorString: err.Error(),
@@ -60,40 +70,43 @@ func (e *Engine) NewItemRequestHandler(sources []Source) func(req *sdp.ItemReque
 
 				responder.Error(ire)
 			}
-
-			logEntry := log.WithFields(log.Fields{
-				"errorType":        "OTHER",
-				"errorString":      err.Error(),
-				"requestType":      itemRequest.Type,
-				"requestMethod":    itemRequest.Method,
-				"requestQuery":     itemRequest.Query,
-				"requestLinkDepth": itemRequest.LinkDepth,
-				"requestContext":   itemRequest.Context,
-			})
-
-			if ire, ok := err.(*sdp.ItemRequestError); ok && ire.ErrorType == sdp.ItemRequestError_OTHER {
-				logEntry.Error("Request ended with unknown error")
-			} else {
-				logEntry.Info("Request ended with error")
-			}
-		} else {
-			responder.Done()
-
-			log.WithFields(log.Fields{
-				"type":      itemRequest.Type,
-				"method":    itemRequest.Method,
-				"query":     itemRequest.Query,
-				"linkDepth": itemRequest.LinkDepth,
-				"context":   itemRequest.Context,
-			}).Info("Request complete")
 		}
 
+		logEntry := log.WithFields(log.Fields{
+			"errorType":        "OTHER",
+			"errorString":      err.Error(),
+			"requestType":      itemRequest.Type,
+			"requestMethod":    itemRequest.Method,
+			"requestQuery":     itemRequest.Query,
+			"requestLinkDepth": itemRequest.LinkDepth,
+			"requestContext":   itemRequest.Context,
+		})
+
+		if ire, ok := err.(*sdp.ItemRequestError); ok && ire.ErrorType == sdp.ItemRequestError_OTHER {
+			logEntry.Error("Request ended with unknown error")
+		} else {
+			logEntry.Info("Request ended with error")
+		}
+	} else {
+		responder.Done()
+
+		log.WithFields(log.Fields{
+			"type":      itemRequest.Type,
+			"method":    itemRequest.Method,
+			"query":     itemRequest.Query,
+			"linkDepth": itemRequest.LinkDepth,
+			"context":   itemRequest.Context,
+		}).Info("Request complete")
 	}
 }
 
 // ExecuteRequest Executes a single request and returns the results without any
 // linking
-func (e *Engine) ExecuteRequest(req *sdp.ItemRequest) ([]*sdp.Item, error) {
+func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest) ([]*sdp.Item, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
 	var requestItem *sdp.Item
 	var requestError error
 
@@ -104,12 +117,12 @@ func (e *Engine) ExecuteRequest(req *sdp.ItemRequest) ([]*sdp.Item, error) {
 	// Make the request of all sources
 	switch req.GetMethod() {
 	case sdp.RequestMethod_GET:
-		requestItem, requestError = e.Get(req)
+		requestItem, requestError = e.Get(ctx, req)
 		requestItems = append(requestItems, requestItem)
 	case sdp.RequestMethod_FIND:
-		requestItems, requestError = e.Find(req)
+		requestItems, requestError = e.Find(ctx, req)
 	case sdp.RequestMethod_SEARCH:
-		requestItems, requestError = e.Search(req)
+		requestItems, requestError = e.Search(ctx, req)
 	}
 
 	// If there was an error in the request then simply return
@@ -125,9 +138,12 @@ func (e *Engine) ExecuteRequest(req *sdp.ItemRequest) ([]*sdp.Item, error) {
 		// won't be executing them
 		if req.GetLinkDepth() > 0 {
 			for _, lir := range i.LinkedItemRequests {
-				lir.LinkDepth = req.GetLinkDepth() - 1
-				lir.ItemSubject = req.GetItemSubject()
-				lir.ResponseSubject = req.GetResponseSubject()
+				lir.LinkDepth = req.LinkDepth - 1
+				lir.ItemSubject = req.ItemSubject
+				lir.ResponseSubject = req.ResponseSubject
+				lir.IgnoreCache = req.IgnoreCache
+				lir.Timeout = req.Timeout
+				lir.UUID = req.UUID
 			}
 		}
 
@@ -140,7 +156,7 @@ func (e *Engine) ExecuteRequest(req *sdp.ItemRequest) ([]*sdp.Item, error) {
 	return requestItems, requestError
 }
 
-// expandRequest Expands requests with wildcards to no longer contain wildcards.
+// ExpandRequest Expands requests with wildcards to no longer contain wildcards.
 // Meaning that if we support 5 types, and a request comes in with a wildcard
 // type, this function will expand that request into 5 requests, one for each
 // type.
@@ -150,7 +166,7 @@ func (e *Engine) ExecuteRequest(req *sdp.ItemRequest) ([]*sdp.Item, error) {
 // exception to this is if we have a source that supports all contexts, but is
 // unable to list them. In this case there will still be some requests with
 // wildcard contexts as they can't be expanded
-func (e *Engine) expandRequest(request *sdp.ItemRequest) []*sdp.ItemRequest {
+func (e *Engine) ExpandRequest(request *sdp.ItemRequest) []*sdp.ItemRequest {
 	// Filter to just sources that are capable of responding
 	relevantSources := e.FilterSources(request.Type, request.Context)
 

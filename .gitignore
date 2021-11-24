@@ -7,4 +7,3 @@ vendor
 Gopkg.lock
 build/compiled
 go.sum
-*.json

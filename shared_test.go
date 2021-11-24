@@ -1,12 +1,30 @@
 package discovery
 
 import (
+	"context"
+	"math/rand"
 	"sync"
 	"time"
 
+	"github.com/goombaio/namegenerator"
 	"github.com/overmindtech/sdp-go"
 	"google.golang.org/protobuf/types/known/structpb"
 )
+
+var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func randSeq(n int) string {
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
+}
+
+func RandomName() string {
+	n := namegenerator.NewNameGenerator(time.Now().UTC().UnixNano())
+	return n.Generate() + " " + n.Generate() + "-" + randSeq(10)
+}
 
 func (s *TestSource) NewTestItem(itemContext string, query string) *sdp.Item {
 	return &sdp.Item{
@@ -77,7 +95,7 @@ func (s *TestSource) Hidden() bool {
 	return s.IsHidden
 }
 
-func (s *TestSource) Get(itemContext string, query string) (*sdp.Item, error) {
+func (s *TestSource) Get(ctx context.Context, itemContext string, query string) (*sdp.Item, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -101,7 +119,7 @@ func (s *TestSource) Get(itemContext string, query string) (*sdp.Item, error) {
 	}
 }
 
-func (s *TestSource) Find(itemContext string) ([]*sdp.Item, error) {
+func (s *TestSource) Find(ctx context.Context, itemContext string) ([]*sdp.Item, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.FindCalls = append(s.FindCalls, []string{itemContext})
@@ -120,7 +138,7 @@ func (s *TestSource) Find(itemContext string) ([]*sdp.Item, error) {
 	}
 }
 
-func (s *TestSource) Search(itemContext string, query string) ([]*sdp.Item, error) {
+func (s *TestSource) Search(ctx context.Context, itemContext string, query string) ([]*sdp.Item, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 

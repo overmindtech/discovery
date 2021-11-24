@@ -6,10 +6,11 @@ go 1.17
 require (
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats.go v1.13.1-0.20211018182449-f2416a8b1483
-	github.com/overmindtech/sdp-go v0.3.1
+	github.com/overmindtech/sdp-go v0.5.3
 	github.com/overmindtech/sdpcache v0.1.4
 	github.com/sirupsen/logrus v1.8.1
 	google.golang.org/protobuf v1.27.1
+	github.com/google/uuid v1.3.0
 )
 
 // Transitive dependencies
@@ -24,5 +25,4 @@ require (
 	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
-
 )

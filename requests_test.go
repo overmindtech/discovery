@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"context"
 	"testing"
 
 	"github.com/overmindtech/sdp-go"
@@ -29,7 +30,7 @@ func TestExecuteRequest(t *testing.T) {
 			ResponseSubject: "responses",
 		}
 
-		items, err := e.ExecuteRequest(request)
+		items, err := e.ExecuteRequest(context.Background(), request)
 
 		if err != nil {
 			t.Error(err)
@@ -73,7 +74,7 @@ func TestExecuteRequest(t *testing.T) {
 			LinkDepth: 0,
 		}
 
-		_, err := e.ExecuteRequest(request)
+		_, err := e.ExecuteRequest(context.Background(), request)
 
 		if ire, ok := err.(*sdp.ItemRequestError); ok {
 			if ire.ErrorType != sdp.ItemRequestError_NOCONTEXT {
@@ -93,7 +94,7 @@ func TestExecuteRequest(t *testing.T) {
 			LinkDepth: 0,
 		}
 
-		_, err := e.ExecuteRequest(request)
+		_, err := e.ExecuteRequest(context.Background(), request)
 
 		if ire, ok := err.(*sdp.ItemRequestError); ok {
 			if ire.ErrorType != sdp.ItemRequestError_NOCONTEXT {
@@ -112,7 +113,7 @@ func TestExecuteRequest(t *testing.T) {
 			LinkDepth: 5,
 		}
 
-		items, err := e.ExecuteRequest(request)
+		items, err := e.ExecuteRequest(context.Background(), request)
 
 		if err != nil {
 			t.Error(err)
@@ -132,7 +133,7 @@ func TestExecuteRequest(t *testing.T) {
 			LinkDepth: 5,
 		}
 
-		items, err := e.ExecuteRequest(request)
+		items, err := e.ExecuteRequest(context.Background(), request)
 
 		if err != nil {
 			t.Error(err)
@@ -183,10 +184,8 @@ func TestNewItemRequestHandler(t *testing.T) {
 			LinkDepth: 0,
 		}
 
-		handler := e.NewItemRequestHandler(e.Sources())
-
 		// Run the handler
-		handler(&req)
+		e.ItemRequestHandler(&req)
 
 		// I'm expecting both sources to get a request since the type was *
 		if l := len(personSource.GetCalls); l != 1 {
@@ -212,10 +211,8 @@ func TestNewItemRequestHandler(t *testing.T) {
 			LinkDepth: 0,
 		}
 
-		handler := e.NewItemRequestHandler(e.Sources())
-
 		// Run the handler
-		handler(&req)
+		e.ItemRequestHandler(&req)
 
 		if l := len(personSource.GetCalls); l != 2 {
 			t.Errorf("expected person backend to have 2 Get calls, got %v", l)

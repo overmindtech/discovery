@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -129,7 +130,7 @@ func TestGet(t *testing.T) {
 			src.ClearCalls()
 		})
 
-		e.Get(&sdp.ItemRequest{
+		e.Get(context.Background(), &sdp.ItemRequest{
 			Type:    "person",
 			Context: "test",
 			Query:   "three",
@@ -164,7 +165,7 @@ func TestGet(t *testing.T) {
 			Query:   "Dylan",
 		}
 
-		finds1, err = e.Get(&req)
+		finds1, err = e.Get(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -172,7 +173,7 @@ func TestGet(t *testing.T) {
 
 		time.Sleep(20 * time.Millisecond)
 
-		item2, err = e.Get(&req)
+		item2, err = e.Get(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -184,7 +185,7 @@ func TestGet(t *testing.T) {
 
 		time.Sleep(200 * time.Millisecond)
 
-		item3, err = e.Get(&req)
+		item3, err = e.Get(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -206,8 +207,8 @@ func TestGet(t *testing.T) {
 			Query:   "query",
 		}
 
-		e.Get(&req)
-		e.Get(&req)
+		e.Get(context.Background(), &req)
+		e.Get(context.Background(), &req)
 
 		if l := len(src.GetCalls); l != 1 {
 			t.Errorf("Expected 1 Get call due to caching og NOTFOUND errors, got %v", l)
@@ -222,7 +223,7 @@ func TestGet(t *testing.T) {
 		src.IsHidden = true
 
 		t.Run("Get", func(t *testing.T) {
-			item, err := e.Get(&sdp.ItemRequest{
+			item, err := e.Get(context.Background(), &sdp.ItemRequest{
 				Type:    "person",
 				Context: "test",
 				Query:   "three",
@@ -238,7 +239,7 @@ func TestGet(t *testing.T) {
 		})
 
 		t.Run("Find", func(t *testing.T) {
-			items, err := e.Find(&sdp.ItemRequest{
+			items, err := e.Find(context.Background(), &sdp.ItemRequest{
 				Type:    "person",
 				Context: "test",
 			})
@@ -253,7 +254,7 @@ func TestGet(t *testing.T) {
 		})
 
 		t.Run("Search", func(t *testing.T) {
-			items, err := e.Search(&sdp.ItemRequest{
+			items, err := e.Search(context.Background(), &sdp.ItemRequest{
 				Type:    "person",
 				Context: "test",
 				Query:   "three",
@@ -279,7 +280,7 @@ func TestFind(t *testing.T) {
 
 	e.AddSources(&src)
 
-	e.Find(&sdp.ItemRequest{
+	e.Find(context.Background(), &sdp.ItemRequest{
 		Type:    "person",
 		Context: "test",
 	})
@@ -304,7 +305,7 @@ func TestSearch(t *testing.T) {
 
 	e.AddSources(&src)
 
-	e.Search(&sdp.ItemRequest{
+	e.Search(context.Background(), &sdp.ItemRequest{
 		Type:    "person",
 		Context: "test",
 		Query:   "query",
@@ -352,7 +353,7 @@ func TestFindSearchCaching(t *testing.T) {
 			Context: "test",
 		}
 
-		finds1, err = e.Find(&req)
+		finds1, err = e.Find(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -360,7 +361,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(10 * time.Millisecond)
 
-		finds2, err = e.Find(&req)
+		finds2, err = e.Find(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -372,7 +373,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(200 * time.Millisecond)
 
-		finds3, err = e.Find(&req)
+		finds3, err = e.Find(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -394,7 +395,7 @@ func TestFindSearchCaching(t *testing.T) {
 			Context: "empty",
 		}
 
-		_, err = e.Find(&req)
+		_, err = e.Find(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -402,7 +403,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(10 * time.Millisecond)
 
-		_, err = e.Find(&req)
+		_, err = e.Find(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -414,7 +415,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(200 * time.Millisecond)
 
-		_, err = e.Find(&req)
+		_, err = e.Find(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -440,7 +441,7 @@ func TestFindSearchCaching(t *testing.T) {
 			Query:   "query",
 		}
 
-		finds1, err = e.Search(&req)
+		finds1, err = e.Search(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -448,7 +449,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(10 * time.Millisecond)
 
-		finds2, err = e.Search(&req)
+		finds2, err = e.Search(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -460,7 +461,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(200 * time.Millisecond)
 
-		finds3, err = e.Search(&req)
+		finds3, err = e.Search(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -483,7 +484,7 @@ func TestFindSearchCaching(t *testing.T) {
 			Query:   "query",
 		}
 
-		_, err = e.Search(&req)
+		_, err = e.Search(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -491,7 +492,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(10 * time.Millisecond)
 
-		_, err = e.Search(&req)
+		_, err = e.Search(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -503,7 +504,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(200 * time.Millisecond)
 
-		_, err = e.Search(&req)
+		_, err = e.Search(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -525,8 +526,8 @@ func TestFindSearchCaching(t *testing.T) {
 			Query:   "query",
 		}
 
-		e.Get(&req)
-		e.Get(&req)
+		e.Get(context.Background(), &req)
+		e.Get(context.Background(), &req)
 
 		if l := len(src.GetCalls); l != 2 {
 			t.Errorf("Exected 2 get calls, got %v, OTHER errors should not be cached", l)
@@ -544,12 +545,12 @@ func TestFindSearchCaching(t *testing.T) {
 			Query:   "query",
 		}
 
-		e.Get(&req)
-		e.Get(&req)
-		e.Find(&req)
-		e.Find(&req)
-		e.Search(&req)
-		e.Search(&req)
+		e.Get(context.Background(), &req)
+		e.Get(context.Background(), &req)
+		e.Find(context.Background(), &req)
+		e.Find(context.Background(), &req)
+		e.Search(context.Background(), &req)
+		e.Search(context.Background(), &req)
 
 		if l := len(src.GetCalls); l != 2 {
 			t.Errorf("Exected 2 get calls, got %v", l)
