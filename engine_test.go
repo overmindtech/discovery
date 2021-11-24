@@ -364,7 +364,7 @@ func TestNatsCancel(t *testing.T) {
 		<-progress.Done()
 
 		// You shouldn't be able to cancel requests that don't have a UUID
-		if progress.NumCancelled() == 0 {
+		if progress.NumCancelled() != 0 {
 			t.Errorf("Expected query to not cancelled, got\n%v", progress.String())
 		}
 	})
