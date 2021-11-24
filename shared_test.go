@@ -2,12 +2,29 @@ package discovery
 
 import (
 	"context"
+	"math/rand"
 	"sync"
 	"time"
 
+	"github.com/goombaio/namegenerator"
 	"github.com/overmindtech/sdp-go"
 	"google.golang.org/protobuf/types/known/structpb"
 )
+
+var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func randSeq(n int) string {
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
+}
+
+func RandomName() string {
+	n := namegenerator.NewNameGenerator(time.Now().UTC().UnixNano())
+	return n.Generate() + " " + n.Generate() + "-" + randSeq(10)
+}
 
 func (s *TestSource) NewTestItem(itemContext string, query string) *sdp.Item {
 	return &sdp.Item{

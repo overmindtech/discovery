@@ -2,105 +2,20 @@ package discovery
 
 import (
 	"fmt"
+	"net"
 	"sync"
 	"testing"
 
-	"math/rand"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/goombaio/namegenerator"
 	"github.com/overmindtech/sdp-go"
-	"google.golang.org/protobuf/types/known/structpb"
 )
 
+const NatsHost = "nats"
+const NatsPort = "4222"
+
 type TestBackend struct{}
-
-var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
-func randSeq(n int) string {
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(b)
-}
-
-func RandomName() string {
-	n := namegenerator.NewNameGenerator(time.Now().UTC().UnixNano())
-	return n.Generate() + " " + n.Generate() + "-" + randSeq(10)
-}
-
-func (tb TestBackend) Type() string {
-	return "person"
-}
-
-func (tb TestBackend) BackendPackage() string {
-	return "test"
-}
-
-func (tb TestBackend) Threadsafe() bool {
-	return true
-}
-
-// Always is able to find a person for testing. Also always has a linked item
-func (tb TestBackend) Get(name string) (*sdp.Item, error) {
-	if name == "fail" {
-		return nil, &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_NOTFOUND,
-			ErrorString: "Error requested",
-		}
-	}
-
-	item := &sdp.Item{
-		Type:            "person",
-		Context:         "global",
-		UniqueAttribute: "name",
-		Attributes: &sdp.ItemAttributes{
-			AttrStruct: &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					"name": structpb.NewStringValue(name),
-					"age":  structpb.NewNumberValue(rand.Float64()),
-				},
-			},
-		},
-		LinkedItemRequests: []*sdp.ItemRequest{
-			{
-				Type:   "person",
-				Method: sdp.RequestMethod_GET,
-				Query:  RandomName(),
-			},
-			{
-				Type:    "shadow",
-				Method:  sdp.RequestMethod_GET,
-				Query:   name,
-				Context: "shadowrealm", // From another context
-			},
-			{
-				Type:   "person",
-				Method: sdp.RequestMethod_GET,
-				Query:  "fail", // Will always fail
-			},
-		},
-	}
-
-	return item, nil
-}
-
-// Always returns 10 random items
-func (tb TestBackend) Find() ([]*sdp.Item, error) {
-	items := make([]*sdp.Item, 10)
-
-	for i := 0; i < 10; i++ {
-		items[i], _ = tb.Get(RandomName())
-	}
-
-	return items, nil
-}
-
-func (tb TestBackend) Search(query string) ([]*sdp.Item, error) {
-	return tb.Find()
-}
 
 func TestDeleteItemRequest(t *testing.T) {
 	one := &sdp.ItemRequest{
@@ -230,5 +145,52 @@ func TestDeleteTrackedRequest(t *testing.T) {
 
 	if len(e.trackedRequests) != 0 {
 		t.Errorf("Expected 0 tracked requests, got %v", len(e.trackedRequests))
+	}
+}
+
+func TestNats(t *testing.T) {
+	SkipWithoutNats(t)
+
+	e := Engine{
+		Name: "nats-test",
+		NATSOptions: &NATSOptions{
+			URLs: []string{
+				"nats://nats:4222",
+			},
+			ConnectionName: "test-connection",
+			ConnectTimeout: time.Second,
+			NumRetries:     5,
+			QueueName:      "test",
+		},
+		MaxParallelExecutions: 10,
+	}
+
+	src := TestSource{}
+
+	e.AddSources(&src)
+
+	t.Run("Starting", func(t *testing.T) {
+		err := e.Connect()
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		err = e.Start()
+
+		if err != nil {
+			t.Error(err)
+		}
+	})
+}
+
+// SKipWithoutNats Skips a test if NATS is not available
+func SkipWithoutNats(t *testing.T) {
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort(NatsHost, NatsPort), time.Second)
+	if err != nil {
+		t.Skip("NATS not available, skipping")
+	}
+	if conn != nil {
+		conn.Close()
 	}
 }

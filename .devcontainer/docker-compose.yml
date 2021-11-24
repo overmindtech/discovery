@@ -1,0 +1,52 @@
+version: "3"
+services:
+  nats:
+    image: nats
+    command: "-c /etc/nats/nats.conf -DV" #-c /etc/nats/nats.conf --cluster nats://0.0.0.0:6222 --routes=nats://ruser:T0pS3cr3t@nats:6222
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+      - "6222:6222"
+      - "4433:4433"
+    volumes:
+      - ./nats/nats-server.conf:/etc/nats/nats.conf
+    networks:
+      - nats
+  # nats-1:
+  #   image: nats
+  #   command: "-c nats-server.conf --routes=nats-route://ruser:T0pS3cr3t@nats:6222 -DV"
+  #link:
+  #  # Will build from a local copy
+  #  build: ../redacted_link
+  #  environment:
+  #    - REDACTED_NATS_URLS=nats
+  #    - REDACTED_VERBOSITY=debug
+
+  devcontainer:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Update 'VARIANT' to pick an LTS version of Node.js: 16, 14, 12.
+        # Append -bullseye or -buster to pin to an OS version.
+        # Use -bullseye variants on local arm64/Apple Silicon.
+        VARIANT: 1-bullseye
+        NODE_VERSION: none
+    volumes:
+      - ..:/workspace:cached
+
+    # Overrides default command so things don't shut down after the process ends.
+    command: sleep infinity
+
+    # Runs app on the same network as the database container, allows "forwardPorts" in devcontainer.json function.
+    networks:
+      - nats
+
+    # Uncomment the next line to use a non-root user for all processes.
+    # user: node
+
+    # Use "forwardPorts" in **devcontainer.json** to forward an app port locally. 
+    # (Adding the "ports" property to this file will not forward from a Codespace.)
+
+networks:
+  nats:

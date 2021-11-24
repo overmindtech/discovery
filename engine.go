@@ -278,8 +278,19 @@ func (e *Engine) Start() error {
 	// Start purging cache
 	e.cache.StartPurger()
 
-	e.Subscribe("request.all", e.ItemRequestHandler)
-	e.Subscribe("cancel.all", e.CancelItemRequestHandler)
+	var err error
+
+	err = e.Subscribe("request.all", e.ItemRequestHandler)
+
+	if err != nil {
+		return err
+	}
+
+	err = e.Subscribe("cancel.all", e.CancelItemRequestHandler)
+
+	if err != nil {
+		return err
+	}
 
 	// Loop over all sources and work out what subscriptions we need to make
 	// depending on what contexts they support. These context names are then
@@ -312,6 +323,10 @@ func (e *Engine) Start() error {
 func (e *Engine) Subscribe(subject string, handler nats.Handler) error {
 	var subscription *nats.Subscription
 	var err error
+
+	if e.natsConnection == nil {
+		return errors.New("cannot subscribe. NATS connection is nil")
+	}
 
 	log.WithFields(log.Fields{
 		"queueName":  e.NATSOptions.QueueName,

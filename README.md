@@ -8,3 +8,10 @@ Code to help with all things related to discovering system state using [State De
 * Agents for discovering local state on servers and other devices
 
 This library is currently under development and documentation can be found on [pkg.go.dev](https://pkg.go.dev/github.com/overmindtech/discovery)
+
+## Developing
+
+This repository is configured to us [VSCode devcontainers](https://code.visualstudio.com/docs/remote/containers). This means that if you don't want to install Go locally, you can do all of your development inside a container. You can also use Github codespaces to host these containers meaning that the only requirement is having VSCode installed. Use of this is optional but does have some benefits:
+
+* Local environment not polluted
+* NATS sidecar container automatically started for end-to-end tests
