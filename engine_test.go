@@ -1,11 +1,14 @@
 package discovery
 
 import (
+	"fmt"
+	"sync"
 	"testing"
 
 	"math/rand"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/goombaio/namegenerator"
 	"github.com/overmindtech/sdp-go"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -119,5 +122,113 @@ func TestDeleteItemRequest(t *testing.T) {
 
 	if len(deleted) > 1 {
 		t.Errorf("Item not successfully deleted: %v", irs)
+	}
+}
+
+func TestTrackRequest(t *testing.T) {
+	e := Engine{
+		Name: "test",
+	}
+
+	t.Run("With normal request", func(t *testing.T) {
+		t.Parallel()
+
+		u := uuid.New()
+
+		rt := RequestTracker{
+			Engine: &e,
+			Request: &sdp.ItemRequest{
+				Type:      "person",
+				Method:    sdp.RequestMethod_FIND,
+				LinkDepth: 10,
+				UUID:      u[:],
+			},
+		}
+
+		e.TrackRequest(u, &rt)
+
+		if got, err := e.GetTrackedRequest(u); err == nil {
+			if got != &rt {
+				t.Errorf("Got mismatched RequestTracker objects %v and %v", got, &rt)
+			}
+		} else {
+			t.Error(err)
+		}
+	})
+
+	t.Run("With many requests", func(t *testing.T) {
+		t.Parallel()
+
+		var wg sync.WaitGroup
+
+		for i := 1; i < 1000; i++ {
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				u := uuid.New()
+
+				rt := RequestTracker{
+					Engine: &e,
+					Request: &sdp.ItemRequest{
+						Type:      "person",
+						Query:     fmt.Sprintf("person-%v", i),
+						Method:    sdp.RequestMethod_GET,
+						LinkDepth: 10,
+						UUID:      u[:],
+					},
+				}
+
+				e.TrackRequest(u, &rt)
+			}(i)
+		}
+
+		wg.Wait()
+
+		if len(e.trackedRequests) != 1000 {
+			t.Errorf("Expected 1000 tracked requests, got %v", len(e.trackedRequests))
+		}
+	})
+}
+
+func TestDeleteTrackedRequest(t *testing.T) {
+	t.Parallel()
+
+	e := Engine{
+		Name: "test",
+	}
+
+	var wg sync.WaitGroup
+
+	// Add and delete many request in parallel
+	for i := 1; i < 1000; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			u := uuid.New()
+
+			rt := RequestTracker{
+				Engine: &e,
+				Request: &sdp.ItemRequest{
+					Type:      "person",
+					Query:     fmt.Sprintf("person-%v", i),
+					Method:    sdp.RequestMethod_GET,
+					LinkDepth: 10,
+					UUID:      u[:],
+				},
+			}
+
+			e.TrackRequest(u, &rt)
+			wg.Add(1)
+			go func(u uuid.UUID) {
+				defer wg.Done()
+				e.DeleteTrackedRequest(u)
+			}(u)
+		}(i)
+	}
+
+	wg.Wait()
+
+	if len(e.trackedRequests) != 0 {
+		t.Errorf("Expected 0 tracked requests, got %v", len(e.trackedRequests))
 	}
 }

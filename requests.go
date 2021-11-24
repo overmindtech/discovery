@@ -3,36 +3,87 @@ package discovery
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/overmindtech/sdp-go"
 	log "github.com/sirupsen/logrus"
 )
 
 // NewItemRequestHandler Returns a function whose job is to handle a single
 // request. This includes responses, linking etc.
-func (e *Engine) NewItemRequestHandler(sources []Source) func(req *sdp.ItemRequest) {
-	return func(itemRequest *sdp.ItemRequest) {
-		if len(e.FilterSources(itemRequest.Type, itemRequest.Context)) == 0 {
-			// If we don't have any relevant sources, exit
-			return
-		}
+func (e *Engine) ItemRequestHandler(itemRequest *sdp.ItemRequest) {
+	if len(e.FilterSources(itemRequest.Type, itemRequest.Context)) == 0 {
+		// If we don't have any relevant sources, exit
+		return
+	}
 
-		// Respond saying we've got it
-		responder := sdp.ResponseSender{
-			ResponseSubject: itemRequest.ResponseSubject,
-		}
+	// Respond saying we've got it
+	responder := sdp.ResponseSender{
+		ResponseSubject: itemRequest.ResponseSubject,
+	}
 
-		var pub sdp.EncodedPublisher
+	var pub sdp.EncodedPublisher
 
-		if e.IsNATSConnected() {
-			pub = e.natsConnection
+	if e.IsNATSConnected() {
+		pub = e.natsConnection
+	} else {
+		pub = NilPublisher{}
+	}
+
+	responder.Start(
+		pub,
+		e.Name,
+	)
+
+	log.WithFields(log.Fields{
+		"type":      itemRequest.Type,
+		"method":    itemRequest.Method,
+		"query":     itemRequest.Query,
+		"linkDepth": itemRequest.LinkDepth,
+		"context":   itemRequest.Context,
+	}).Info("Received request")
+
+	requestTracker := RequestTracker{
+		Request: itemRequest,
+		Engine:  e,
+	}
+
+	if u, err := uuid.FromBytes(itemRequest.UUID); err != nil {
+		e.TrackRequest(u, &requestTracker)
+	}
+
+	_, err := requestTracker.Execute()
+
+	// If all failed then return an error
+	if err != nil {
+		if ire, ok := err.(*sdp.ItemRequestError); ok {
+			responder.Error(ire)
 		} else {
-			pub = NilPublisher{}
+			ire = &sdp.ItemRequestError{
+				ErrorType:   sdp.ItemRequestError_OTHER,
+				ErrorString: err.Error(),
+				Context:     itemRequest.Context,
+			}
+
+			responder.Error(ire)
 		}
 
-		responder.Start(
-			pub,
-			e.Name,
-		)
+		logEntry := log.WithFields(log.Fields{
+			"errorType":        "OTHER",
+			"errorString":      err.Error(),
+			"requestType":      itemRequest.Type,
+			"requestMethod":    itemRequest.Method,
+			"requestQuery":     itemRequest.Query,
+			"requestLinkDepth": itemRequest.LinkDepth,
+			"requestContext":   itemRequest.Context,
+		})
+
+		if ire, ok := err.(*sdp.ItemRequestError); ok && ire.ErrorType == sdp.ItemRequestError_OTHER {
+			logEntry.Error("Request ended with unknown error")
+		} else {
+			logEntry.Info("Request ended with error")
+		}
+	} else {
+		responder.Done()
 
 		log.WithFields(log.Fields{
 			"type":      itemRequest.Type,
@@ -40,56 +91,7 @@ func (e *Engine) NewItemRequestHandler(sources []Source) func(req *sdp.ItemReque
 			"query":     itemRequest.Query,
 			"linkDepth": itemRequest.LinkDepth,
 			"context":   itemRequest.Context,
-		}).Info("Received request")
-
-		requestTracker := RequestTracker{
-			Request: itemRequest,
-			Engine:  e,
-		}
-
-		_, err := requestTracker.Execute()
-
-		// If all failed then return an error
-		if err != nil {
-			if ire, ok := err.(*sdp.ItemRequestError); ok {
-				responder.Error(ire)
-			} else {
-				ire = &sdp.ItemRequestError{
-					ErrorType:   sdp.ItemRequestError_OTHER,
-					ErrorString: err.Error(),
-					Context:     itemRequest.Context,
-				}
-
-				responder.Error(ire)
-			}
-
-			logEntry := log.WithFields(log.Fields{
-				"errorType":        "OTHER",
-				"errorString":      err.Error(),
-				"requestType":      itemRequest.Type,
-				"requestMethod":    itemRequest.Method,
-				"requestQuery":     itemRequest.Query,
-				"requestLinkDepth": itemRequest.LinkDepth,
-				"requestContext":   itemRequest.Context,
-			})
-
-			if ire, ok := err.(*sdp.ItemRequestError); ok && ire.ErrorType == sdp.ItemRequestError_OTHER {
-				logEntry.Error("Request ended with unknown error")
-			} else {
-				logEntry.Info("Request ended with error")
-			}
-		} else {
-			responder.Done()
-
-			log.WithFields(log.Fields{
-				"type":      itemRequest.Type,
-				"method":    itemRequest.Method,
-				"query":     itemRequest.Query,
-				"linkDepth": itemRequest.LinkDepth,
-				"context":   itemRequest.Context,
-			}).Info("Request complete")
-		}
-
+		}).Info("Request complete")
 	}
 }
 

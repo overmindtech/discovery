@@ -10,6 +10,7 @@ require (
 	github.com/overmindtech/sdpcache v0.1.4
 	github.com/sirupsen/logrus v1.8.1
 	google.golang.org/protobuf v1.27.1
+	github.com/google/uuid v1.3.0
 )
 
 // Transitive dependencies

@@ -184,10 +184,8 @@ func TestNewItemRequestHandler(t *testing.T) {
 			LinkDepth: 0,
 		}
 
-		handler := e.NewItemRequestHandler(e.Sources())
-
 		// Run the handler
-		handler(&req)
+		e.ItemRequestHandler(&req)
 
 		// I'm expecting both sources to get a request since the type was *
 		if l := len(personSource.GetCalls); l != 1 {
@@ -213,10 +211,8 @@ func TestNewItemRequestHandler(t *testing.T) {
 			LinkDepth: 0,
 		}
 
-		handler := e.NewItemRequestHandler(e.Sources())
-
 		// Run the handler
-		handler(&req)
+		e.ItemRequestHandler(&req)
 
 		if l := len(personSource.GetCalls); l != 2 {
 			t.Errorf("expected person backend to have 2 Get calls, got %v", l)

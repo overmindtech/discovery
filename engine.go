@@ -6,8 +6,10 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/overmindtech/sdp-go"
 	"github.com/overmindtech/sdpcache"
 
@@ -76,6 +78,52 @@ type Engine struct {
 
 	// GetFindMutex used for locking
 	gfm GetFindMutex
+
+	// trackedRequests is used for storing requests that have a UUID so they can
+	// be cancelled if required
+	trackedRequests      map[uuid.UUID]*RequestTracker
+	trackedRequestsMutex sync.RWMutex
+}
+
+// TrackRequest Stores a RequestTracker in the engine so that it can be looked
+// up later and cancelled if required. The UUID should be supplied as part of
+// the request itself
+func (e *Engine) TrackRequest(uuid uuid.UUID, request *RequestTracker) {
+	e.ensureTrackedRequests()
+	e.trackedRequestsMutex.Lock()
+	defer e.trackedRequestsMutex.Unlock()
+	e.trackedRequests[uuid] = request
+}
+
+// GetTrackedRequest Returns the RequestTracked object for a given UUID. THis
+// tracker can then be used to cancel the request
+func (e *Engine) GetTrackedRequest(uuid uuid.UUID) (*RequestTracker, error) {
+	e.ensureTrackedRequests()
+	e.trackedRequestsMutex.RLock()
+	defer e.trackedRequestsMutex.RUnlock()
+
+	if tracker, ok := e.trackedRequests[uuid]; ok {
+		return tracker, nil
+	} else {
+		return nil, fmt.Errorf("tracker with UUID %x not found", uuid)
+	}
+}
+
+// DeleteTrackedRequest Deletes a request from tracking
+func (e *Engine) DeleteTrackedRequest(uuid [16]byte) {
+	e.ensureTrackedRequests()
+	e.trackedRequestsMutex.Lock()
+	defer e.trackedRequestsMutex.Unlock()
+	delete(e.trackedRequests, uuid)
+}
+
+// ensureTrackedRequests Makes sure the trackedRequests map has been created
+func (e *Engine) ensureTrackedRequests() {
+	e.trackedRequestsMutex.Lock()
+	defer e.trackedRequestsMutex.Unlock()
+	if e.trackedRequests == nil {
+		e.trackedRequests = make(map[uuid.UUID]*RequestTracker)
+	}
 }
 
 // SetupThrottle Sets up the throttling based on MaxParallelExecutions,
@@ -225,15 +273,45 @@ func (e *Engine) Connect() error {
 // modifying the Sources value after an engine has been started will not have
 // any effect until the engine is restarted
 func (e *Engine) Start() error {
-	var subscription *nats.Subscription
-	var err error
-
 	e.SetupThrottle()
 
 	// Start purging cache
 	e.cache.StartPurger()
 
-	subject := "request.all"
+	e.Subscribe("request.all", e.ItemRequestHandler)
+	e.Subscribe("cancel.all", e.CancelItemRequestHandler)
+
+	// Loop over all sources and work out what subscriptions we need to make
+	// depending on what contexts they support. These context names are then
+	// stored in a map for de-duplication before being subscribed to
+	subscriptionMap := make(map[string]bool)
+
+	for _, src := range e.Sources() {
+		for _, itemContext := range src.Contexts() {
+			var subjectSuffix string
+
+			if itemContext == sdp.WILDCARD {
+				subjectSuffix = ">"
+			} else {
+				subjectSuffix = itemContext
+			}
+
+			subscriptionMap[subjectSuffix] = true
+		}
+	}
+
+	// Now actually create the required subscriptions
+	for suffix := range subscriptionMap {
+		e.Subscribe(fmt.Sprintf("request.context.%v", suffix), e.ItemRequestHandler)
+		e.Subscribe(fmt.Sprintf("cancel.context.%v", suffix), e.CancelItemRequestHandler)
+	}
+
+	return nil
+}
+
+func (e *Engine) Subscribe(subject string, handler nats.Handler) error {
+	var subscription *nats.Subscription
+	var err error
 
 	log.WithFields(log.Fields{
 		"queueName":  e.NATSOptions.QueueName,
@@ -241,11 +319,10 @@ func (e *Engine) Start() error {
 		"engineName": e.Name,
 	}).Debug("creating NATS subscription")
 
-	// Subscribe to "requests.all" since this is relevant for all sources
 	if e.NATSOptions.QueueName == "" {
-		subscription, err = e.natsConnection.Subscribe(subject, e.NewItemRequestHandler(e.Sources()))
+		subscription, err = e.natsConnection.Subscribe(subject, handler)
 	} else {
-		subscription, err = e.natsConnection.QueueSubscribe(subject, e.NATSOptions.QueueName, e.NewItemRequestHandler(e.Sources()))
+		subscription, err = e.natsConnection.QueueSubscribe(subject, e.NATSOptions.QueueName, handler)
 	}
 
 	if err != nil {
@@ -253,52 +330,6 @@ func (e *Engine) Start() error {
 	}
 
 	e.subscriptions = append(e.subscriptions, subscription)
-
-	// Now group sources by the subscriptions they require based on their
-	// supported contexts. Each key represnets a subscription, and the value is
-	// the list of sources that are capable of responding to requests on that
-	// subscription
-	subscriptionMap := make(map[string][]Source)
-
-	for _, src := range e.Sources() {
-		for _, itemContext := range src.Contexts() {
-			var subject string
-
-			if itemContext == sdp.WILDCARD {
-				subject = "request.context.>"
-			} else {
-				subject = fmt.Sprintf("request.context.%v", itemContext)
-			}
-
-			if sources, ok := subscriptionMap[subject]; ok {
-				subscriptionMap[subject] = append(sources, src)
-			} else {
-				subscriptionMap[subject] = []Source{src}
-			}
-		}
-	}
-
-	// Now actually create the required subscriptions
-	for subject, sources := range subscriptionMap {
-		log.WithFields(log.Fields{
-			"queueName":  e.NATSOptions.QueueName,
-			"subject":    subject,
-			"engineName": e.Name,
-		}).Debug("creating NATS subscription")
-
-		// Subscribe to "requests.all" since this is relevant for all sources
-		if e.NATSOptions.QueueName == "" {
-			subscription, err = e.natsConnection.Subscribe(subject, e.NewItemRequestHandler(sources))
-		} else {
-			subscription, err = e.natsConnection.QueueSubscribe(subject, e.NATSOptions.QueueName, e.NewItemRequestHandler(sources))
-		}
-
-		if err != nil {
-			return err
-		}
-
-		e.subscriptions = append(e.subscriptions, subscription)
-	}
 
 	return nil
 }
@@ -325,6 +356,32 @@ func (e *Engine) IsNATSConnected() bool {
 		return false
 	}
 	return false
+}
+
+// CancelItemRequestHandler Takes a CancelItemRequest and cancels that request if it exists
+func (e *Engine) CancelItemRequestHandler(cancelRequest *sdp.CancelItemRequest) {
+	u, err := uuid.FromBytes(cancelRequest.UUID)
+
+	if err != nil {
+		log.Errorf("Error parsing UUID for cancel request: %v", err)
+		return
+	}
+
+	var rt *RequestTracker
+
+	rt, err = e.GetTrackedRequest(u)
+
+	if err != nil {
+		log.Debugf("Could not find tracked request %v. Possibly is has already finished", u.String())
+		return
+	}
+
+	if rt != nil {
+		log.WithFields(log.Fields{
+			"UUID": u.String(),
+		}).Debug("Cancelling request")
+		rt.Cancel()
+	}
 }
 
 // IsWildcard checks if a string is the wildcard. Use this instead of

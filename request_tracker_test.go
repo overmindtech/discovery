@@ -3,9 +3,11 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/overmindtech/sdp-go"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -338,4 +340,56 @@ func TestTimeout(t *testing.T) {
 			t.Errorf("Expected 3 items, got %v", len(items))
 		}
 	})
+}
+
+func TestCancel(t *testing.T) {
+	engine := Engine{
+		Name:                  "test",
+		MaxParallelExecutions: 1,
+	}
+
+	src := SpeedTestSource{
+		QueryDelay: 1 * time.Second,
+	}
+
+	engine.AddSources(&src)
+
+	u := uuid.New()
+
+	rt := RequestTracker{
+		Engine: &engine,
+		Request: &sdp.ItemRequest{
+			Type:      "person",
+			Method:    sdp.RequestMethod_GET,
+			Query:     "somethingElse1",
+			LinkDepth: 10,
+			Context:   "test",
+			UUID:      u[:],
+		},
+	}
+
+	items := make([]*sdp.Item, 0)
+	var err error
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	go func() {
+		items, err = rt.Execute()
+		wg.Done()
+	}()
+
+	// Give it some time to populate the cancelFunc
+	time.Sleep(100 * time.Millisecond)
+
+	rt.Cancel()
+
+	wg.Wait()
+
+	if err == nil {
+		t.Error("expected error but got none")
+	}
+
+	if len(items) != 0 {
+		t.Errorf("Expected no items but got %v", items)
+	}
 }

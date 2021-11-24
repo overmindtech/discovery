@@ -35,6 +35,9 @@ type RequestTracker struct {
 	// The keys in this map are the GloballyUniqueName to speed up searching
 	linkedItems      map[string]*sdp.Item
 	linkedItemsMutex sync.RWMutex
+
+	// cancelFunc A cuntion that will cancel all requests when called
+	cancelFunc context.CancelFunc
 }
 
 func (r *RequestTracker) LinkedItems() []*sdp.Item {
@@ -219,6 +222,7 @@ func (r *RequestTracker) Execute() ([]*sdp.Item, error) {
 
 	// Create context to enforce timeouts
 	ctx, cancel := r.Request.TimeoutContext()
+	r.cancelFunc = cancel
 	defer cancel()
 
 	// Populate the waitgroup with the initial number of requests
@@ -259,6 +263,13 @@ func (r *RequestTracker) Execute() ([]*sdp.Item, error) {
 	}
 
 	return r.LinkedItems(), ctx.Err()
+}
+
+// Cancel Cancells the currently running request
+func (r *RequestTracker) Cancel() {
+	if r.cancelFunc != nil {
+		r.cancelFunc()
+	}
 }
 
 // deleteItemRequest Deletes an item request from a slice
