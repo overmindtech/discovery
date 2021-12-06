@@ -1,6 +1,6 @@
 # SDP Discovery Libraries
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/overmindtech/discovery.svg)](https://pkg.go.dev/github.com/overmindtech/discovery)
+[![Go Reference](https://pkg.go.dev/badge/github.com/overmindtech/discovery.svg)](https://pkg.go.dev/github.com/overmindtech/discovery) [![Tests](https://github.com/overmindtech/discovery/actions/workflows/test.yml/badge.svg)](https://github.com/overmindtech/discovery/actions/workflows/test.yml)
 
 Code to help with all things related to discovering system state using [State Description Protocol](github.com/overmindtech/sdp). Allows users to easily create software that discovers system state, for example:
 
