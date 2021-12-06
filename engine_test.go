@@ -3,6 +3,7 @@ package discovery
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"sync"
 	"testing"
 
@@ -13,8 +14,11 @@ import (
 	"github.com/overmindtech/sdp-go"
 )
 
-const NatsHost = "nats"
-const NatsPort = "4222"
+var NatsTestURLs = []string{
+	"nats://nats:4222",
+	"nats://127.0.0.1:4222",
+	"nats://www.google.com:4222",
+}
 
 func TestDeleteItemRequest(t *testing.T) {
 	one := &sdp.ItemRequest{
@@ -153,9 +157,7 @@ func TestNats(t *testing.T) {
 	e := Engine{
 		Name: "nats-test",
 		NATSOptions: &NATSOptions{
-			URLs: []string{
-				"nats://nats:4222",
-			},
+			URLs:           NatsTestURLs,
 			ConnectionName: "test-connection",
 			ConnectTimeout: time.Second,
 			NumRetries:     5,
@@ -263,9 +265,7 @@ func TestNatsCancel(t *testing.T) {
 	e := Engine{
 		Name: "nats-test",
 		NATSOptions: &NATSOptions{
-			URLs: []string{
-				"nats://nats:4222",
-			},
+			URLs:           NatsTestURLs,
 			ConnectionName: "test-connection",
 			ConnectTimeout: time.Second,
 			NumRetries:     5,
@@ -380,11 +380,28 @@ func TestNatsCancel(t *testing.T) {
 
 // SKipWithoutNats Skips a test if NATS is not available
 func SkipWithoutNats(t *testing.T) {
-	conn, err := net.DialTimeout("tcp", net.JoinHostPort(NatsHost, NatsPort), time.Second)
-	if err != nil {
-		t.Skip("NATS not available, skipping")
+	errors := make([]error, 0)
+
+	for _, urlString := range NatsTestURLs {
+		url, err := url.Parse(urlString)
+
+		if err != nil {
+			t.Errorf("could not parse NATS URL: %v. Error: %v", urlString, err)
+		}
+
+		conn, err := net.DialTimeout("tcp", net.JoinHostPort(url.Hostname(), url.Port()), time.Second)
+
+		if err == nil {
+			conn.Close()
+			return
+		}
+
+		errors = append(errors, err)
 	}
-	if conn != nil {
-		conn.Close()
+
+	for _, e := range errors {
+		t.Log(e)
 	}
+
+	t.Skip("NATS not available")
 }
