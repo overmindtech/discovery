@@ -76,6 +76,10 @@ type Engine struct {
 	// Map of types to all sources for that type
 	sourceMap map[string][]Source
 
+	// Storage for triggers
+	triggers      []*Trigger
+	triggersMutex sync.RWMutex
+
 	// GetFindMutex used for locking
 	gfm GetFindMutex
 
@@ -157,6 +161,60 @@ func (e *Engine) AddSources(sources ...Source) {
 
 		e.sourceMap[src.Type()] = append(e.sourceMap[src.Type()], src)
 	}
+}
+
+// AddTriggers Adds a trigger to this engine. Triggers cause the engine to
+// listen for items from other contexts and will fire a custom ItemRequest if
+// they match
+func (e *Engine) AddTriggers(triggers ...Trigger) {
+	e.triggersMutex.Lock()
+	defer e.triggersMutex.Unlock()
+
+	if e.triggers == nil {
+		e.triggers = make([]*Trigger, 0)
+	}
+
+	for _, trigger := range triggers {
+		e.triggers = append(e.triggers, &trigger)
+	}
+}
+
+// ClearTriggers removes all triggers from the engine
+func (e *Engine) ClearTriggers() {
+	e.triggersMutex.Lock()
+	defer e.triggersMutex.Unlock()
+
+	e.triggers = make([]*Trigger, 0)
+}
+
+// ProcessTriggers Checks all triggers against a given item and fires them if
+// required
+func (e *Engine) ProcessTriggers(item *sdp.Item) {
+	e.triggersMutex.RLock()
+	defer e.triggersMutex.RUnlock()
+
+	wg := sync.WaitGroup{}
+
+	wg.Add(len(e.triggers))
+
+	for _, trigger := range e.triggers {
+		go func(t *Trigger) {
+			defer wg.Done()
+
+			// Check to see if the trigger should fire
+			req, err := t.ProcessItem(item)
+
+			if err != nil {
+				return
+			}
+
+			// Fire the trigger and send the request to the engine
+			e.ItemRequestHandler(req)
+		}(trigger)
+	}
+
+	// Wait for all to complete so that we know what we have running
+	wg.Wait()
 }
 
 // Sources Returns a slice of all known sources
@@ -290,6 +348,14 @@ func (e *Engine) Start() error {
 
 	if err != nil {
 		return err
+	}
+
+	if len(e.triggers) > 0 {
+		err = e.Subscribe("return.item.>", e.ProcessTriggers)
+
+		if err != nil {
+			return err
+		}
 	}
 
 	// Loop over all sources and work out what subscriptions we need to make

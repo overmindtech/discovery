@@ -2,7 +2,6 @@ package discovery
 
 import (
 	"fmt"
-	"net"
 	"sync"
 	"testing"
 
@@ -12,9 +11,6 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/overmindtech/sdp-go"
 )
-
-const NatsHost = "nats"
-const NatsPort = "4222"
 
 func TestDeleteItemRequest(t *testing.T) {
 	one := &sdp.ItemRequest{
@@ -153,9 +149,7 @@ func TestNats(t *testing.T) {
 	e := Engine{
 		Name: "nats-test",
 		NATSOptions: &NATSOptions{
-			URLs: []string{
-				"nats://nats:4222",
-			},
+			URLs:           NatsTestURLs,
 			ConnectionName: "test-connection",
 			ConnectTimeout: time.Second,
 			NumRetries:     5,
@@ -263,9 +257,7 @@ func TestNatsCancel(t *testing.T) {
 	e := Engine{
 		Name: "nats-test",
 		NATSOptions: &NATSOptions{
-			URLs: []string{
-				"nats://nats:4222",
-			},
+			URLs:           NatsTestURLs,
 			ConnectionName: "test-connection",
 			ConnectTimeout: time.Second,
 			NumRetries:     5,
@@ -376,15 +368,4 @@ func TestNatsCancel(t *testing.T) {
 			t.Error(err)
 		}
 	})
-}
-
-// SKipWithoutNats Skips a test if NATS is not available
-func SkipWithoutNats(t *testing.T) {
-	conn, err := net.DialTimeout("tcp", net.JoinHostPort(NatsHost, NatsPort), time.Second)
-	if err != nil {
-		t.Skip("NATS not available, skipping")
-	}
-	if conn != nil {
-		conn.Close()
-	}
 }
