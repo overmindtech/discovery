@@ -181,28 +181,21 @@ func TestNats(t *testing.T) {
 			src.ClearCalls()
 		})
 
-		conn := e.natsConnection
-
 		req := sdp.ItemRequest{
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
 			Query:           "dylan",
 			LinkDepth:       0,
 			Context:         "test",
-			ResponseSubject: nats.NewInbox(),
+			ResponseSubject: NewResponseSubject(),
+			ItemSubject:     NewItemSubject(),
 		}
 
-		progress := sdp.NewRequestProgress()
-
-		conn.Subscribe(req.ResponseSubject, progress.ProcessResponse)
-
-		err := conn.Publish("request.all", &req)
+		_, _, err := e.SendRequestSync(&req)
 
 		if err != nil {
 			t.Error(err)
 		}
-
-		<-progress.Done()
 
 		if len(src.GetCalls) != 1 {
 			t.Errorf("expected 1 get call, got %v: %v", len(src.GetCalls), src.GetCalls)
@@ -214,28 +207,21 @@ func TestNats(t *testing.T) {
 			src.ClearCalls()
 		})
 
-		conn := e.natsConnection
-
 		req := sdp.ItemRequest{
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
 			Query:           "dylan",
 			LinkDepth:       10,
 			Context:         "test",
-			ResponseSubject: nats.NewInbox(),
+			ResponseSubject: NewResponseSubject(),
+			ItemSubject:     NewItemSubject(),
 		}
 
-		progress := sdp.NewRequestProgress()
-
-		conn.Subscribe(req.ResponseSubject, progress.ProcessResponse)
-
-		err := conn.Publish("request.all", &req)
+		_, _, err := e.SendRequestSync(&req)
 
 		if err != nil {
 			t.Error(err)
 		}
-
-		<-progress.Done()
 
 		if len(src.GetCalls) != 10 {
 			t.Errorf("expected 10 get calls, got %v: %v", len(src.GetCalls), src.GetCalls)

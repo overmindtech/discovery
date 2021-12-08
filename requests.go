@@ -2,7 +2,9 @@ package discovery
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
@@ -208,4 +210,67 @@ func (e *Engine) ExpandRequest(request *sdp.ItemRequest) []*sdp.ItemRequest {
 	}
 
 	return requests
+}
+
+// SendRequest Uses the connection to the NATS network that the engine manages
+// to send an SDP request. It will wait for all responders to be complete before
+// returning the request progress, all items, and optionally an error
+func (e *Engine) SendRequestSync(r *sdp.ItemRequest) (*sdp.RequestProgress, []*sdp.Item, error) {
+	var responseSubscription *nats.Subscription
+	var itemSubscription *nats.Subscription
+	var err error
+	var itemsMutex sync.Mutex
+	progress := sdp.NewRequestProgress()
+	items := make([]*sdp.Item, 0)
+
+	addItem := func(i *sdp.Item) {
+		itemsMutex.Lock()
+		defer itemsMutex.Unlock()
+
+		items = append(items, i)
+	}
+
+	if r == nil {
+		return progress, items, errors.New("ItemRequest cannot be nil")
+	}
+
+	responseSubscription, err = e.natsConnection.Subscribe(r.ResponseSubject, progress.ProcessResponse)
+
+	if err != nil {
+		return progress, items, err
+	}
+
+	itemSubscription, err = e.natsConnection.Subscribe(r.ItemSubject, addItem)
+
+	if err != nil {
+		return progress, items, err
+	}
+
+	// Calculate the correct subject
+	var subject string
+
+	if r.Context == sdp.WILDCARD {
+		subject = "request.all"
+	} else {
+		subject = fmt.Sprintf("request.context.%v", r.Context)
+	}
+
+	err = e.natsConnection.Publish(subject, r)
+
+	if err != nil {
+		return progress, items, err
+	}
+
+	// Wait for all responders
+	<-progress.Done()
+
+	// Drain subscriptions
+	responseSubscription.Drain()
+	itemSubscription.Drain()
+
+	// Take a lock to make certain all items have been added
+	itemsMutex.Lock()
+	defer itemsMutex.Unlock()
+
+	return progress, items, nil
 }
