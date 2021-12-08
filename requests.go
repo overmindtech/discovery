@@ -2,11 +2,25 @@ package discovery
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/nats-io/nats.go"
 	"github.com/overmindtech/sdp-go"
 	log "github.com/sirupsen/logrus"
 )
+
+// NewItemSubject Generates a random subject name for returning items e.g.
+// return.item._INBOX.712ab421
+func NewItemSubject() string {
+	return fmt.Sprintf("return.item.%v", nats.NewInbox())
+}
+
+// NewResponseSubject Generates a random subject name for returning responses
+// e.g. return.response._INBOX.978af6de
+func NewResponseSubject() string {
+	return fmt.Sprintf("return.response.%v", nats.NewInbox())
+}
 
 // NewItemRequestHandler Returns a function whose job is to handle a single
 // request. This includes responses, linking etc.
