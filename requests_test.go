@@ -224,3 +224,46 @@ func TestNewItemRequestHandler(t *testing.T) {
 	})
 
 }
+
+func TestWildcardSourceExpansion(t *testing.T) {
+	e := Engine{
+		Name: "test",
+	}
+
+	personSource := TestSource{
+		ReturnType: "person",
+		ReturnContexts: []string{
+			sdp.WILDCARD,
+		},
+	}
+
+	e.AddSources(&personSource)
+
+	t.Run("request context should be preserved", func(t *testing.T) {
+		req := sdp.ItemRequest{
+			Type:      "person",
+			Method:    sdp.RequestMethod_GET,
+			Query:     "Dylan1",
+			Context:   "something.specific",
+			LinkDepth: 0,
+		}
+
+		// Run the handler
+		e.ItemRequestHandler(&req)
+
+		if len(personSource.GetCalls) != 1 {
+			t.Errorf("expected 1 get call got %v", len(personSource.GetCalls))
+		}
+
+		call := personSource.GetCalls[0]
+
+		if expected := "something.specific"; call[0] != expected {
+			t.Errorf("expected itemContext to be %v, got %v", expected, call[0])
+		}
+
+		if expected := "Dylan1"; call[1] != expected {
+			t.Errorf("expected query to be %v, got %v", expected, call[1])
+		}
+	})
+
+}

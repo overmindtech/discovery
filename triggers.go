@@ -51,7 +51,7 @@ func (t *Trigger) ProcessItem(i *sdp.Item) (*sdp.ItemRequest, error) {
 	if i.Metadata != nil && i.Metadata.SourceRequest != nil {
 		// If the values have not been set, copy their values from the source
 		// request
-		if req.LinkDepth == uint32(0) {
+		if req.LinkDepth == uint32(0) && i.Metadata.SourceRequest.LinkDepth != uint32(0) {
 			req.LinkDepth = i.Metadata.SourceRequest.LinkDepth - 1
 		}
 

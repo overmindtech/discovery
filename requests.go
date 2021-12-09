@@ -189,18 +189,27 @@ func (e *Engine) ExpandRequest(request *sdp.ItemRequest) []*sdp.ItemRequest {
 	requests := make([]*sdp.ItemRequest, 0)
 
 	for _, src := range relevantSources {
-		for _, ctx := range src.Contexts() {
+		for _, sourceContext := range src.Contexts() {
 			// Create a new request if:
 			//
 			// * The source supports all contexts, or
 			// * The request context is a wildcard, or
 			// * The request context matches source context
-			if IsWildcard(ctx) || IsWildcard(request.Context) || ctx == request.Context {
+			if IsWildcard(sourceContext) || IsWildcard(request.Context) || sourceContext == request.Context {
+				var itemContext string
+
+				// Choose the more specific context
+				if IsWildcard(sourceContext) {
+					itemContext = request.Context
+				} else {
+					itemContext = sourceContext
+				}
+
 				requests = append(requests, &sdp.ItemRequest{
 					Type:            src.Type(),
 					Method:          request.Method,
 					Query:           request.Query,
-					Context:         ctx,
+					Context:         itemContext,
 					ItemSubject:     request.ItemSubject,
 					ResponseSubject: request.ResponseSubject,
 					LinkDepth:       request.LinkDepth,
