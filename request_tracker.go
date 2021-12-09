@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -114,22 +115,34 @@ func (r *RequestTracker) startLinking(ctx context.Context) {
 							return
 						}
 
-						if i.GetMetadata().GetSourceRequest().GetLinkDepth() > 0 {
-							// Resolve links
-							r.linkItem(ctx, i)
+						var hasSourceRequest bool
+						var itemSubject string
+
+						if metadata := i.GetMetadata(); metadata != nil {
+							if sourceRequest := metadata.GetSourceRequest(); sourceRequest != nil {
+								hasSourceRequest = true
+								itemSubject = sourceRequest.ItemSubject
+
+								if sourceRequest.GetLinkDepth() > 0 {
+									// Resolve links
+									r.linkItem(ctx, i)
+								}
+							}
 						}
 
 						// Send the fully linked item back onto the network
-						if r.Engine.IsNATSConnected() {
-							// Respond with the Item
-							err := r.Engine.natsConnection.Publish(i.Metadata.SourceRequest.ItemSubject, i)
+						if e := r.Engine; e != nil && hasSourceRequest {
+							if e.IsNATSConnected() {
+								// Respond with the Item
+								err := e.natsConnection.Publish(itemSubject, i)
 
-							if err != nil {
-								// TODO: I probably shouldn't be logging directly here but I
-								// don't want the error to be lost
-								log.WithFields(log.Fields{
-									"error": err,
-								}).Error("Response publishing error")
+								if err != nil {
+									// TODO: I probably shouldn't be logging directly here but I
+									// don't want the error to be lost
+									log.WithFields(log.Fields{
+										"error": err,
+									}).Error("Response publishing error")
+								}
 							}
 						}
 					}(unlinkedItem)
@@ -158,6 +171,10 @@ func (r *RequestTracker) linkItem(ctx context.Context, parent *sdp.Item) {
 	for _, lir := range parent.LinkedItemRequests {
 		go func(p *sdp.Item, req *sdp.ItemRequest) {
 			defer lirWG.Done()
+
+			if r.Engine == nil {
+				return
+			}
 
 			linkedItems, err := r.Engine.ExecuteRequest(ctx, req)
 
@@ -204,8 +221,8 @@ func (r *RequestTracker) stopLinking() {
 }
 
 func (r *RequestTracker) Execute() ([]*sdp.Item, error) {
-	var errors []error
-	var errorsMutex sync.Mutex
+	var errs []error
+	var errsMutex sync.Mutex
 	var requestsWait sync.WaitGroup
 	var expandedRequests []*sdp.ItemRequest
 
@@ -215,6 +232,10 @@ func (r *RequestTracker) Execute() ([]*sdp.Item, error) {
 
 	if r.Request == nil {
 		return nil, nil
+	}
+
+	if r.Engine == nil {
+		return nil, errors.New("no engine supplied, cannot execute")
 	}
 
 	// Expand wildcards based on what the engine can provide
@@ -246,9 +267,9 @@ func (r *RequestTracker) Execute() ([]*sdp.Item, error) {
 					r.queueUnlinkedItem(item)
 				}
 			} else {
-				errorsMutex.Lock()
-				errors = append(errors, err)
-				errorsMutex.Unlock()
+				errsMutex.Lock()
+				errs = append(errs, err)
+				errsMutex.Unlock()
 			}
 		}(request)
 	}
@@ -258,8 +279,8 @@ func (r *RequestTracker) Execute() ([]*sdp.Item, error) {
 	r.stopLinking()
 
 	// If everything has failed then just stop here
-	if len(errors) == len(expandedRequests) {
-		return nil, errors[0]
+	if len(errs) == len(expandedRequests) {
+		return nil, errs[0]
 	}
 
 	return r.LinkedItems(), ctx.Err()
