@@ -38,7 +38,8 @@ type RequestTracker struct {
 	linkedItemsMutex sync.RWMutex
 
 	// cancelFunc A cuntion that will cancel all requests when called
-	cancelFunc context.CancelFunc
+	cancelFunc      context.CancelFunc
+	cancelFuncMutex sync.Mutex
 }
 
 func (r *RequestTracker) LinkedItems() []*sdp.Item {
@@ -243,7 +244,9 @@ func (r *RequestTracker) Execute() ([]*sdp.Item, error) {
 
 	// Create context to enforce timeouts
 	ctx, cancel := r.Request.TimeoutContext()
+	r.cancelFuncMutex.Lock()
 	r.cancelFunc = cancel
+	r.cancelFuncMutex.Unlock()
 	defer cancel()
 
 	// Populate the waitgroup with the initial number of requests
@@ -288,6 +291,9 @@ func (r *RequestTracker) Execute() ([]*sdp.Item, error) {
 
 // Cancel Cancells the currently running request
 func (r *RequestTracker) Cancel() {
+	r.cancelFuncMutex.Lock()
+	defer r.cancelFuncMutex.Unlock()
+
 	if r.cancelFunc != nil {
 		r.cancelFunc()
 	}

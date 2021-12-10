@@ -157,8 +157,8 @@ func TestGet(t *testing.T) {
 		var item3 *sdp.Item
 		var err error
 
-		e.cache.StartPurger()
 		e.cache.MinWaitTime = (10 * time.Millisecond)
+		e.cache.StartPurger()
 		req := sdp.ItemRequest{
 			Type:    "person",
 			Context: "test",

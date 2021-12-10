@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
@@ -228,15 +229,18 @@ func (e *Engine) SendRequestSync(r *sdp.ItemRequest) (*sdp.RequestProgress, []*s
 	var responseSubscription *nats.Subscription
 	var itemSubscription *nats.Subscription
 	var err error
+	var itemsWG sync.WaitGroup
 	var itemsMutex sync.Mutex
 	progress := sdp.NewRequestProgress()
 	items := make([]*sdp.Item, 0)
 
 	addItem := func(i *sdp.Item) {
-		itemsMutex.Lock()
-		defer itemsMutex.Unlock()
+		itemsWG.Add(1)
+		defer itemsWG.Done()
 
+		itemsMutex.Lock()
 		items = append(items, i)
+		itemsMutex.Unlock()
 	}
 
 	if r == nil {
@@ -277,9 +281,21 @@ func (e *Engine) SendRequestSync(r *sdp.ItemRequest) (*sdp.RequestProgress, []*s
 	responseSubscription.Drain()
 	itemSubscription.Drain()
 
+	// NOTE: This is a nasty hack that is in place to ensure that we can wait
+	// for all items to be processed before returning. The better solution to
+	// this would be to actually know how many messages to expect, but this will
+	// require changes ot the SDP protocol and will probably coincide with a
+	// move to NATS JetStream. For now this works
+	for {
+		if n, _, err := itemSubscription.Pending(); n == 0 || err != nil {
+			break
+		}
+
+		time.Sleep(10 * time.Millisecond)
+	}
+
 	// Take a lock to make certain all items have been added
-	itemsMutex.Lock()
-	defer itemsMutex.Unlock()
+	itemsWG.Wait()
 
 	return progress, items, nil
 }
