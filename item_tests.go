@@ -57,13 +57,16 @@ func TestValidateItem(t *testing.T, i *sdp.Item) {
 	for index, linkedItemRequest := range i.GetLinkedItemRequests() {
 		if linkedItemRequest.GetType() == "" {
 			t.Errorf("LinkedItemRequest %v of item %v has empty type", index, i.GloballyUniqueName())
-
 		}
 
 		if linkedItemRequest.GetMethod() != sdp.RequestMethod_FIND {
 			if linkedItemRequest.GetQuery() == "" {
 				t.Errorf("LinkedItemRequest %v of item %v has empty query. This is not allowed unless the method is FIND", index, i.GloballyUniqueName())
 			}
+		}
+
+		if linkedItemRequest.GetContext() == "" {
+			t.Errorf("LinkedItemRequest %v of item %v has empty context", index, i.GloballyUniqueName())
 		}
 	}
 }

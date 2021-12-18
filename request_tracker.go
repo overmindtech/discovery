@@ -10,13 +10,12 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// RequestTracker is used for tracking the progress of a single request (or a set
-// of related requests). This is required because a single request could have a
-// link depth that results in many requests being executed meaning that we need
-// to not only track the first request, but also all other requests and items
-// that result from linking
+// RequestTracker is used for tracking the progress of a single requestt. This
+// is used because a single request could have a link depth that results in many
+// requests being executed meaning that we need to not only track the first
+// request, but also all other requests and items that result from linking
 type RequestTracker struct {
-	// The list of requests to track
+	// The request to track
 	Request *sdp.ItemRequest
 
 	// The engine that this is connected to, used for sending NATS messages
