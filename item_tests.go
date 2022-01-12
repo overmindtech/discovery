@@ -2,10 +2,13 @@
 package discovery
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/overmindtech/sdp-go"
 )
+
+var RFC1123 = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
 
 // TestValidateItem Checks an item to ensure it is a valid SDP item. This includes
 // checking that all required attributes are populated
@@ -17,6 +20,20 @@ func TestValidateItem(t *testing.T, i *sdp.Item) {
 	// * Attributes
 	if i.GetType() == "" {
 		t.Errorf("Item %v has an empty Type", i.GloballyUniqueName())
+	}
+
+	// Validate that the pattern is RFC1123
+	if !RFC1123.MatchString(i.GetType()) {
+		pattern := `
+Type names should match RFC1123 (lower case). This means the name must:
+
+	* contain at most 63 characters
+	* contain only lowercase alphanumeric characters or '-'
+	* start with an alphanumeric character
+	* end with an alphanumeric character	
+`
+
+		t.Errorf("Item type %v is invalid. %v", i.GetType(), pattern)
 	}
 
 	if i.GetUniqueAttribute() == "" {
