@@ -2,12 +2,10 @@ package discovery
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/nats-io/nats.go"
 	"github.com/overmindtech/sdp-go"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
@@ -341,50 +339,4 @@ func TestSendRequestSync(t *testing.T) {
 
 	}
 
-}
-
-func TestExample(t *testing.T) {
-	nc, _ := nats.Connect("nats://localhost:4222")
-
-	var words []string
-	var wordsMutex sync.Mutex
-	var wordsWG sync.WaitGroup
-
-	handler := func(msg *nats.Msg) {
-		// Add to the waitgroup before trying to get a lock
-		wordsWG.Add(1)
-		defer wordsWG.Done()
-
-		// Get a lock to avoid a data race
-		wordsMutex.Lock()
-		defer wordsMutex.Unlock()
-
-		// Append the message content
-		words = append(words, string(msg.Data))
-	}
-
-	nc.Subscribe("words", handler)
-
-	// Let's say I get some external signal here to say that there won't be any
-	// more messages sent. This means I want to finish process and then be done
-	//
-	// I'll use a time.Sleep as a stand-in
-	<-time.After(100 * time.Millisecond)
-
-	// This will remove interest in the subject but there's a chance the
-	// handlers are still running
-	nc.Drain()
-
-	// At this point if I call nc.Pending() I can see there are still messages
-	// pending
-
-	// Wait for the handlers
-	wordsWG.Wait()
-
-	// The problem is, at this point there's still a chance that some messages
-	// are in flight. If there is a goroutine that is reading the message, but
-	// hasn't yet executed the handler, the WaitGroup will be zero and therefore
-	// my execution will continue when in fact there is still processing going
-	// on in the background. Is there a sane way to wait in the way I'm hoping
-	// to, other than periodically checking nc.Pending()?
 }
