@@ -247,6 +247,10 @@ func (e *Engine) SendRequestSync(r *sdp.ItemRequest) (*sdp.RequestProgress, []*s
 		return progress, items, errors.New("ItemRequest cannot be nil")
 	}
 
+	if e.natsConnection == nil {
+		return progress, items, errors.New("Engine has no NATS connection. Has it been started?")
+	}
+
 	responseSubscription, err = e.natsConnection.Subscribe(r.ResponseSubject, progress.ProcessResponse)
 
 	if err != nil {

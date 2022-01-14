@@ -160,7 +160,14 @@ func TestNats(t *testing.T) {
 
 	src := TestSource{}
 
-	e.AddSources(&src)
+	e.AddSources(
+		&src,
+		&TestSource{
+			ReturnContexts: []string{
+				sdp.WILDCARD,
+			},
+		},
+	)
 
 	t.Run("Starting", func(t *testing.T) {
 		err := e.Connect()
@@ -173,6 +180,10 @@ func TestNats(t *testing.T) {
 
 		if err != nil {
 			t.Error(err)
+		}
+
+		if len(e.subscriptions) != 4 {
+			t.Errorf("Expected engine to have 4 subscriptions, got %v", len(e.subscriptions))
 		}
 	})
 
