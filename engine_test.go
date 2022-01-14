@@ -195,7 +195,7 @@ func TestNats(t *testing.T) {
 		req := sdp.ItemRequest{
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
-			Query:           "dylan",
+			Query:           "basic",
 			LinkDepth:       0,
 			Context:         "test",
 			ResponseSubject: NewResponseSubject(),
@@ -221,7 +221,7 @@ func TestNats(t *testing.T) {
 		req := sdp.ItemRequest{
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
-			Query:           "dylan",
+			Query:           "deeplink",
 			LinkDepth:       10,
 			Context:         "test",
 			ResponseSubject: NewResponseSubject(),
@@ -234,8 +234,8 @@ func TestNats(t *testing.T) {
 			t.Error(err)
 		}
 
-		if len(src.GetCalls) != 10 {
-			t.Errorf("expected 10 get calls, got %v: %v", len(src.GetCalls), src.GetCalls)
+		if len(src.GetCalls) != 11 {
+			t.Errorf("expected 11 get calls, got %v: %v", len(src.GetCalls), src.GetCalls)
 		}
 	})
 
