@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -57,6 +58,8 @@ type TestSource struct {
 	FindCalls      [][]string
 	SearchCalls    [][]string
 	IsHidden       bool
+	ReturnWeight   int
+	ReturnName     string
 	mutex          sync.Mutex
 }
 
@@ -76,7 +79,7 @@ func (s *TestSource) Type() string {
 }
 
 func (s *TestSource) Name() string {
-	return "testSource"
+	return fmt.Sprintf("testSource-%v", s.ReturnName)
 }
 
 func (s *TestSource) DefaultCacheDuration() time.Duration {
@@ -159,5 +162,5 @@ func (s *TestSource) Search(ctx context.Context, itemContext string, query strin
 }
 
 func (s *TestSource) Weight() int {
-	return 10
+	return s.ReturnWeight
 }

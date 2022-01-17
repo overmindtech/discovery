@@ -31,3 +31,17 @@ jobs:
   
     - name: Test
       run: go test -timeout 30s ./... -race
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    needs:
+      - test
+    steps:
+      # Creates a release and attaches
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          generateReleaseNotes: true
+          token: ${{ secrets.GITHUB_TOKEN }}

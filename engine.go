@@ -159,7 +159,7 @@ func (e *Engine) AddSources(sources ...Source) {
 			return iSource.Weight() > jSource.Weight()
 		})
 
-		e.sourceMap[src.Type()] = append(e.sourceMap[src.Type()], src)
+		e.sourceMap[src.Type()] = allSources
 	}
 }
 
@@ -363,24 +363,31 @@ func (e *Engine) Start() error {
 	// stored in a map for de-duplication before being subscribed to
 	subscriptionMap := make(map[string]bool)
 
+	// We need to track if we are making a wildcard subscription. If we are then
+	// there isn't any point making 10 subscriptions since they will be covered
+	// by the wildcard anyway and will end up being duplicates. In that case we
+	// should just be making the one
+	var wildcardExists bool
+
 	for _, src := range e.Sources() {
 		for _, itemContext := range src.Contexts() {
-			var subjectSuffix string
-
 			if itemContext == sdp.WILDCARD {
-				subjectSuffix = ">"
+				wildcardExists = true
 			} else {
-				subjectSuffix = itemContext
+				subscriptionMap[itemContext] = true
 			}
-
-			subscriptionMap[subjectSuffix] = true
 		}
 	}
 
 	// Now actually create the required subscriptions
-	for suffix := range subscriptionMap {
-		e.Subscribe(fmt.Sprintf("request.context.%v", suffix), e.ItemRequestHandler)
-		e.Subscribe(fmt.Sprintf("cancel.context.%v", suffix), e.CancelItemRequestHandler)
+	if wildcardExists {
+		e.Subscribe("request.context.>", e.ItemRequestHandler)
+		e.Subscribe("cancel.context.>", e.CancelItemRequestHandler)
+	} else {
+		for suffix := range subscriptionMap {
+			e.Subscribe(fmt.Sprintf("request.context.%v", suffix), e.ItemRequestHandler)
+			e.Subscribe(fmt.Sprintf("cancel.context.%v", suffix), e.CancelItemRequestHandler)
+		}
 	}
 
 	return nil
@@ -463,6 +470,11 @@ func (e *Engine) CancelItemRequestHandler(cancelRequest *sdp.CancelItemRequest) 
 		}).Debug("Cancelling request")
 		rt.Cancel()
 	}
+}
+
+// ClearCache Completely clears the cache
+func (e *Engine) ClearCache() {
+	e.cache.Clear()
 }
 
 // IsWildcard checks if a string is the wildcard. Use this instead of

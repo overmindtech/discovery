@@ -41,60 +41,160 @@ func TestFilterSources(t *testing.T) {
 	)
 
 	t.Run("Right type wrong context", func(t *testing.T) {
-		if s := e.FilterSources("person", "wrong"); len(s) != 1 {
-			t.Error("expected only wildcard context to match")
+		req := sdp.ItemRequest{
+			Type:    "person",
+			Context: "wrong",
 		}
+
+		ee := ExpectExpand{
+			NumRequests: 1,
+			NumSources:  1,
+		}
+
+		ee.Validate(t, e.ExpandRequest(&req))
 	})
 
 	t.Run("Right context wrong type", func(t *testing.T) {
-		if s := e.FilterSources("wrong", "test"); len(s) != 0 {
-			t.Error("found source when expecting no filter results")
+		req := sdp.ItemRequest{
+			Type:    "wrong",
+			Context: "test",
 		}
+
+		ee := ExpectExpand{
+			NumRequests: 0,
+			NumSources:  0,
+		}
+
+		ee.Validate(t, e.ExpandRequest(&req))
 	})
 
 	t.Run("Right both", func(t *testing.T) {
-		if x := len(e.FilterSources("person", "test")); x != 2 {
-			t.Errorf("expected to find 2 sources, found %v", x)
+		req := sdp.ItemRequest{
+			Type:    "person",
+			Context: "test",
 		}
+
+		ee := ExpectExpand{
+			NumRequests: 1,
+			NumSources:  2,
+		}
+
+		ee.Validate(t, e.ExpandRequest(&req))
 	})
 
 	t.Run("Multi-context", func(t *testing.T) {
-		if x := len(e.FilterSources("chair", "testB")); x != 1 {
-			t.Errorf("expected to find 1 source, found %v", x)
+		req := sdp.ItemRequest{
+			Type:    "chair",
+			Context: "testB",
 		}
+
+		ee := ExpectExpand{
+			NumRequests: 1,
+			NumSources:  1,
+		}
+
+		ee.Validate(t, e.ExpandRequest(&req))
 	})
 
 	t.Run("Wildcard context", func(t *testing.T) {
-		if x := len(e.FilterSources("person", sdp.WILDCARD)); x != 2 {
-			t.Errorf("expected to find 2 sources, found %v", x)
+		req := sdp.ItemRequest{
+			Type:    "person",
+			Context: sdp.WILDCARD,
 		}
 
-		if x := len(e.FilterSources("chair", sdp.WILDCARD)); x != 1 {
-			t.Errorf("expected to find 1 sources, found %v", x)
+		ee := ExpectExpand{
+			NumRequests: 2,
+			NumSources:  2,
 		}
+
+		ee.Validate(t, e.ExpandRequest(&req))
+
+		req = sdp.ItemRequest{
+			Type:    "chair",
+			Context: sdp.WILDCARD,
+		}
+
+		ee = ExpectExpand{
+			NumRequests: 2,
+			NumSources:  2,
+		}
+
+		ee.Validate(t, e.ExpandRequest(&req))
 	})
 
 	t.Run("Wildcard type", func(t *testing.T) {
-		if x := len(e.FilterSources(sdp.WILDCARD, "test")); x != 3 {
-			t.Errorf("expected to find 3 sources, found %v", x)
+		req := sdp.ItemRequest{
+			Type:    sdp.WILDCARD,
+			Context: "test",
 		}
+
+		ee := ExpectExpand{
+			NumRequests: 2,
+			NumSources:  3,
+		}
+
+		ee.Validate(t, e.ExpandRequest(&req))
 	})
 
 	t.Run("Wildcard both", func(t *testing.T) {
-		if x := len(e.FilterSources(sdp.WILDCARD, sdp.WILDCARD)); x != 4 {
-			t.Errorf("expected to find 4 sources, found %v", x)
+		req := sdp.ItemRequest{
+			Type:    sdp.WILDCARD,
+			Context: sdp.WILDCARD,
 		}
+
+		ee := ExpectExpand{
+			NumRequests: 5,
+			NumSources:  5,
+		}
+
+		ee.Validate(t, e.ExpandRequest(&req))
 	})
 
 	t.Run("Finding hidden source with wildcard context", func(t *testing.T) {
-		if x := len(e.FilterSources("hidden_person", sdp.WILDCARD)); x != 0 {
+		req := sdp.ItemRequest{
+			Type:    "hidden_person",
+			Context: sdp.WILDCARD,
+		}
+		if x := len(e.ExpandRequest(&req)); x != 0 {
 			t.Errorf("expected to find 0 sources, found %v", x)
 		}
 
-		if x := len(e.FilterSources("hidden_person", "test")); x != 1 {
+		req = sdp.ItemRequest{
+			Type:    "hidden_person",
+			Context: "test",
+		}
+		if x := len(e.ExpandRequest(&req)); x != 1 {
 			t.Errorf("expected to find 1 sources, found %v", x)
 		}
 	})
+}
+
+type ExpectExpand struct {
+	NumRequests int
+
+	// Note that this is not the number of unique sources, but teh number of
+	// sources total. So if a source would be hit twice this will be 2
+	NumSources int
+}
+
+func (e *ExpectExpand) Validate(t *testing.T, m map[*sdp.ItemRequest][]Source) {
+	t.Helper()
+
+	numSources := 0
+	numRequests := 0
+
+	for _, v := range m {
+		numRequests++
+		numSources = numSources + len(v)
+	}
+
+	if e.NumRequests != numRequests {
+		t.Errorf("Expected %v requests, got %v", e.NumRequests, numRequests)
+	}
+
+	if e.NumSources != numSources {
+		t.Errorf("Expected %v sources, got %v", e.NumSources, numSources)
+	}
 }
 
 func TestSourceAdd(t *testing.T) {
@@ -130,10 +230,11 @@ func TestGet(t *testing.T) {
 			src.ClearCalls()
 		})
 
-		e.Get(context.Background(), &sdp.ItemRequest{
+		e.ExecuteRequest(context.Background(), &sdp.ItemRequest{
 			Type:    "person",
 			Context: "test",
 			Query:   "three",
+			Method:  sdp.RequestMethod_GET,
 		})
 
 		if x := len(src.GetCalls); x != 1 {
@@ -152,9 +253,9 @@ func TestGet(t *testing.T) {
 			src.ClearCalls()
 		})
 
-		var finds1 *sdp.Item
-		var item2 *sdp.Item
-		var item3 *sdp.Item
+		var finds1 []*sdp.Item
+		var item2 []*sdp.Item
+		var item3 []*sdp.Item
 		var err error
 
 		e.cache.MinWaitTime = (10 * time.Millisecond)
@@ -163,9 +264,10 @@ func TestGet(t *testing.T) {
 			Type:    "person",
 			Context: "test",
 			Query:   "Dylan",
+			Method:  sdp.RequestMethod_GET,
 		}
 
-		finds1, err = e.Get(context.Background(), &req)
+		finds1, err = e.ExecuteRequest(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -173,25 +275,25 @@ func TestGet(t *testing.T) {
 
 		time.Sleep(20 * time.Millisecond)
 
-		item2, err = e.Get(context.Background(), &req)
+		item2, err = e.ExecuteRequest(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
 		}
 
-		if finds1.Metadata.Timestamp.String() != item2.Metadata.Timestamp.String() {
-			t.Errorf("Get requests 10ms apart had different timestamps, caching not working. %v != %v", finds1.Metadata.Timestamp.String(), item2.Metadata.Timestamp.String())
+		if finds1[0].Metadata.Timestamp.String() != item2[0].Metadata.Timestamp.String() {
+			t.Errorf("Get requests 10ms apart had different timestamps, caching not working. %v != %v", finds1[0].Metadata.Timestamp.String(), item2[0].Metadata.Timestamp.String())
 		}
 
 		time.Sleep(200 * time.Millisecond)
 
-		item3, err = e.Get(context.Background(), &req)
+		item3, err = e.ExecuteRequest(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
 		}
 
-		if item2.Metadata.Timestamp.String() == item3.Metadata.Timestamp.String() {
+		if item2[0].Metadata.Timestamp.String() == item3[0].Metadata.Timestamp.String() {
 			t.Error("Get requests 200ms apart had the same timestamps, cache not expiring")
 		}
 	})
@@ -205,10 +307,11 @@ func TestGet(t *testing.T) {
 			Type:    "person",
 			Context: "empty",
 			Query:   "query",
+			Method:  sdp.RequestMethod_GET,
 		}
 
-		e.Get(context.Background(), &req)
-		e.Get(context.Background(), &req)
+		e.ExecuteRequest(context.Background(), &req)
+		e.ExecuteRequest(context.Background(), &req)
 
 		if l := len(src.GetCalls); l != 1 {
 			t.Errorf("Expected 1 Get call due to caching og NOTFOUND errors, got %v", l)
@@ -223,25 +326,27 @@ func TestGet(t *testing.T) {
 		src.IsHidden = true
 
 		t.Run("Get", func(t *testing.T) {
-			item, err := e.Get(context.Background(), &sdp.ItemRequest{
+			item, err := e.ExecuteRequest(context.Background(), &sdp.ItemRequest{
 				Type:    "person",
 				Context: "test",
 				Query:   "three",
+				Method:  sdp.RequestMethod_GET,
 			})
 
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			if !item.Metadata.Hidden {
+			if !item[0].Metadata.Hidden {
 				t.Fatal("Item was not marked as hidden in metedata")
 			}
 		})
 
 		t.Run("Find", func(t *testing.T) {
-			items, err := e.Find(context.Background(), &sdp.ItemRequest{
+			items, err := e.ExecuteRequest(context.Background(), &sdp.ItemRequest{
 				Type:    "person",
 				Context: "test",
+				Method:  sdp.RequestMethod_FIND,
 			})
 
 			if err != nil {
@@ -254,10 +359,11 @@ func TestGet(t *testing.T) {
 		})
 
 		t.Run("Search", func(t *testing.T) {
-			items, err := e.Search(context.Background(), &sdp.ItemRequest{
+			items, err := e.ExecuteRequest(context.Background(), &sdp.ItemRequest{
 				Type:    "person",
 				Context: "test",
 				Query:   "three",
+				Method:  sdp.RequestMethod_SEARCH,
 			})
 
 			if err != nil {
@@ -280,9 +386,10 @@ func TestFind(t *testing.T) {
 
 	e.AddSources(&src)
 
-	e.Find(context.Background(), &sdp.ItemRequest{
+	e.ExecuteRequest(context.Background(), &sdp.ItemRequest{
 		Type:    "person",
 		Context: "test",
+		Method:  sdp.RequestMethod_FIND,
 	})
 
 	if x := len(src.FindCalls); x != 1 {
@@ -305,10 +412,11 @@ func TestSearch(t *testing.T) {
 
 	e.AddSources(&src)
 
-	e.Search(context.Background(), &sdp.ItemRequest{
+	e.ExecuteRequest(context.Background(), &sdp.ItemRequest{
 		Type:    "person",
 		Context: "test",
 		Query:   "query",
+		Method:  sdp.RequestMethod_SEARCH,
 	})
 
 	if x := len(src.SearchCalls); x != 1 {
@@ -351,9 +459,10 @@ func TestFindSearchCaching(t *testing.T) {
 		req := sdp.ItemRequest{
 			Type:    "person",
 			Context: "test",
+			Method:  sdp.RequestMethod_FIND,
 		}
 
-		finds1, err = e.Find(context.Background(), &req)
+		finds1, err = e.ExecuteRequest(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -361,7 +470,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(10 * time.Millisecond)
 
-		finds2, err = e.Find(context.Background(), &req)
+		finds2, err = e.ExecuteRequest(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -373,7 +482,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(200 * time.Millisecond)
 
-		finds3, err = e.Find(context.Background(), &req)
+		finds3, err = e.ExecuteRequest(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -393,9 +502,10 @@ func TestFindSearchCaching(t *testing.T) {
 		req := sdp.ItemRequest{
 			Type:    "person",
 			Context: "empty",
+			Method:  sdp.RequestMethod_FIND,
 		}
 
-		_, err = e.Find(context.Background(), &req)
+		_, err = e.ExecuteRequest(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -403,7 +513,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(10 * time.Millisecond)
 
-		_, err = e.Find(context.Background(), &req)
+		_, err = e.ExecuteRequest(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -415,7 +525,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(200 * time.Millisecond)
 
-		_, err = e.Find(context.Background(), &req)
+		_, err = e.ExecuteRequest(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -439,9 +549,10 @@ func TestFindSearchCaching(t *testing.T) {
 			Type:    "person",
 			Context: "test",
 			Query:   "query",
+			Method:  sdp.RequestMethod_SEARCH,
 		}
 
-		finds1, err = e.Search(context.Background(), &req)
+		finds1, err = e.ExecuteRequest(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -449,7 +560,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(10 * time.Millisecond)
 
-		finds2, err = e.Search(context.Background(), &req)
+		finds2, err = e.ExecuteRequest(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -461,7 +572,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(200 * time.Millisecond)
 
-		finds3, err = e.Search(context.Background(), &req)
+		finds3, err = e.ExecuteRequest(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -482,9 +593,10 @@ func TestFindSearchCaching(t *testing.T) {
 			Type:    "person",
 			Context: "empty",
 			Query:   "query",
+			Method:  sdp.RequestMethod_SEARCH,
 		}
 
-		_, err = e.Search(context.Background(), &req)
+		_, err = e.ExecuteRequest(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -492,7 +604,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(10 * time.Millisecond)
 
-		_, err = e.Search(context.Background(), &req)
+		_, err = e.ExecuteRequest(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -504,7 +616,7 @@ func TestFindSearchCaching(t *testing.T) {
 
 		time.Sleep(200 * time.Millisecond)
 
-		_, err = e.Search(context.Background(), &req)
+		_, err = e.ExecuteRequest(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -524,10 +636,11 @@ func TestFindSearchCaching(t *testing.T) {
 			Type:    "person",
 			Context: "error",
 			Query:   "query",
+			Method:  sdp.RequestMethod_GET,
 		}
 
-		e.Get(context.Background(), &req)
-		e.Get(context.Background(), &req)
+		e.ExecuteRequest(context.Background(), &req)
+		e.ExecuteRequest(context.Background(), &req)
 
 		if l := len(src.GetCalls); l != 2 {
 			t.Errorf("Exected 2 get calls, got %v, OTHER errors should not be cached", l)
@@ -543,14 +656,21 @@ func TestFindSearchCaching(t *testing.T) {
 			Type:    "person",
 			Context: "error",
 			Query:   "query",
+			Method:  sdp.RequestMethod_GET,
 		}
 
-		e.Get(context.Background(), &req)
-		e.Get(context.Background(), &req)
-		e.Find(context.Background(), &req)
-		e.Find(context.Background(), &req)
-		e.Search(context.Background(), &req)
-		e.Search(context.Background(), &req)
+		e.ExecuteRequest(context.Background(), &req)
+		e.ExecuteRequest(context.Background(), &req)
+
+		req.Method = sdp.RequestMethod_FIND
+
+		e.ExecuteRequest(context.Background(), &req)
+		e.ExecuteRequest(context.Background(), &req)
+
+		req.Method = sdp.RequestMethod_SEARCH
+
+		e.ExecuteRequest(context.Background(), &req)
+		e.ExecuteRequest(context.Background(), &req)
 
 		if l := len(src.GetCalls); l != 2 {
 			t.Errorf("Exected 2 get calls, got %v", l)

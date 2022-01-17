@@ -160,7 +160,14 @@ func TestNats(t *testing.T) {
 
 	src := TestSource{}
 
-	e.AddSources(&src)
+	e.AddSources(
+		&src,
+		&TestSource{
+			ReturnContexts: []string{
+				sdp.WILDCARD,
+			},
+		},
+	)
 
 	t.Run("Starting", func(t *testing.T) {
 		err := e.Connect()
@@ -174,17 +181,22 @@ func TestNats(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
+
+		if len(e.subscriptions) != 4 {
+			t.Errorf("Expected engine to have 4 subscriptions, got %v", len(e.subscriptions))
+		}
 	})
 
 	t.Run("Handling a basic request", func(t *testing.T) {
 		t.Cleanup(func() {
 			src.ClearCalls()
+			e.ClearCache()
 		})
 
 		req := sdp.ItemRequest{
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
-			Query:           "dylan",
+			Query:           "basic",
 			LinkDepth:       0,
 			Context:         "test",
 			ResponseSubject: NewResponseSubject(),
@@ -205,12 +217,13 @@ func TestNats(t *testing.T) {
 	t.Run("Handling a deeply linking request", func(t *testing.T) {
 		t.Cleanup(func() {
 			src.ClearCalls()
+			e.ClearCache()
 		})
 
 		req := sdp.ItemRequest{
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
-			Query:           "dylan",
+			Query:           "deeplink",
 			LinkDepth:       10,
 			Context:         "test",
 			ResponseSubject: NewResponseSubject(),
@@ -223,8 +236,8 @@ func TestNats(t *testing.T) {
 			t.Error(err)
 		}
 
-		if len(src.GetCalls) != 10 {
-			t.Errorf("expected 10 get calls, got %v: %v", len(src.GetCalls), src.GetCalls)
+		if len(src.GetCalls) != 11 {
+			t.Errorf("expected 11 get calls, got %v: %v", len(src.GetCalls), src.GetCalls)
 		}
 	})
 

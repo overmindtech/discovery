@@ -340,3 +340,364 @@ func TestSendRequestSync(t *testing.T) {
 	}
 
 }
+
+func TestExpandRequest(t *testing.T) {
+	e := Engine{
+		Name: "expand-test",
+	}
+
+	t.Run("with a single source with a single context", func(t *testing.T) {
+		t.Cleanup(func() {
+			e.sourceMap = nil
+			e.ClearCache()
+		})
+
+		simple := TestSource{
+			ReturnContexts: []string{
+				"test1",
+			},
+		}
+
+		e.AddSources(&simple)
+
+		e.ItemRequestHandler(&sdp.ItemRequest{
+			Type:    "person",
+			Method:  sdp.RequestMethod_GET,
+			Query:   "Debby",
+			Context: "*",
+		})
+
+		if expected := 1; len(simple.GetCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, len(simple.GetCalls))
+		}
+	})
+
+	t.Run("with a single source with many contexts", func(t *testing.T) {
+		t.Cleanup(func() {
+			e.sourceMap = nil
+			e.ClearCache()
+		})
+
+		many := TestSource{
+			ReturnName: "many",
+			ReturnContexts: []string{
+				"test1",
+				"test2",
+				"test3",
+			},
+		}
+
+		e.AddSources(&many)
+
+		e.ItemRequestHandler(&sdp.ItemRequest{
+			Type:    "person",
+			Method:  sdp.RequestMethod_GET,
+			Query:   "Debby",
+			Context: "*",
+		})
+
+		if expected := 3; len(many.GetCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, many.GetCalls)
+		}
+	})
+
+	t.Run("with many sources with single contexts", func(t *testing.T) {
+		t.Cleanup(func() {
+			e.sourceMap = nil
+			e.ClearCache()
+		})
+
+		sx := TestSource{
+			ReturnName: "sx",
+			ReturnContexts: []string{
+				"test1",
+			},
+		}
+
+		sy := TestSource{
+			ReturnName: "sy",
+			ReturnContexts: []string{
+				"test2",
+			},
+		}
+
+		e.AddSources(&sx)
+		e.AddSources(&sy)
+
+		e.ItemRequestHandler(&sdp.ItemRequest{
+			Type:    "person",
+			Method:  sdp.RequestMethod_GET,
+			Query:   "Daniel",
+			Context: "*",
+		})
+
+		if expected := 1; len(sx.GetCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sx.GetCalls)
+		}
+
+		if expected := 1; len(sy.GetCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sy.GetCalls)
+		}
+	})
+
+	t.Run("with many sources with many contexts", func(t *testing.T) {
+		t.Cleanup(func() {
+			e.sourceMap = nil
+			e.ClearCache()
+		})
+
+		sx := TestSource{
+			ReturnName: "sx",
+			ReturnContexts: []string{
+				"test1",
+				"test2",
+				"test3",
+			},
+		}
+
+		sy := TestSource{
+			ReturnName: "sy",
+			ReturnContexts: []string{
+				"test4",
+				"test5",
+				"test6",
+			},
+		}
+
+		e.AddSources(&sx)
+		e.AddSources(&sy)
+
+		e.ItemRequestHandler(&sdp.ItemRequest{
+			Type:    "person",
+			Method:  sdp.RequestMethod_GET,
+			Query:   "Steven",
+			Context: "*",
+		})
+
+		if expected := 3; len(sx.GetCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sx.GetCalls)
+		}
+
+		if expected := 3; len(sy.GetCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sy.GetCalls)
+		}
+	})
+
+	t.Run("with many sources with many contexts which overlap GET", func(t *testing.T) {
+		t.Cleanup(func() {
+			e.sourceMap = nil
+			e.ClearCache()
+		})
+
+		sx := TestSource{
+			ReturnName: "sx",
+			ReturnContexts: []string{
+				"test1",
+				"test2",
+				"test3",
+			},
+			ReturnWeight: 10,
+		}
+
+		sy := TestSource{
+			ReturnName: "sy",
+			ReturnContexts: []string{
+				"test2",
+				"test3",
+				"test4",
+			},
+			ReturnWeight: 11,
+		}
+
+		e.AddSources(&sx)
+		e.AddSources(&sy)
+
+		e.ItemRequestHandler(&sdp.ItemRequest{
+			Type:    "person",
+			Method:  sdp.RequestMethod_GET,
+			Query:   "Jane",
+			Context: "*",
+		})
+
+		if expected := 1; len(sx.GetCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sx.GetCalls)
+		}
+
+		if expected := 3; len(sy.GetCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sy.GetCalls)
+		}
+	})
+
+	t.Run("with many sources with many contexts which overlap FIND", func(t *testing.T) {
+		t.Cleanup(func() {
+			e.sourceMap = nil
+			e.ClearCache()
+		})
+
+		sx := TestSource{
+			ReturnName: "sx",
+			ReturnContexts: []string{
+				"test1",
+				"test2",
+				"test3",
+			},
+		}
+
+		sy := TestSource{
+			ReturnName: "sy",
+			ReturnContexts: []string{
+				"test2",
+				"test3",
+				"test4",
+			},
+		}
+
+		e.AddSources(&sx)
+		e.AddSources(&sy)
+
+		e.ItemRequestHandler(&sdp.ItemRequest{
+			Type:    "person",
+			Method:  sdp.RequestMethod_FIND,
+			Query:   "Jane",
+			Context: "*",
+		})
+
+		if expected := 3; len(sx.FindCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sx.FindCalls)
+		}
+
+		if expected := 3; len(sy.FindCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sy.FindCalls)
+		}
+	})
+
+	t.Run("with a single wildcard source", func(t *testing.T) {
+		t.Cleanup(func() {
+			e.sourceMap = nil
+			e.ClearCache()
+		})
+
+		sx := TestSource{
+			ReturnName: "sx",
+			ReturnContexts: []string{
+				sdp.WILDCARD,
+			},
+		}
+
+		e.AddSources(&sx)
+
+		e.ItemRequestHandler(&sdp.ItemRequest{
+			Type:    "person",
+			Method:  sdp.RequestMethod_FIND,
+			Query:   "Rachel",
+			Context: "*",
+		})
+
+		if expected := 1; len(sx.FindCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sx.FindCalls)
+		}
+	})
+
+	t.Run("with a many wildcard sources", func(t *testing.T) {
+		t.Cleanup(func() {
+			e.sourceMap = nil
+			e.ClearCache()
+		})
+
+		sx := TestSource{
+			ReturnName: "sx",
+			ReturnContexts: []string{
+				sdp.WILDCARD,
+			},
+		}
+
+		sy := TestSource{
+			ReturnName: "sy",
+			ReturnContexts: []string{
+				sdp.WILDCARD,
+			},
+		}
+
+		sz := TestSource{
+			ReturnName: "sz",
+			ReturnContexts: []string{
+				sdp.WILDCARD,
+			},
+		}
+
+		e.AddSources(&sx)
+		e.AddSources(&sy)
+		e.AddSources(&sz)
+
+		e.ItemRequestHandler(&sdp.ItemRequest{
+			Type:    "person",
+			Method:  sdp.RequestMethod_FIND,
+			Query:   "Ross",
+			Context: "*",
+		})
+
+		if expected := 1; len(sx.FindCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sx.FindCalls)
+		}
+
+		if expected := 1; len(sy.FindCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sy.FindCalls)
+		}
+
+		if expected := 1; len(sz.FindCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sz.FindCalls)
+		}
+	})
+
+	t.Run("with a many wildcard sources and static sources", func(t *testing.T) {
+		t.Cleanup(func() {
+			e.sourceMap = nil
+			e.ClearCache()
+		})
+
+		sx := TestSource{
+			ReturnName: "sx",
+			ReturnContexts: []string{
+				sdp.WILDCARD,
+			},
+		}
+
+		sy := TestSource{
+			ReturnName: "sy",
+			ReturnContexts: []string{
+				"test1",
+			},
+		}
+
+		sz := TestSource{
+			ReturnName: "sz",
+			ReturnContexts: []string{
+				"test2",
+				"test3",
+			},
+		}
+
+		e.AddSources(&sx)
+		e.AddSources(&sy)
+		e.AddSources(&sz)
+
+		e.ItemRequestHandler(&sdp.ItemRequest{
+			Type:    "person",
+			Method:  sdp.RequestMethod_FIND,
+			Query:   "Ross",
+			Context: "*",
+		})
+
+		if expected := 1; len(sx.FindCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sx.FindCalls)
+		}
+
+		if expected := 1; len(sy.FindCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sy.FindCalls)
+		}
+
+		if expected := 2; len(sz.FindCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sz.FindCalls)
+		}
+	})
+}

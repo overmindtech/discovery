@@ -2,6 +2,8 @@ package discovery
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"sync"
@@ -11,6 +13,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/overmindtech/sdp-go"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/proto"
 )
 
 // NewItemSubject Generates a random subject name for returning items e.g.
@@ -28,7 +31,7 @@ func NewResponseSubject() string {
 // NewItemRequestHandler Returns a function whose job is to handle a single
 // request. This includes responses, linking etc.
 func (e *Engine) ItemRequestHandler(itemRequest *sdp.ItemRequest) {
-	if len(e.FilterSources(itemRequest.Type, itemRequest.Context)) == 0 {
+	if !e.WillRespond(itemRequest) {
 		// If we don't have any relevant sources, exit
 		return
 	}
@@ -124,53 +127,122 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest) ([]*s
 		return nil, ctx.Err()
 	}
 
-	var requestItem *sdp.Item
-	var requestError error
+	items := make(chan *sdp.Item)
+	errors := make(chan error)
+	done := make(chan bool)
+	wg := sync.WaitGroup{}
 
-	requestItems := make([]*sdp.Item, 0)
+	expanded := e.ExpandRequest(req)
 
-	// TODO: Thread safety
-
-	// Make the request of all sources
-	switch req.GetMethod() {
-	case sdp.RequestMethod_GET:
-		requestItem, requestError = e.Get(ctx, req)
-		requestItems = append(requestItems, requestItem)
-	case sdp.RequestMethod_FIND:
-		requestItems, requestError = e.Find(ctx, req)
-	case sdp.RequestMethod_SEARCH:
-		requestItems, requestError = e.Search(ctx, req)
+	if len(expanded) == 0 {
+		return []*sdp.Item{}, &sdp.ItemRequestError{
+			ErrorType:   sdp.ItemRequestError_NOCONTEXT,
+			ErrorString: "No matching sources found",
+			Context:     req.Context,
+		}
 	}
 
-	// If there was an error in the request then simply return
-	if requestError != nil {
-		return nil, sdp.NewItemRequestError(requestError)
+	for request, sources := range expanded {
+		wg.Add(1)
+		go func(r *sdp.ItemRequest, sources []Source) {
+			defer wg.Done()
+			var requestItems []*sdp.Item
+			var requestError error
+
+			// Make the request of all sources
+			switch req.GetMethod() {
+			case sdp.RequestMethod_GET:
+				var requestItem *sdp.Item
+
+				requestItem, requestError = e.Get(ctx, r, sources)
+				requestItems = append(requestItems, requestItem)
+			case sdp.RequestMethod_FIND:
+				requestItems, requestError = e.Find(ctx, r, sources)
+			case sdp.RequestMethod_SEARCH:
+				requestItems, requestError = e.Search(ctx, r, sources)
+			}
+
+			for _, i := range requestItems {
+				// If the main request had a linkDepth of great than zero it means we
+				// need to keep linking, this means that we need to pass down all of the
+				// subject info along with the number of remaining links. If the link
+				// depth is zero then we just pass then back in their normal form as we
+				// won't be executing them
+				if req.GetLinkDepth() > 0 {
+					for _, lir := range i.LinkedItemRequests {
+						lir.LinkDepth = req.LinkDepth - 1
+						lir.ItemSubject = req.ItemSubject
+						lir.ResponseSubject = req.ResponseSubject
+						lir.IgnoreCache = req.IgnoreCache
+						lir.Timeout = req.Timeout
+						lir.UUID = req.UUID
+					}
+				}
+
+				// Assign the item request
+				if i.Metadata != nil {
+					i.Metadata.SourceRequest = req
+				}
+
+				items <- i
+			}
+			errors <- requestError
+		}(request, sources)
 	}
 
-	for _, i := range requestItems {
-		// If the main request had a linkDepth of great than zero it means we
-		// need to keep linking, this means that we need to pass down all of the
-		// subject info along with the number of remaining links. If the link
-		// depth is zero then we just pass then back in their normal form as we
-		// won't be executing them
-		if req.GetLinkDepth() > 0 {
-			for _, lir := range i.LinkedItemRequests {
-				lir.LinkDepth = req.LinkDepth - 1
-				lir.ItemSubject = req.ItemSubject
-				lir.ResponseSubject = req.ResponseSubject
-				lir.IgnoreCache = req.IgnoreCache
-				lir.Timeout = req.Timeout
-				lir.UUID = req.UUID
+	allItems := make([]*sdp.Item, 0)
+	allErrors := make([]error, 0)
+
+	go func() {
+		for item := range items {
+			allItems = append(allItems, item)
+		}
+		done <- true
+	}()
+
+	go func() {
+		for err := range errors {
+			allErrors = append(allErrors, err)
+		}
+		done <- true
+	}()
+
+	// Wait for all requests to complete
+	wg.Wait()
+
+	// Close channels as no more messages are coming
+	close(items)
+	close(errors)
+
+	// Wait for all channels to empty and be added to slices
+	<-done
+	<-done
+
+	// If all failed then return first error
+	if len(allErrors) == len(expanded) && len(allErrors) > 0 {
+		return allItems, allErrors[0]
+	}
+
+	return allItems, nil
+}
+
+// WillRespond Performs a cursory check to see if it's likely that this engine
+// will respond to a given request based on the type and context of teh request.
+// Should be used an initial check before proceeding to detailed processing.
+func (e *Engine) WillRespond(req *sdp.ItemRequest) bool {
+	for _, src := range e.Sources() {
+		typeMatch := (req.Type == src.Type() || IsWildcard(req.Type))
+
+		for _, context := range src.Contexts() {
+			contextMatch := (req.Context == context || IsWildcard(req.Context) || IsWildcard(context))
+
+			if contextMatch && typeMatch {
+				return true
 			}
 		}
-
-		// Assign the item request
-		if i.Metadata != nil {
-			i.Metadata.SourceRequest = req
-		}
 	}
 
-	return requestItems, requestError
+	return false
 }
 
 // ExpandRequest Expands requests with wildcards to no longer contain wildcards.
@@ -183,20 +255,41 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest) ([]*s
 // exception to this is if we have a source that supports all contexts, but is
 // unable to list them. In this case there will still be some requests with
 // wildcard contexts as they can't be expanded
-func (e *Engine) ExpandRequest(request *sdp.ItemRequest) []*sdp.ItemRequest {
-	// Filter to just sources that are capable of responding
-	relevantSources := e.FilterSources(request.Type, request.Context)
+//
+// This functions returns a map of requests with the sources that they should be
+// run against
+func (e *Engine) ExpandRequest(request *sdp.ItemRequest) map[*sdp.ItemRequest][]Source {
+	requests := make(map[string]*struct {
+		Request *sdp.ItemRequest
+		Sources []Source
+	})
 
-	requests := make([]*sdp.ItemRequest, 0)
+	var checkSources []Source
 
-	for _, src := range relevantSources {
+	if IsWildcard(request.Type) {
+		// If the request has a wildcard type, all non-hidden sources might try
+		// to respond
+		checkSources = e.NonHiddenSources()
+	} else {
+		// If the type is specific, pull just sources for that type
+		checkSources = e.sourceMap[request.Type]
+	}
+
+	for _, src := range checkSources {
+		// Calculate if the source is hidden
+		var isHidden bool
+
+		if hs, ok := src.(HiddenSource); ok {
+			isHidden = hs.Hidden()
+		}
+
 		for _, sourceContext := range src.Contexts() {
 			// Create a new request if:
 			//
 			// * The source supports all contexts, or
-			// * The request context is a wildcard, or
+			// * The request context is a wildcard (and the source is not hidden), or
 			// * The request context matches source context
-			if IsWildcard(sourceContext) || IsWildcard(request.Context) || sourceContext == request.Context {
+			if IsWildcard(sourceContext) || (IsWildcard(request.Context) && !isHidden) || sourceContext == request.Context {
 				var itemContext string
 
 				// Choose the more specific context
@@ -206,7 +299,7 @@ func (e *Engine) ExpandRequest(request *sdp.ItemRequest) []*sdp.ItemRequest {
 					itemContext = sourceContext
 				}
 
-				requests = append(requests, &sdp.ItemRequest{
+				request := sdp.ItemRequest{
 					Type:            src.Type(),
 					Method:          request.Method,
 					Query:           request.Query,
@@ -214,12 +307,39 @@ func (e *Engine) ExpandRequest(request *sdp.ItemRequest) []*sdp.ItemRequest {
 					ItemSubject:     request.ItemSubject,
 					ResponseSubject: request.ResponseSubject,
 					LinkDepth:       request.LinkDepth,
-				})
+					IgnoreCache:     request.IgnoreCache,
+					UUID:            request.UUID,
+					Timeout:         request.Timeout,
+				}
+
+				hash, err := requestHash(&request)
+
+				if err == nil {
+					if existing, ok := requests[hash]; ok {
+						existing.Sources = append(existing.Sources, src)
+					} else {
+						requests[hash] = &struct {
+							Request *sdp.ItemRequest
+							Sources []Source
+						}{
+							Request: &request,
+							Sources: []Source{
+								src,
+							},
+						}
+					}
+				}
 			}
 		}
 	}
 
-	return requests
+	// Convert back to final map
+	finalMap := make(map[*sdp.ItemRequest][]Source)
+	for _, expanded := range requests {
+		finalMap[expanded.Request] = expanded.Sources
+	}
+
+	return finalMap
 }
 
 // SendRequest Uses the connection to the NATS network that the engine manages
@@ -245,6 +365,10 @@ func (e *Engine) SendRequestSync(r *sdp.ItemRequest) (*sdp.RequestProgress, []*s
 
 	if r == nil {
 		return progress, items, errors.New("ItemRequest cannot be nil")
+	}
+
+	if e.natsConnection == nil {
+		return progress, items, errors.New("Engine has no NATS connection. Has it been started?")
 	}
 
 	responseSubscription, err = e.natsConnection.Subscribe(r.ResponseSubject, progress.ProcessResponse)
@@ -298,4 +422,19 @@ func (e *Engine) SendRequestSync(r *sdp.ItemRequest) (*sdp.RequestProgress, []*s
 	itemsWG.Wait()
 
 	return progress, items, nil
+}
+
+// requestHash Calculates a hash for a given request which can be used to
+// determine if two requests are identical
+func requestHash(req *sdp.ItemRequest) (string, error) {
+	hash := sha1.New()
+
+	// Marshall to bytes so that we can use sha1 to compare the raw binary
+	b, err := proto.Marshal(req)
+
+	if err != nil {
+		return "", err
+	}
+
+	return base64.URLEncoding.EncodeToString(hash.Sum(b)), nil
 }
