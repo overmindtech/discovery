@@ -190,6 +190,7 @@ func TestNats(t *testing.T) {
 	t.Run("Handling a basic request", func(t *testing.T) {
 		t.Cleanup(func() {
 			src.ClearCalls()
+			e.ClearCache()
 		})
 
 		req := sdp.ItemRequest{
@@ -216,6 +217,7 @@ func TestNats(t *testing.T) {
 	t.Run("Handling a deeply linking request", func(t *testing.T) {
 		t.Cleanup(func() {
 			src.ClearCalls()
+			e.ClearCache()
 		})
 
 		req := sdp.ItemRequest{
