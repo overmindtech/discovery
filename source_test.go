@@ -52,6 +52,10 @@ func TestFilterSources(t *testing.T) {
 		}
 
 		ee.Validate(t, e.ExpandRequest(&req))
+
+		if !e.WillRespond(&req) {
+			t.Error("Engine reported that it will not respond to this request, it should be responding")
+		}
 	})
 
 	t.Run("Right context wrong type", func(t *testing.T) {
@@ -80,6 +84,10 @@ func TestFilterSources(t *testing.T) {
 		}
 
 		ee.Validate(t, e.ExpandRequest(&req))
+
+		if !e.WillRespond(&req) {
+			t.Error("Engine reported that it will not respond to this request, it should be responding")
+		}
 	})
 
 	t.Run("Multi-context", func(t *testing.T) {
@@ -94,6 +102,10 @@ func TestFilterSources(t *testing.T) {
 		}
 
 		ee.Validate(t, e.ExpandRequest(&req))
+
+		if !e.WillRespond(&req) {
+			t.Error("Engine reported that it will not respond to this request, it should be responding")
+		}
 	})
 
 	t.Run("Wildcard context", func(t *testing.T) {
@@ -109,6 +121,10 @@ func TestFilterSources(t *testing.T) {
 
 		ee.Validate(t, e.ExpandRequest(&req))
 
+		if !e.WillRespond(&req) {
+			t.Error("Engine reported that it will not respond to this request, it should be responding")
+		}
+
 		req = sdp.ItemRequest{
 			Type:    "chair",
 			Context: sdp.WILDCARD,
@@ -120,6 +136,10 @@ func TestFilterSources(t *testing.T) {
 		}
 
 		ee.Validate(t, e.ExpandRequest(&req))
+
+		if !e.WillRespond(&req) {
+			t.Error("Engine reported that it will not respond to this request, it should be responding")
+		}
 	})
 
 	t.Run("Wildcard type", func(t *testing.T) {
@@ -134,6 +154,10 @@ func TestFilterSources(t *testing.T) {
 		}
 
 		ee.Validate(t, e.ExpandRequest(&req))
+
+		if !e.WillRespond(&req) {
+			t.Error("Engine reported that it will not respond to this request, it should be responding")
+		}
 	})
 
 	t.Run("Wildcard both", func(t *testing.T) {
@@ -148,6 +172,10 @@ func TestFilterSources(t *testing.T) {
 		}
 
 		ee.Validate(t, e.ExpandRequest(&req))
+
+		if !e.WillRespond(&req) {
+			t.Error("Engine reported that it will not respond to this request, it should be responding")
+		}
 	})
 
 	t.Run("Finding hidden source with wildcard context", func(t *testing.T) {
@@ -165,6 +193,10 @@ func TestFilterSources(t *testing.T) {
 		}
 		if x := len(e.ExpandRequest(&req)); x != 1 {
 			t.Errorf("expected to find 1 sources, found %v", x)
+		}
+
+		if !e.WillRespond(&req) {
+			t.Error("Engine reported that it will not respond to this request, it should be responding")
 		}
 	})
 }
