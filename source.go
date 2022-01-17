@@ -98,53 +98,9 @@ func GetCacheDuration(s Source) time.Duration {
 	return (10 * time.Minute)
 }
 
-// FilterSources returns the set of sources that match the supplied type and
-// context. Supports wildcards in either position
-func (e *Engine) FilterSources(typ string, context string) []Source {
-	var checkSources []Source
-
-	if IsWildcard(typ) {
-		// If the type is a wildcard then check all sources for matching context
-		// except hidden ones
-		checkSources = e.NonHiddenSources()
-	} else {
-		checkSources = e.sourceMap[typ]
-	}
-
-	sources := make([]Source, 0)
-
-	// Get all sources that match the supplied type
-	for _, source := range checkSources {
-		// Calculate if the source is hidden
-		var isHidden bool
-
-		if hs, ok := source.(HiddenSource); ok {
-			isHidden = hs.Hidden()
-		}
-
-		// Filter by matching context
-		for _, sourceContext := range source.Contexts() {
-			// Should should be included if:
-			//
-			// * The source has the same context as requested
-			// * The source supports all contexts (wildcard)
-			// * The request of for a wildcard AND the source isn't hidden
-			//
-			if sourceContext == context || IsWildcard(sourceContext) || (IsWildcard(context) && !isHidden) {
-				sources = append(sources, source)
-				break
-			}
-		}
-	}
-
-	return sources
-}
-
 // Get Runs a get query against known sources in priority order. If nothing was
 // found, returns the first error
-func (e *Engine) Get(ctx context.Context, r *sdp.ItemRequest) (*sdp.Item, error) {
-	relevantSources := e.FilterSources(r.Type, r.Context)
-
+func (e *Engine) Get(ctx context.Context, r *sdp.ItemRequest, relevantSources []Source) (*sdp.Item, error) {
 	if len(relevantSources) == 0 {
 		return nil, &sdp.ItemRequestError{
 			ErrorType:   sdp.ItemRequestError_NOCONTEXT,
@@ -278,11 +234,9 @@ func (e *Engine) Get(ctx context.Context, r *sdp.ItemRequest) (*sdp.Item, error)
 // Find executes Find() on all sources for a given type, returning the merged
 // results. Only returns an error if all sources fail, in which case returns the
 // first error
-func (e *Engine) Find(ctx context.Context, r *sdp.ItemRequest) ([]*sdp.Item, error) {
+func (e *Engine) Find(ctx context.Context, r *sdp.ItemRequest, relevantSources []Source) ([]*sdp.Item, error) {
 	var storageMutex sync.Mutex
 	var workingSources sync.WaitGroup
-
-	relevantSources := e.FilterSources(r.Type, r.Context)
 
 	if len(relevantSources) == 0 {
 		return nil, &sdp.ItemRequestError{
@@ -434,11 +388,10 @@ func (e *Engine) Find(ctx context.Context, r *sdp.ItemRequest) ([]*sdp.Item, err
 // Search executes Search() on all sources for a given type, returning the merged
 // results. Only returns an error if all sources fail, in which case returns the
 // first error
-func (e *Engine) Search(ctx context.Context, r *sdp.ItemRequest) ([]*sdp.Item, error) {
+func (e *Engine) Search(ctx context.Context, r *sdp.ItemRequest, relevantSources []Source) ([]*sdp.Item, error) {
 	var storageMutex sync.Mutex
 	var workingSources sync.WaitGroup
 
-	relevantSources := e.FilterSources(r.Type, r.Context)
 	searchableSources := make([]SearchableSource, 0)
 
 	// Filter further by searchability

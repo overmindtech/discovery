@@ -159,7 +159,7 @@ func (e *Engine) AddSources(sources ...Source) {
 			return iSource.Weight() > jSource.Weight()
 		})
 
-		e.sourceMap[src.Type()] = append(e.sourceMap[src.Type()], src)
+		e.sourceMap[src.Type()] = allSources
 	}
 }
 
@@ -470,6 +470,11 @@ func (e *Engine) CancelItemRequestHandler(cancelRequest *sdp.CancelItemRequest) 
 		}).Debug("Cancelling request")
 		rt.Cancel()
 	}
+}
+
+// ClearCache Completely clears the cache
+func (e *Engine) ClearCache() {
+	e.cache.Clear()
 }
 
 // IsWildcard checks if a string is the wildcard. Use this instead of

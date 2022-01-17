@@ -238,9 +238,6 @@ func (r *RequestTracker) Execute() ([]*sdp.Item, error) {
 		return nil, errors.New("no engine supplied, cannot execute")
 	}
 
-	// Expand wildcards based on what the engine can provide
-	expandedRequests = r.Engine.ExpandRequest(r.Request)
-
 	// Create context to enforce timeouts
 	ctx, cancel := r.Request.TimeoutContext()
 	r.cancelFuncMutex.Lock()
@@ -253,27 +250,20 @@ func (r *RequestTracker) Execute() ([]*sdp.Item, error) {
 
 	r.startLinking(ctx)
 
-	// Process requests
-	for _, request := range expandedRequests {
-		go func(req *sdp.ItemRequest) {
-			defer requestsWait.Done()
+	// Run the request
+	items, err := r.Engine.ExecuteRequest(ctx, r.Request)
 
-			// Run the request
-			items, err := r.Engine.ExecuteRequest(ctx, req)
-
-			// If it worked, put the items in the unlinked queue for linking
-			if err == nil {
-				for _, item := range items {
-					// Add to the queue. This will be picked up by other
-					// goroutine, linked and published once done
-					r.queueUnlinkedItem(item)
-				}
-			} else {
-				errsMutex.Lock()
-				errs = append(errs, err)
-				errsMutex.Unlock()
-			}
-		}(request)
+	// If it worked, put the items in the unlinked queue for linking
+	if err == nil {
+		for _, item := range items {
+			// Add to the queue. This will be picked up by other
+			// goroutine, linked and published once done
+			r.queueUnlinkedItem(item)
+		}
+	} else {
+		errsMutex.Lock()
+		errs = append(errs, err)
+		errsMutex.Unlock()
 	}
 
 	// Wait for all of the initial requests to be done processing
@@ -281,7 +271,7 @@ func (r *RequestTracker) Execute() ([]*sdp.Item, error) {
 	r.stopLinking()
 
 	// If everything has failed then just stop here
-	if len(errs) == len(expandedRequests) {
+	if len(errs) == len(expandedRequests) && len(errs) > 0 {
 		return nil, errs[0]
 	}
 
