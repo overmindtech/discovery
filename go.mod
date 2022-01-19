@@ -6,6 +6,7 @@ go 1.17
 require (
 	github.com/google/uuid v1.3.0
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
+	github.com/nats-io/nats-server/v2 v2.7.0
 	github.com/nats-io/nats.go v1.13.1-0.20211122170419-d7c1d78a50fc
 	github.com/overmindtech/sdp-go v0.6.1
 	github.com/overmindtech/sdpcache v0.2.0
@@ -16,7 +17,9 @@ require (
 // Transitive dependencies
 require (
 	github.com/google/go-cmp v0.5.6 // indirect
-	github.com/nats-io/nats-server/v2 v2.6.6 // indirect
+	github.com/klauspost/compress v1.14.1 // indirect
+	github.com/minio/highwayhash v1.0.2 // indirect
+	github.com/nats-io/jwt/v2 v2.2.1-0.20220113022732-58e87895b296 // indirect
 	github.com/nats-io/nkeys v0.3.0 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/stretchr/testify v1.7.0 // indirect

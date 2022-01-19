@@ -28,8 +28,19 @@ type NATSOptions struct {
 	// How long to wait when trying to connect to each NATS server
 	ConnectTimeout time.Duration
 
-	// How many times to retry if there was an error when connecting
-	NumRetries int
+	// MaxReconnect sets the number of reconnect attempts that will be
+	// tried before giving up. If negative, then it will never give up
+	// trying to reconnect.
+	MaxReconnect int
+
+	// ReconnectWait sets the time to backoff after attempting a reconnect
+	// to a server that we were already connected to previously.
+	ReconnectWait time.Duration
+
+	// ReconnectJitter sets the upper bound for a random delay added to
+	// ReconnectWait during a reconnect when no TLS is used.
+	// Note that any jitter is capped with ReconnectJitterMax.
+	ReconnectJitter time.Duration
 
 	// Path to the customer CA file to use when using TLS (if required)
 	CAFile string
@@ -252,7 +263,6 @@ func (e *Engine) NonHiddenSources() []Source {
 func (e *Engine) Connect() error {
 	// Try to connect to NATS
 	if no := e.NATSOptions; no != nil {
-		var tries int
 		var servers string
 
 		// Register our custom encoder
@@ -265,6 +275,47 @@ func (e *Engine) Connect() error {
 		options := []nats.Option{
 			nats.Name(no.ConnectionName),
 			nats.Timeout(no.ConnectTimeout),
+			nats.RetryOnFailedConnect(true),
+			nats.MaxReconnects(no.MaxReconnect),
+			nats.DisconnectErrHandler(func(c *nats.Conn, e error) {
+				log.WithFields(log.Fields{
+					"error":   e,
+					"address": c.ConnectedAddr(),
+				}).Error("NATS disconnected")
+			}),
+			nats.ReconnectHandler(func(c *nats.Conn) {
+				log.WithFields(log.Fields{
+					"reconnects": c.Reconnects,
+					"ServerID":   c.ConnectedServerId(),
+					"URL:":       c.ConnectedUrl(),
+				}).Info("NATS reconnected")
+			}),
+			nats.ClosedHandler(func(c *nats.Conn) {
+				log.WithFields(log.Fields{
+					"error": c.LastError(),
+				}).Info("NATS connection closed")
+			}),
+			nats.LameDuckModeHandler(func(c *nats.Conn) {
+				log.WithFields(log.Fields{
+					"address": c.ConnectedAddr(),
+				}).Info("NATS server has entered lame duck mode")
+			}),
+			nats.ErrorHandler(func(c *nats.Conn, s *nats.Subscription, e error) {
+				log.WithFields(log.Fields{
+					"error":   e,
+					"address": c.ConnectedAddr(),
+					"subject": s.Subject,
+					"queue":   s.Queue,
+				}).Error("NATS error")
+			}),
+		}
+
+		if no.ReconnectWait > 0 {
+			options = append(options, nats.ReconnectWait(no.ReconnectWait))
+		}
+
+		if no.ReconnectJitter > 0 {
+			options = append(options, nats.ReconnectJitter(no.ReconnectJitter, no.ReconnectJitter))
 		}
 
 		if no.CAFile != "" {
@@ -275,52 +326,72 @@ func (e *Engine) Connect() error {
 			options = append(options, nats.UserCredentials(no.JWTFile, no.NkeyFile))
 		}
 
-		// Loop until we have a connection
-		for tries <= no.NumRetries {
-			log.WithFields(log.Fields{
-				"servers": servers,
-			}).Info("Connecting to NATS")
+		log.WithFields(log.Fields{
+			"servers": servers,
+		}).Info("NATS connecting")
 
-			// TODO: Make these options more configurable
-			// https://docs.nats.io/developing-with-nats/connecting/pingpong
-			nc, err := nats.Connect(
-				servers,
-				options...,
-			)
+		// TODO: Make these options more configurable
+		// https://docs.nats.io/developing-with-nats/connecting/pingpong
+		nc, err := nats.Connect(
+			servers,
+			options...,
+		)
 
-			if err == nil {
-				var enc *nats.EncodedConn
-
-				enc, err = nats.NewEncodedConn(nc, "sdp")
-
-				if err != nil {
-					return err
-				}
-
-				e.natsConnection = enc
-
-				log.WithFields(log.Fields{
-					"Addr":     e.natsConnection.Conn.ConnectedAddr(),
-					"ServerID": e.natsConnection.Conn.ConnectedServerId(),
-					"URL:":     e.natsConnection.Conn.ConnectedUrl(),
-				}).Info("NATS connected")
-
-				return nil
-			}
-
-			// Increment tries
-			tries++
-
-			log.WithFields(log.Fields{
-				"servers": servers,
-				"err":     err,
-			}).Info("Connection failed")
-
-			// TODO: Add a configurable backoff here
-			time.Sleep(5 * time.Second)
+		if err != nil {
+			return err
 		}
 
-		return fmt.Errorf("could not connect after %v tries", tries)
+		// Wait for the connection to be completed
+		flush := make(chan error)
+		tick := time.NewTicker(time.Second)
+		defer tick.Stop()
+
+		go func() {
+			// Try to do a round trip. This will time out after 10 minutes
+			// however if the connection fails before that the flush will finish
+			// with an error
+			flush <- nc.FlushTimeout(10 * time.Minute)
+		}()
+
+		for !nc.IsConnected() {
+			select {
+			case <-tick.C:
+				// This will be selected each second if we haven't managed to flush
+				// a message to the server and back yet
+				log.WithFields(log.Fields{
+					"status":     nc.Status().String(),
+					"inBytes":    nc.Stats().InBytes,
+					"outBytes":   nc.Stats().OutBytes,
+					"reconnects": nc.Stats().Reconnects,
+					"lastError":  nc.LastError(),
+				}).Info("NATS still connecting")
+			case err := <-flush:
+				if err != nil {
+					if nc.LastError() != nil {
+						return nc.LastError()
+					} else {
+						return err
+					}
+				}
+			}
+		}
+
+		var enc *nats.EncodedConn
+
+		enc, err = nats.NewEncodedConn(nc, "sdp")
+
+		if err != nil {
+			return err
+		}
+
+		e.natsConnection = enc
+
+		log.WithFields(log.Fields{
+			"ServerID": e.natsConnection.Conn.ConnectedServerId(),
+			"URL:":     e.natsConnection.Conn.ConnectedUrl(),
+		}).Info("NATS connected")
+
+		return nil
 	}
 
 	return errors.New("no NATSOptions struct provided")
