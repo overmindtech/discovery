@@ -372,6 +372,7 @@ func TestNatsCancel(t *testing.T) {
 }
 
 func TestNatsConnections(t *testing.T) {
+	// Need to change this to avoid port clashes in github actions
 	test.DefaultTestOptions.Port = 4111
 
 	t.Run("with a bad hostname", func(t *testing.T) {
