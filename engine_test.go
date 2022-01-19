@@ -371,7 +371,9 @@ func TestNatsCancel(t *testing.T) {
 	})
 }
 
-func TestNatsConnectFail(t *testing.T) {
+func TestNatsConnections(t *testing.T) {
+	test.DefaultTestOptions.Port = 4111
+
 	t.Run("with a bad hostname", func(t *testing.T) {
 		e := Engine{
 			Name: "nats-test",
@@ -409,7 +411,7 @@ func TestNatsConnectFail(t *testing.T) {
 		e := Engine{
 			Name: "nats-test",
 			NATSOptions: &NATSOptions{
-				URLs:            []string{s.Addr().String()},
+				URLs:            []string{"127.0.0.1:4111"},
 				ConnectionName:  "test-disconnection",
 				ConnectTimeout:  time.Second,
 				QueueName:       "test",
@@ -465,7 +467,7 @@ func TestNatsConnectFail(t *testing.T) {
 		e := Engine{
 			Name: "nats-test",
 			NATSOptions: &NATSOptions{
-				URLs:            []string{"127.0.0.1:4222"},
+				URLs:            []string{"127.0.0.1:4111"},
 				ConnectionName:  "test-disconnection",
 				ConnectTimeout:  5 * time.Second,
 				QueueName:       "test",
