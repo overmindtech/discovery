@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"
 	"github.com/overmindtech/sdp-go"
 )
@@ -152,7 +154,7 @@ func TestNats(t *testing.T) {
 			URLs:           NatsTestURLs,
 			ConnectionName: "test-connection",
 			ConnectTimeout: time.Second,
-			NumRetries:     5,
+			MaxReconnect:   5,
 			QueueName:      "test",
 		},
 		MaxParallelExecutions: 10,
@@ -259,8 +261,8 @@ func TestNatsCancel(t *testing.T) {
 			URLs:           NatsTestURLs,
 			ConnectionName: "test-connection",
 			ConnectTimeout: time.Second,
-			NumRetries:     5,
 			QueueName:      "test",
+			MaxReconnect:   5,
 		},
 		MaxParallelExecutions: 1,
 	}
@@ -365,6 +367,135 @@ func TestNatsCancel(t *testing.T) {
 
 		if err != nil {
 			t.Error(err)
+		}
+	})
+}
+
+func TestNatsConnectFail(t *testing.T) {
+	t.Run("with a bad hostname", func(t *testing.T) {
+		e := Engine{
+			Name: "nats-test",
+			NATSOptions: &NATSOptions{
+				URLs:           []string{"nats://bad.server"},
+				ConnectionName: "test-disconnection",
+				ConnectTimeout: time.Second,
+				QueueName:      "test",
+				MaxReconnect:   1,
+			},
+			MaxParallelExecutions: 1,
+		}
+
+		err := e.Connect()
+
+		if err == nil {
+			t.Error("expected error but got nil")
+		}
+	})
+
+	t.Run("with a server that disconnects", func(t *testing.T) {
+		// We are running a custom server here so that we can control its lifecycle
+		s := test.RunServer(&test.DefaultTestOptions)
+
+		if !s.ReadyForConnections(10 * time.Second) {
+			t.Fatal("Could not start goroutine NATS server")
+		}
+
+		t.Cleanup(func() {
+			if s != nil {
+				s.Shutdown()
+			}
+		})
+
+		e := Engine{
+			Name: "nats-test",
+			NATSOptions: &NATSOptions{
+				URLs:            []string{s.Addr().String()},
+				ConnectionName:  "test-disconnection",
+				ConnectTimeout:  time.Second,
+				QueueName:       "test",
+				MaxReconnect:    10,
+				ReconnectWait:   time.Second,
+				ReconnectJitter: time.Second,
+			},
+			MaxParallelExecutions: 1,
+		}
+
+		err := e.Connect()
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		t.Log("Stopping NATS server")
+		s.Shutdown()
+
+		for i := 0; i <= 20; i++ {
+			if i == 20 {
+				t.Errorf("Engine did not report a NATS disconnect after %v tries", i)
+			}
+
+			if !e.IsNATSConnected() {
+				break
+			}
+
+			time.Sleep(time.Second)
+		}
+
+		// Reset the server
+		s = test.RunServer(&test.DefaultTestOptions)
+
+		// Wait for the server to start
+		s.ReadyForConnections(10 * time.Second)
+
+		// Wait 2 more seconds for a reconnect
+		time.Sleep(2 * time.Second)
+
+		for i := 0; i <= 20; i++ {
+			if e.IsNATSConnected() {
+				return
+			}
+
+			time.Sleep(time.Second)
+		}
+
+		t.Error("Engine should have reconnected but hasn't")
+	})
+
+	t.Run("with a server that takes a while to start", func(t *testing.T) {
+		e := Engine{
+			Name: "nats-test",
+			NATSOptions: &NATSOptions{
+				URLs:            []string{"127.0.0.1:4222"},
+				ConnectionName:  "test-disconnection",
+				ConnectTimeout:  5 * time.Second,
+				QueueName:       "test",
+				MaxReconnect:    10,
+				ReconnectJitter: time.Second,
+				ReconnectWait:   time.Second,
+			},
+			MaxParallelExecutions: 1,
+		}
+
+		var s *server.Server
+
+		go func() {
+			// Start the server after a delay
+			time.Sleep(2 * time.Second)
+
+			// We are running a custom server here so that we can control its lifecycle
+			s = test.RunServer(&test.DefaultTestOptions)
+
+			t.Cleanup(func() {
+				if s != nil {
+					s.Shutdown()
+				}
+			})
+		}()
+
+		err := e.Connect()
+
+		if err != nil {
+			t.Fatal(err)
 		}
 	})
 }

@@ -279,7 +279,7 @@ func TestSendRequestSync(t *testing.T) {
 			URLs:           NatsTestURLs,
 			ConnectionName: "test-connection",
 			ConnectTimeout: time.Second,
-			NumRetries:     5,
+			MaxReconnect:   5,
 			QueueName:      "test",
 		},
 		MaxParallelExecutions: 10,
