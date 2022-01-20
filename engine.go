@@ -81,6 +81,11 @@ type Engine struct {
 	// The NATS connection
 	natsConnection *nats.EncodedConn
 
+	// Whether or not we should be connected to NATS. This is used by the
+	// connection watcher and will try to reconnect if this is true
+	watcherShouldReconnect bool
+	watcherTicker          *time.Ticker
+
 	// List of all current subscriptions
 	subscriptions []*nats.Subscription
 
@@ -330,8 +335,6 @@ func (e *Engine) Connect() error {
 			"servers": servers,
 		}).Info("NATS connecting")
 
-		// TODO: Make these options more configurable
-		// https://docs.nats.io/developing-with-nats/connecting/pingpong
 		nc, err := nats.Connect(
 			servers,
 			options...,
@@ -341,39 +344,14 @@ func (e *Engine) Connect() error {
 			return err
 		}
 
+		// Start watching for disconnects
+		e.StartWatchingNATS(3 * time.Second)
+
 		// Wait for the connection to be completed
-		flush := make(chan error)
-		tick := time.NewTicker(time.Second)
-		defer tick.Stop()
+		err = nc.FlushTimeout(10 * time.Minute)
 
-		go func() {
-			// Try to do a round trip. This will time out after 10 minutes
-			// however if the connection fails before that the flush will finish
-			// with an error
-			flush <- nc.FlushTimeout(10 * time.Minute)
-		}()
-
-		for !nc.IsConnected() {
-			select {
-			case <-tick.C:
-				// This will be selected each second if we haven't managed to flush
-				// a message to the server and back yet
-				log.WithFields(log.Fields{
-					"status":     nc.Status().String(),
-					"inBytes":    nc.Stats().InBytes,
-					"outBytes":   nc.Stats().OutBytes,
-					"reconnects": nc.Stats().Reconnects,
-					"lastError":  nc.LastError(),
-				}).Info("NATS still connecting")
-			case err := <-flush:
-				if err != nil {
-					if nc.LastError() != nil {
-						return nc.LastError()
-					} else {
-						return err
-					}
-				}
-			}
+		if err != nil {
+			return err
 		}
 
 		var enc *nats.EncodedConn
@@ -395,6 +373,54 @@ func (e *Engine) Connect() error {
 	}
 
 	return errors.New("no NATSOptions struct provided")
+}
+
+// StartWatchingNATS Starts a goroutine that watches the NATS connection
+func (e *Engine) StartWatchingNATS(interval time.Duration) {
+	// If anything else sets this to false it will cause the goroutione to exit
+	e.watcherShouldReconnect = true
+	e.watcherTicker = time.NewTicker(interval)
+
+	go func() {
+		for e.watcherShouldReconnect {
+			// Wait for a tick
+			<-e.watcherTicker.C
+
+			if !e.watcherShouldReconnect {
+				// Guard in case the state has changed since the last
+				// iteration of the loop
+				continue
+			}
+
+			if e == nil || e.natsConnection == nil || e.natsConnection.Conn == nil {
+				// If any of these connections are nil there's nothing to watch
+				continue
+			}
+
+			log.WithFields(log.Fields{
+				"status":     e.natsConnection.Conn.Status().String(),
+				"inBytes":    e.natsConnection.Conn.Stats().InBytes,
+				"outBytes":   e.natsConnection.Conn.Stats().OutBytes,
+				"reconnects": e.natsConnection.Conn.Stats().Reconnects,
+				"lastError":  e.natsConnection.Conn.LastError(),
+			}).Warn("NATS not connected")
+
+			if e.natsConnection.Conn.Status() == nats.CLOSED {
+				log.Error("NATS cannot reconnect, restarting engine")
+				e.Stop()
+				e.Connect()
+				e.Start()
+
+				// Kill this goroutine as it'll be replaced by a new one when
+				// the engine starts again
+				return
+			}
+		}
+	}()
+}
+
+func (e *Engine) StopWatchingNATS() {
+	e.watcherShouldReconnect = false
 }
 
 // Start performs all of the initialisation steps required for the engine to
@@ -493,7 +519,7 @@ func (e *Engine) Subscribe(subject string, handler nats.Handler) error {
 	return nil
 }
 
-// Stop Stops the engine running, draining all connections
+// Stop Stops the engine running and disconnects from NATS
 func (e *Engine) Stop() error {
 	for _, c := range e.subscriptions {
 		err := c.Drain()
@@ -501,6 +527,15 @@ func (e *Engine) Stop() error {
 		if err != nil {
 			return err
 		}
+	}
+
+	// Clear the cache
+	e.cache.Clear()
+	e.cache.StopPurger()
+
+	e.StopWatchingNATS()
+	if e.natsConnection != nil {
+		e.natsConnection.Close()
 	}
 
 	return nil
