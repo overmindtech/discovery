@@ -349,6 +349,8 @@ func (e *Engine) Connect() error {
 		e.ConnectionWatcher = NATSWatcher{
 			Connection: nc,
 			FailureHandler: func() {
+				log.Error("NATS connection could not recover. Restarting engine")
+
 				// Restart the engine on a failure
 				go e.Restart()
 			},
