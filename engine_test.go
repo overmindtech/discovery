@@ -503,7 +503,7 @@ func TestNatsConnections(t *testing.T) {
 	})
 }
 
-func TestNATSWatcher(t *testing.T) {
+func TestNATSFailureRestart(t *testing.T) {
 	test.DefaultTestOptions.Port = 4111
 
 	// We are running a custom server here so that we can control its lifecycle
@@ -524,7 +524,8 @@ func TestNATSWatcher(t *testing.T) {
 			ReconnectWait:   100 * time.Millisecond,
 			ReconnectJitter: 10 * time.Millisecond,
 		},
-		MaxParallelExecutions: 1,
+		MaxParallelExecutions:   1,
+		ConnectionWatchInterval: 1 * time.Second,
 	}
 
 	// Connect successfully
@@ -533,10 +534,6 @@ func TestNATSWatcher(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Change the watcher to be much more frequent
-	e.StopWatchingNATS()
-	e.StartWatchingNATS(100 * time.Millisecond)
 
 	// Lose the connection
 	t.Log("Stopping NATS server")
@@ -547,10 +544,14 @@ func TestNATSWatcher(t *testing.T) {
 	// RECONNECTING, once it's CLOSED however it won't keep trying to connect so
 	// we want to make sure that the watcher detects this and kills the whole
 	// thing
-	time.Sleep(5 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	s = test.RunServer(&test.DefaultTestOptions)
 	s.ReadyForConnections(10 * time.Second)
+
+	t.Cleanup(func() {
+		s.Shutdown()
+	})
 
 	time.Sleep(3 * time.Second)
 
