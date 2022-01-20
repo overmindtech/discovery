@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -11,17 +12,24 @@ type TestConnection struct {
 	ReturnStatus nats.Status
 	ReturnStats  nats.Statistics
 	ReturnError  error
+	Mutex        sync.Mutex
 }
 
 func (t *TestConnection) Status() nats.Status {
+	t.Mutex.Lock()
+	defer t.Mutex.Unlock()
 	return t.ReturnStatus
 }
 
 func (t *TestConnection) Stats() nats.Statistics {
+	t.Mutex.Lock()
+	defer t.Mutex.Unlock()
 	return t.ReturnStats
 }
 
 func (t *TestConnection) LastError() error {
+	t.Mutex.Lock()
+	defer t.Mutex.Unlock()
 	return t.ReturnError
 }
 
@@ -47,19 +55,27 @@ func TestNATSWatcher(t *testing.T) {
 
 	time.Sleep(interval * 2)
 
+	c.Mutex.Lock()
 	c.ReturnStatus = nats.CONNECTED
+	c.Mutex.Unlock()
 
 	time.Sleep(interval * 2)
 
+	c.Mutex.Lock()
 	c.ReturnStatus = nats.RECONNECTING
+	c.Mutex.Unlock()
 
 	time.Sleep(interval * 2)
 
+	c.Mutex.Lock()
 	c.ReturnStatus = nats.CONNECTED
+	c.Mutex.Unlock()
 
 	time.Sleep(interval * 2)
 
+	c.Mutex.Lock()
 	c.ReturnStatus = nats.CLOSED
+	c.Mutex.Unlock()
 
 	select {
 	case <-time.After(interval * 2):
@@ -94,7 +110,9 @@ func TestFailureHandler(t *testing.T) {
 
 	time.Sleep(interval * 2)
 
+	c.Mutex.Lock()
 	c.ReturnStatus = nats.CLOSED
+	c.Mutex.Unlock()
 
 	time.Sleep(interval * 2)
 

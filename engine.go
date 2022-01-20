@@ -79,7 +79,8 @@ type Engine struct {
 	cache sdpcache.Cache
 
 	// The NATS connection
-	natsConnection *nats.EncodedConn
+	natsConnection      *nats.EncodedConn
+	natsConnectionMutex sync.Mutex
 
 	// How often to check for closed connections and try to recover
 	ConnectionWatchInterval time.Duration
@@ -369,6 +370,8 @@ func (e *Engine) Connect() error {
 			return err
 		}
 
+		e.natsConnectionMutex.Lock()
+		defer e.natsConnectionMutex.Unlock()
 		e.natsConnection = enc
 
 		log.WithFields(log.Fields{
@@ -453,6 +456,9 @@ func (e *Engine) Subscribe(subject string, handler nats.Handler) error {
 	var subscription *nats.Subscription
 	var err error
 
+	e.natsConnectionMutex.Lock()
+	defer e.natsConnectionMutex.Unlock()
+
 	if e.natsConnection == nil {
 		return errors.New("cannot subscribe. NATS connection is nil")
 	}
@@ -493,6 +499,10 @@ func (e *Engine) Stop() error {
 	e.cache.StopPurger()
 
 	e.ConnectionWatcher.Stop()
+
+	e.natsConnectionMutex.Lock()
+	defer e.natsConnectionMutex.Unlock()
+
 	if e.natsConnection != nil {
 		e.natsConnection.Close()
 	}
@@ -525,6 +535,9 @@ func (e *Engine) Restart() error {
 
 // IsNATSConnected returns whether the engine is connected to NATS
 func (e *Engine) IsNATSConnected() bool {
+	e.natsConnectionMutex.Lock()
+	defer e.natsConnectionMutex.Unlock()
+
 	if enc := e.natsConnection; enc != nil {
 		if conn := enc.Conn; conn != nil {
 			return conn.IsConnected()
