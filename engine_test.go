@@ -502,3 +502,60 @@ func TestNatsConnections(t *testing.T) {
 		}
 	})
 }
+
+func TestNATSFailureRestart(t *testing.T) {
+	test.DefaultTestOptions.Port = 4111
+
+	// We are running a custom server here so that we can control its lifecycle
+	s := test.RunServer(&test.DefaultTestOptions)
+
+	if !s.ReadyForConnections(10 * time.Second) {
+		t.Fatal("Could not start goroutine NATS server")
+	}
+
+	e := Engine{
+		Name: "nats-test",
+		NATSOptions: &NATSOptions{
+			URLs:            []string{"127.0.0.1:4111"},
+			ConnectionName:  "test-disconnection",
+			ConnectTimeout:  time.Second,
+			QueueName:       "test",
+			MaxReconnect:    1,
+			ReconnectWait:   100 * time.Millisecond,
+			ReconnectJitter: 10 * time.Millisecond,
+		},
+		MaxParallelExecutions:   1,
+		ConnectionWatchInterval: 1 * time.Second,
+	}
+
+	// Connect successfully
+	err := e.Connect()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Lose the connection
+	t.Log("Stopping NATS server")
+	s.Shutdown()
+	s.WaitForShutdown()
+
+	// The watcher should keep watching while the nats connection is
+	// RECONNECTING, once it's CLOSED however it won't keep trying to connect so
+	// we want to make sure that the watcher detects this and kills the whole
+	// thing
+	time.Sleep(2 * time.Second)
+
+	s = test.RunServer(&test.DefaultTestOptions)
+	s.ReadyForConnections(10 * time.Second)
+
+	t.Cleanup(func() {
+		s.Shutdown()
+	})
+
+	time.Sleep(3 * time.Second)
+
+	if !e.IsNATSConnected() {
+		t.Error("NATS didn't manage to reconnect")
+	}
+}

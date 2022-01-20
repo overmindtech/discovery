@@ -30,7 +30,7 @@ jobs:
         go get -v -t -d ./...
   
     - name: Test
-      run: go test -timeout 30s ./... -race
+      run: go test -timeout 60s ./... -race
 
   release:
     name: Release

@@ -79,7 +79,12 @@ type Engine struct {
 	cache sdpcache.Cache
 
 	// The NATS connection
-	natsConnection *nats.EncodedConn
+	natsConnection      *nats.EncodedConn
+	natsConnectionMutex sync.Mutex
+
+	// How often to check for closed connections and try to recover
+	ConnectionWatchInterval time.Duration
+	ConnectionWatcher       NATSWatcher
 
 	// List of all current subscriptions
 	subscriptions []*nats.Subscription
@@ -98,6 +103,8 @@ type Engine struct {
 	// be cancelled if required
 	trackedRequests      map[uuid.UUID]*RequestTracker
 	trackedRequestsMutex sync.RWMutex
+
+	restartMutex sync.Mutex
 }
 
 // TrackRequest Stores a RequestTracker in the engine so that it can be looked
@@ -330,8 +337,6 @@ func (e *Engine) Connect() error {
 			"servers": servers,
 		}).Info("NATS connecting")
 
-		// TODO: Make these options more configurable
-		// https://docs.nats.io/developing-with-nats/connecting/pingpong
 		nc, err := nats.Connect(
 			servers,
 			options...,
@@ -341,39 +346,20 @@ func (e *Engine) Connect() error {
 			return err
 		}
 
+		e.ConnectionWatcher = NATSWatcher{
+			Connection: nc,
+			FailureHandler: func() {
+				// Restart the engine on a failure
+				go e.Restart()
+			},
+		}
+		e.ConnectionWatcher.Start(e.ConnectionWatchInterval)
+
 		// Wait for the connection to be completed
-		flush := make(chan error)
-		tick := time.NewTicker(time.Second)
-		defer tick.Stop()
+		err = nc.FlushTimeout(10 * time.Minute)
 
-		go func() {
-			// Try to do a round trip. This will time out after 10 minutes
-			// however if the connection fails before that the flush will finish
-			// with an error
-			flush <- nc.FlushTimeout(10 * time.Minute)
-		}()
-
-		for !nc.IsConnected() {
-			select {
-			case <-tick.C:
-				// This will be selected each second if we haven't managed to flush
-				// a message to the server and back yet
-				log.WithFields(log.Fields{
-					"status":     nc.Status().String(),
-					"inBytes":    nc.Stats().InBytes,
-					"outBytes":   nc.Stats().OutBytes,
-					"reconnects": nc.Stats().Reconnects,
-					"lastError":  nc.LastError(),
-				}).Info("NATS still connecting")
-			case err := <-flush:
-				if err != nil {
-					if nc.LastError() != nil {
-						return nc.LastError()
-					} else {
-						return err
-					}
-				}
-			}
+		if err != nil {
+			return err
 		}
 
 		var enc *nats.EncodedConn
@@ -384,6 +370,8 @@ func (e *Engine) Connect() error {
 			return err
 		}
 
+		e.natsConnectionMutex.Lock()
+		defer e.natsConnectionMutex.Unlock()
 		e.natsConnection = enc
 
 		log.WithFields(log.Fields{
@@ -468,6 +456,9 @@ func (e *Engine) Subscribe(subject string, handler nats.Handler) error {
 	var subscription *nats.Subscription
 	var err error
 
+	e.natsConnectionMutex.Lock()
+	defer e.natsConnectionMutex.Unlock()
+
 	if e.natsConnection == nil {
 		return errors.New("cannot subscribe. NATS connection is nil")
 	}
@@ -493,7 +484,7 @@ func (e *Engine) Subscribe(subject string, handler nats.Handler) error {
 	return nil
 }
 
-// Stop Stops the engine running, draining all connections
+// Stop Stops the engine running and disconnects from NATS
 func (e *Engine) Stop() error {
 	for _, c := range e.subscriptions {
 		err := c.Drain()
@@ -503,11 +494,50 @@ func (e *Engine) Stop() error {
 		}
 	}
 
+	// Clear the cache
+	e.cache.Clear()
+	e.cache.StopPurger()
+
+	e.ConnectionWatcher.Stop()
+
+	e.natsConnectionMutex.Lock()
+	defer e.natsConnectionMutex.Unlock()
+
+	if e.natsConnection != nil {
+		e.natsConnection.Close()
+	}
+
 	return nil
+}
+
+// Restart Restarts the engine. If called in parallel, subsequent calls are
+// ignored until the restart is completed
+func (e *Engine) Restart() error {
+	e.restartMutex.Lock()
+	defer e.restartMutex.Unlock()
+
+	err := e.Stop()
+
+	if err != nil {
+		return err
+	}
+
+	err = e.Connect()
+
+	if err != nil {
+		return err
+	}
+
+	err = e.Start()
+
+	return err
 }
 
 // IsNATSConnected returns whether the engine is connected to NATS
 func (e *Engine) IsNATSConnected() bool {
+	e.natsConnectionMutex.Lock()
+	defer e.natsConnectionMutex.Unlock()
+
 	if enc := e.natsConnection; enc != nil {
 		if conn := enc.Conn; conn != nil {
 			return conn.IsConnected()
