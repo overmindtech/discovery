@@ -83,8 +83,8 @@ type Engine struct {
 
 	// Whether or not we should be connected to NATS. This is used by the
 	// connection watcher and will try to reconnect if this is true
-	watcherShouldReconnect bool
-	watcherTicker          *time.Ticker
+	watcherKillChan chan bool
+	watcherTicker   *time.Ticker
 
 	// List of all current subscriptions
 	subscriptions []*nats.Subscription
@@ -344,9 +344,6 @@ func (e *Engine) Connect() error {
 			return err
 		}
 
-		// Start watching for disconnects
-		e.StartWatchingNATS(3 * time.Second)
-
 		// Wait for the connection to be completed
 		err = nc.FlushTimeout(10 * time.Minute)
 
@@ -369,6 +366,9 @@ func (e *Engine) Connect() error {
 			"URL:":     e.natsConnection.Conn.ConnectedUrl(),
 		}).Info("NATS connected")
 
+		// Start watching for disconnects
+		e.StartWatchingNATS(3 * time.Second)
+
 		return nil
 	}
 
@@ -378,41 +378,39 @@ func (e *Engine) Connect() error {
 // StartWatchingNATS Starts a goroutine that watches the NATS connection
 func (e *Engine) StartWatchingNATS(interval time.Duration) {
 	// If anything else sets this to false it will cause the goroutione to exit
-	e.watcherShouldReconnect = true
+	e.watcherKillChan = make(chan bool)
 	e.watcherTicker = time.NewTicker(interval)
 
 	go func() {
-		for e.watcherShouldReconnect {
-			// Wait for a tick
-			<-e.watcherTicker.C
+		for {
+			select {
+			case <-e.watcherTicker.C:
+				if e == nil || e.natsConnection == nil || e.natsConnection.Conn == nil {
+					// If any of these connections are nil there's nothing to watch
+					continue
+				}
 
-			if !e.watcherShouldReconnect {
-				// Guard in case the state has changed since the last
-				// iteration of the loop
-				continue
-			}
+				if e.natsConnection.Conn.Status() != nats.CONNECTED {
+					log.WithFields(log.Fields{
+						"status":     e.natsConnection.Conn.Status().String(),
+						"inBytes":    e.natsConnection.Conn.Stats().InBytes,
+						"outBytes":   e.natsConnection.Conn.Stats().OutBytes,
+						"reconnects": e.natsConnection.Conn.Stats().Reconnects,
+						"lastError":  e.natsConnection.Conn.LastError(),
+					}).Warn("NATS not connected")
 
-			if e == nil || e.natsConnection == nil || e.natsConnection.Conn == nil {
-				// If any of these connections are nil there's nothing to watch
-				continue
-			}
+					if e.natsConnection.Conn.Status() == nats.CLOSED {
+						log.Error("NATS cannot reconnect, restarting engine")
+						e.Stop()
+						e.Connect()
+						e.Start()
 
-			log.WithFields(log.Fields{
-				"status":     e.natsConnection.Conn.Status().String(),
-				"inBytes":    e.natsConnection.Conn.Stats().InBytes,
-				"outBytes":   e.natsConnection.Conn.Stats().OutBytes,
-				"reconnects": e.natsConnection.Conn.Stats().Reconnects,
-				"lastError":  e.natsConnection.Conn.LastError(),
-			}).Warn("NATS not connected")
-
-			if e.natsConnection.Conn.Status() == nats.CLOSED {
-				log.Error("NATS cannot reconnect, restarting engine")
-				e.Stop()
-				e.Connect()
-				e.Start()
-
-				// Kill this goroutine as it'll be replaced by a new one when
-				// the engine starts again
+						// Kill this goroutine as it'll be replaced by a new one when
+						// the engine starts again
+						return
+					}
+				}
+			case <-e.watcherKillChan:
 				return
 			}
 		}
@@ -420,7 +418,7 @@ func (e *Engine) StartWatchingNATS(interval time.Duration) {
 }
 
 func (e *Engine) StopWatchingNATS() {
-	e.watcherShouldReconnect = false
+	e.watcherKillChan <- true
 }
 
 // Start performs all of the initialisation steps required for the engine to
