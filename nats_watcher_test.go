@@ -124,6 +124,6 @@ func TestFailureHandler(t *testing.T) {
 			t.Errorf("Handler was called more than once")
 		}
 		// The fail handler has been called!
-		t.Log("Fail handler called suucesfully 🥳")
+		t.Log("Fail handler called successfully 🥳")
 	}
 }
