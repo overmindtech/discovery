@@ -9,14 +9,14 @@ require (
 	github.com/nats-io/nats-server/v2 v2.7.0
 	github.com/nats-io/nats.go v1.13.1-0.20211122170419-d7c1d78a50fc
 	github.com/overmindtech/sdp-go v0.6.1
-	github.com/overmindtech/sdpcache v0.3.0
+	github.com/overmindtech/sdpcache v0.3.1
 	github.com/sirupsen/logrus v1.8.1
 	google.golang.org/protobuf v1.27.1
 )
 
 // Transitive dependencies
 require (
-	github.com/google/go-cmp v0.5.6 // indirect
+	github.com/google/go-cmp v0.5.7 // indirect
 	github.com/klauspost/compress v1.14.1 // indirect
 	github.com/minio/highwayhash v1.0.2 // indirect
 	github.com/nats-io/jwt/v2 v2.2.1-0.20220113022732-58e87895b296 // indirect
