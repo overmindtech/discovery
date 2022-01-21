@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -24,9 +25,10 @@ type NATSWatcher struct {
 	// no longer trying to reconnect.
 	FailureHandler func()
 
-	watcherKillChan chan bool
-	watcherTicker   *time.Ticker
-	watchingMutex   sync.Mutex
+	watcherContext context.Context
+	watcherCancel  context.CancelFunc
+	watcherTicker  *time.Ticker
+	watchingMutex  sync.Mutex
 }
 
 const DefaultCheckInterval = 3 * time.Second
@@ -40,11 +42,11 @@ func (w *NATSWatcher) Start(checkInterval time.Duration) {
 		checkInterval = DefaultCheckInterval
 	}
 
-	w.watcherKillChan = make(chan bool)
+	w.watcherContext, w.watcherCancel = context.WithCancel(context.Background())
 	w.watcherTicker = time.NewTicker(checkInterval)
 	w.watchingMutex.Lock()
 
-	go func() {
+	go func(ctx context.Context) {
 		defer w.watchingMutex.Unlock()
 		for {
 			select {
@@ -64,24 +66,23 @@ func (w *NATSWatcher) Start(checkInterval time.Duration) {
 						w.FailureHandler()
 					}
 				}
-			case <-w.watcherKillChan:
-				close(w.watcherKillChan)
-				w.watcherKillChan = nil
+			case <-ctx.Done():
 				w.watcherTicker.Stop()
 
 				return
 			}
 		}
-	}()
+	}(w.watcherContext)
 }
 
 func (w *NATSWatcher) Stop() {
-	if w.watcherKillChan != nil {
-		w.watcherKillChan <- true
+	if w.watcherCancel != nil {
+		w.watcherCancel()
 
 		// Once we have sent the signal, wait until it's unlocked so we know
 		// it's completely stopped
 		w.watchingMutex.Lock()
 		defer w.watchingMutex.Unlock()
+
 	}
 }
