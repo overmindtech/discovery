@@ -172,13 +172,7 @@ func TestNats(t *testing.T) {
 	)
 
 	t.Run("Starting", func(t *testing.T) {
-		err := e.Connect()
-
-		if err != nil {
-			t.Error(err)
-		}
-
-		err = e.Start()
+		err := e.Start()
 
 		if err != nil {
 			t.Error(err)
@@ -276,13 +270,7 @@ func TestNatsCancel(t *testing.T) {
 	e.AddSources(&src)
 
 	t.Run("Starting", func(t *testing.T) {
-		err := e.Connect()
-
-		if err != nil {
-			t.Error(err)
-		}
-
-		err = e.Start()
+		err := e.Start()
 
 		if err != nil {
 			t.Error(err)
@@ -388,7 +376,7 @@ func TestNatsConnections(t *testing.T) {
 			MaxParallelExecutions: 1,
 		}
 
-		err := e.Connect()
+		err := e.Start()
 
 		if err == nil {
 			t.Error("expected error but got nil")
@@ -423,7 +411,7 @@ func TestNatsConnections(t *testing.T) {
 			MaxParallelExecutions: 1,
 		}
 
-		err := e.Connect()
+		err := e.Start()
 
 		if err != nil {
 			t.Fatal(err)
@@ -495,7 +483,7 @@ func TestNatsConnections(t *testing.T) {
 			})
 		}()
 
-		err := e.Connect()
+		err := e.Start()
 
 		if err != nil {
 			t.Fatal(err)
@@ -529,11 +517,15 @@ func TestNATSFailureRestart(t *testing.T) {
 	}
 
 	// Connect successfully
-	err := e.Connect()
+	err := e.Start()
 
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	t.Cleanup(func() {
+		e.Stop()
+	})
 
 	// Lose the connection
 	t.Log("Stopping NATS server")

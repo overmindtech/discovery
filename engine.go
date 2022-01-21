@@ -267,7 +267,7 @@ func (e *Engine) NonHiddenSources() []Source {
 }
 
 // Connect Connects to NATS
-func (e *Engine) Connect() error {
+func (e *Engine) connect() error {
 	// Try to connect to NATS
 	if no := e.NATSOptions; no != nil {
 		var servers string
@@ -337,28 +337,13 @@ func (e *Engine) Connect() error {
 			"servers": servers,
 		}).Info("NATS connecting")
 
+		e.natsConnectionMutex.Lock()
+		defer e.natsConnectionMutex.Unlock()
+
 		nc, err := nats.Connect(
 			servers,
 			options...,
 		)
-
-		if err != nil {
-			return err
-		}
-
-		e.ConnectionWatcher = NATSWatcher{
-			Connection: nc,
-			FailureHandler: func() {
-				log.Error("NATS connection could not recover. Restarting engine")
-
-				// Restart the engine on a failure
-				go e.Restart()
-			},
-		}
-		e.ConnectionWatcher.Start(e.ConnectionWatchInterval)
-
-		// Wait for the connection to be completed
-		err = nc.FlushTimeout(10 * time.Minute)
 
 		if err != nil {
 			return err
@@ -372,19 +357,132 @@ func (e *Engine) Connect() error {
 			return err
 		}
 
-		e.natsConnectionMutex.Lock()
-		defer e.natsConnectionMutex.Unlock()
 		e.natsConnection = enc
+
+		e.ConnectionWatcher = NATSWatcher{
+			Connection: e.natsConnection.Conn,
+			FailureHandler: func() {
+				go func() {
+					if err := e.disconnect(); err != nil {
+						log.Error(err)
+					}
+
+					if err := e.connect(); err != nil {
+						log.Error(err)
+					}
+				}()
+			},
+		}
+		e.ConnectionWatcher.Start(e.ConnectionWatchInterval)
+
+		// Wait for the connection to be completed
+		err = e.natsConnection.FlushTimeout(10 * time.Minute)
+
+		if err != nil {
+			return err
+		}
 
 		log.WithFields(log.Fields{
 			"ServerID": e.natsConnection.Conn.ConnectedServerId(),
 			"URL:":     e.natsConnection.Conn.ConnectedUrl(),
 		}).Info("NATS connected")
 
+		err = e.subscribe("request.all", e.ItemRequestHandler)
+
+		if err != nil {
+			return err
+		}
+
+		err = e.subscribe("cancel.all", e.CancelItemRequestHandler)
+
+		if err != nil {
+			return err
+		}
+
+		if len(e.triggers) > 0 {
+			err = e.subscribe("return.item.>", e.ProcessTriggers)
+
+			if err != nil {
+				return err
+			}
+		}
+
+		// Loop over all sources and work out what subscriptions we need to make
+		// depending on what contexts they support. These context names are then
+		// stored in a map for de-duplication before being subscribed to
+		subscriptionMap := make(map[string]bool)
+
+		// We need to track if we are making a wildcard subscription. If we are then
+		// there isn't any point making 10 subscriptions since they will be covered
+		// by the wildcard anyway and will end up being duplicates. In that case we
+		// should just be making the one
+		var wildcardExists bool
+
+		for _, src := range e.Sources() {
+			for _, itemContext := range src.Contexts() {
+				if itemContext == sdp.WILDCARD {
+					wildcardExists = true
+				} else {
+					subscriptionMap[itemContext] = true
+				}
+			}
+		}
+
+		// Now actually create the required subscriptions
+		if wildcardExists {
+			e.subscribe("request.context.>", e.ItemRequestHandler)
+			e.subscribe("cancel.context.>", e.CancelItemRequestHandler)
+		} else {
+			for suffix := range subscriptionMap {
+				e.subscribe(fmt.Sprintf("request.context.%v", suffix), e.ItemRequestHandler)
+				e.subscribe(fmt.Sprintf("cancel.context.%v", suffix), e.CancelItemRequestHandler)
+			}
+		}
+
 		return nil
 	}
 
 	return errors.New("no NATSOptions struct provided")
+}
+
+// disconnect Disconnects the engine from the NATS network
+func (e *Engine) disconnect() error {
+	e.ConnectionWatcher.Stop()
+
+	e.natsConnectionMutex.Lock()
+	defer e.natsConnectionMutex.Unlock()
+
+	if e.natsConnection != nil {
+		// Only unsubscribe if the connection is not closed. If it's closed
+		// there is no point
+		for _, c := range e.subscriptions {
+			if e.natsConnection.Conn.Status() != nats.CONNECTED {
+				// If the connection is not connected we can't unsubscribe
+				continue
+			}
+
+			err := c.Drain()
+
+			if err != nil {
+				return err
+			}
+
+			err = c.Unsubscribe()
+
+			if err != nil {
+				return err
+			}
+		}
+
+		e.subscriptions = nil
+
+		// Finally close the connection
+		e.natsConnection.Close()
+	}
+
+	e.natsConnection = nil
+
+	return nil
 }
 
 // Start performs all of the initialisation steps required for the engine to
@@ -397,69 +495,13 @@ func (e *Engine) Start() error {
 	// Start purging cache
 	e.cache.StartPurger()
 
-	var err error
-
-	err = e.Subscribe("request.all", e.ItemRequestHandler)
-
-	if err != nil {
-		return err
-	}
-
-	err = e.Subscribe("cancel.all", e.CancelItemRequestHandler)
-
-	if err != nil {
-		return err
-	}
-
-	if len(e.triggers) > 0 {
-		err = e.Subscribe("return.item.>", e.ProcessTriggers)
-
-		if err != nil {
-			return err
-		}
-	}
-
-	// Loop over all sources and work out what subscriptions we need to make
-	// depending on what contexts they support. These context names are then
-	// stored in a map for de-duplication before being subscribed to
-	subscriptionMap := make(map[string]bool)
-
-	// We need to track if we are making a wildcard subscription. If we are then
-	// there isn't any point making 10 subscriptions since they will be covered
-	// by the wildcard anyway and will end up being duplicates. In that case we
-	// should just be making the one
-	var wildcardExists bool
-
-	for _, src := range e.Sources() {
-		for _, itemContext := range src.Contexts() {
-			if itemContext == sdp.WILDCARD {
-				wildcardExists = true
-			} else {
-				subscriptionMap[itemContext] = true
-			}
-		}
-	}
-
-	// Now actually create the required subscriptions
-	if wildcardExists {
-		e.Subscribe("request.context.>", e.ItemRequestHandler)
-		e.Subscribe("cancel.context.>", e.CancelItemRequestHandler)
-	} else {
-		for suffix := range subscriptionMap {
-			e.Subscribe(fmt.Sprintf("request.context.%v", suffix), e.ItemRequestHandler)
-			e.Subscribe(fmt.Sprintf("cancel.context.%v", suffix), e.CancelItemRequestHandler)
-		}
-	}
-
-	return nil
+	return e.connect()
 }
 
-func (e *Engine) Subscribe(subject string, handler nats.Handler) error {
+// subscribe Subscribes to a subject using the current NATS connection
+func (e *Engine) subscribe(subject string, handler nats.Handler) error {
 	var subscription *nats.Subscription
 	var err error
-
-	e.natsConnectionMutex.Lock()
-	defer e.natsConnectionMutex.Unlock()
 
 	if e.natsConnection == nil {
 		return errors.New("cannot subscribe. NATS connection is nil")
@@ -488,26 +530,15 @@ func (e *Engine) Subscribe(subject string, handler nats.Handler) error {
 
 // Stop Stops the engine running and disconnects from NATS
 func (e *Engine) Stop() error {
-	for _, c := range e.subscriptions {
-		err := c.Drain()
+	err := e.disconnect()
 
-		if err != nil {
-			return err
-		}
+	if err != nil {
+		return err
 	}
 
 	// Clear the cache
 	e.cache.Clear()
 	e.cache.StopPurger()
-
-	e.ConnectionWatcher.Stop()
-
-	e.natsConnectionMutex.Lock()
-	defer e.natsConnectionMutex.Unlock()
-
-	if e.natsConnection != nil {
-		e.natsConnection.Close()
-	}
 
 	return nil
 }
@@ -519,12 +550,6 @@ func (e *Engine) Restart() error {
 	defer e.restartMutex.Unlock()
 
 	err := e.Stop()
-
-	if err != nil {
-		return err
-	}
-
-	err = e.Connect()
 
 	if err != nil {
 		return err

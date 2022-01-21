@@ -294,19 +294,13 @@ func TestSendRequestSync(t *testing.T) {
 
 	e.AddSources(&src)
 
-	err := e.Connect()
+	err := e.Start()
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = e.Start()
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 250; i++ {
 		u := uuid.New()
 
 		var progress *sdp.RequestProgress

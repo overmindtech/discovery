@@ -235,12 +235,6 @@ func TestNATSTriggers(t *testing.T) {
 
 	engine.AddSources(&source)
 
-	err := engine.Connect()
-
-	if err != nil {
-		t.Error(err)
-	}
-
 	for _, tt := range tests {
 		if tt.ExpectError {
 			// Don't run if we don't expect the trigger to fire
@@ -252,7 +246,7 @@ func TestNATSTriggers(t *testing.T) {
 
 			// Start the engine so that it subscribes to the correct subjects
 			engine.AddTriggers(tt.Trigger)
-			err = engine.Start()
+			err := engine.Start()
 
 			if err != nil {
 				t.Fatal(err)
