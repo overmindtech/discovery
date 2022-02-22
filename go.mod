@@ -6,8 +6,8 @@ go 1.17
 require (
 	github.com/google/uuid v1.3.0
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
-	github.com/nats-io/nats-server/v2 v2.7.0
-	github.com/nats-io/nats.go v1.13.1-0.20211122170419-d7c1d78a50fc
+	github.com/nats-io/nats-server/v2 v2.7.2
+	github.com/nats-io/nats.go v1.13.1-0.20220121202836-972a071d373d
 	github.com/overmindtech/sdp-go v0.6.1
 	github.com/overmindtech/sdpcache v0.3.1
 	github.com/sirupsen/logrus v1.8.1
