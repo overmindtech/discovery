@@ -8,7 +8,8 @@ services:
       - nsc-storage:/nsc
       - ..:/workspace
 
-  nats:
+  # Authenticted NATS for testing auth mechanisms
+  nats-auth:
     image: nats
     command: "-c /nsc/nats-server.conf -DV" #-c /etc/nats/nats.conf --cluster nats://0.0.0.0:6222 --routes=nats://ruser:T0pS3cr3t@nats:6222
     volumes:
@@ -18,6 +19,12 @@ services:
     depends_on:
       token-exchange-init:
         condition: service_completed_successfully
+
+  # Unauthenticated NATS for simpler testing
+  nats:
+    image: nats
+    networks:
+      - nats
 
   # Runs the token exchange
   nats-token-exchange:

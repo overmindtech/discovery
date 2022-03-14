@@ -72,6 +72,10 @@ type Engine struct {
 	// to the number of CPUs
 	MaxParallelExecutions int
 
+	// How often to check for closed connections and try to recover
+	ConnectionWatchInterval time.Duration
+	ConnectionWatcher       NATSWatcher
+
 	// Internal throttle used to limit MaxParallelExecutions
 	throttle Throttle
 
@@ -81,10 +85,6 @@ type Engine struct {
 	// The NATS connection
 	natsConnection      *nats.EncodedConn
 	natsConnectionMutex sync.Mutex
-
-	// How often to check for closed connections and try to recover
-	ConnectionWatchInterval time.Duration
-	ConnectionWatcher       NATSWatcher
 
 	// List of all current subscriptions
 	subscriptions []*nats.Subscription
