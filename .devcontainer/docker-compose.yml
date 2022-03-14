@@ -1,26 +1,37 @@
 version: "3"
 services:
+  # Creates operator for testing
+  token-exchange-init:
+    image: ghcr.io/overmindtech/nats-token-exchange:main
+    entrypoint: /workspace/.devcontainer/init-nsc.sh
+    volumes:
+      - nsc-storage:/nsc
+      - ..:/workspace
+
   nats:
     image: nats
-    command: "-c /etc/nats/nats.conf -DV" #-c /etc/nats/nats.conf --cluster nats://0.0.0.0:6222 --routes=nats://ruser:T0pS3cr3t@nats:6222
-    ports:
-      - "4222:4222"
-      - "8222:8222"
-      - "6222:6222"
-      - "4433:4433"
+    command: "-c /nsc/nats-server.conf -DV" #-c /etc/nats/nats.conf --cluster nats://0.0.0.0:6222 --routes=nats://ruser:T0pS3cr3t@nats:6222
     volumes:
-      - ./nats/nats-server.conf:/etc/nats/nats.conf
+      - nsc-storage:/nsc
     networks:
       - nats
-  # nats-1:
-  #   image: nats
-  #   command: "-c nats-server.conf --routes=nats-route://ruser:T0pS3cr3t@nats:6222 -DV"
-  #link:
-  #  # Will build from a local copy
-  #  build: ../redacted_link
-  #  environment:
-  #    - REDACTED_NATS_URLS=nats
-  #    - REDACTED_VERBOSITY=debug
+    depends_on:
+      token-exchange-init:
+        condition: service_completed_successfully
+
+  # Runs the token exchange
+  nats-token-exchange:
+    image: ghcr.io/overmindtech/nats-token-exchange:main
+    command: run --nsc-operator overmind-testing --nsc-storage /nsc --auth0-domain dev-qsurrmp8.eu.auth0.com
+    volumes:
+      - nsc-storage:/nsc
+    networks:
+      - nats
+    depends_on:
+      token-exchange-init:
+        condition: service_completed_successfully
+      nats:
+        condition: service_started
 
   devcontainer:
     build: 
@@ -50,3 +61,6 @@ services:
 
 networks:
   nats:
+
+volumes:
+  nsc-storage:

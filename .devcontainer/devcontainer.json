@@ -26,6 +26,10 @@
 		"go.goroot": "/usr/local/go"
 	},
 
+	"remoteEnv": {
+		"GOPRIVATE": "github.com/overmindtech/*"
+	},
+
 	// Add the IDs of extensions you want installed when the container is created.
 	"extensions": [
 		"golang.Go"
