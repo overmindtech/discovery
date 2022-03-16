@@ -26,8 +26,14 @@
 		"go.goroot": "/usr/local/go"
 	},
 
+	// Set up environment variables in the remote container. These will need to
+	// be set locally first using:
+	// https://github.com/overmindtech/auth0-test-data
 	"remoteEnv": {
-		"GOPRIVATE": "github.com/overmindtech/*"
+		"GOPRIVATE": "github.com/overmindtech/*",
+		"OVERMIND_NTE_ALLPERMS_DOMAIN": "${localEnv:OVERMIND_NTE_ALLPERMS_DOMAIN}",
+		"OVERMIND_NTE_ALLPERMS_CLIENT_ID": "${localEnv:OVERMIND_NTE_ALLPERMS_CLIENT_ID}",
+		"OVERMIND_NTE_ALLPERMS_CLIENT_SECRET": "${localEnv:OVERMIND_NTE_ALLPERMS_CLIENT_SECRET}"
 	},
 
 	// Add the IDs of extensions you want installed when the container is created.

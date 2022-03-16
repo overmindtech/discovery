@@ -3,11 +3,43 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/nats-io/nkeys"
 	"github.com/overmindtech/nats-token-exchange/client"
 )
+
+func GetAllPermissionsConfig() (*OAuthTokenClient, error) {
+	var domain string
+	var clientID string
+	var clientSecret string
+	var exists bool
+
+	errorFormat := "environment variable %v not found. Set uo your test environment first. See: https://github.com/overmindtech/auth0-test-data"
+
+	// Read secrets form the environment
+	if domain, exists = os.LookupEnv("OVERMIND_NTE_ALLPERMS_DOMAIN"); !exists || domain == "" {
+		return nil, fmt.Errorf(errorFormat, "OVERMIND_NTE_ALLPERMS_DOMAIN")
+	}
+
+	if clientID, exists = os.LookupEnv("OVERMIND_NTE_ALLPERMS_CLIENT_ID"); !exists || clientID == "" {
+		return nil, fmt.Errorf(errorFormat, "OVERMIND_NTE_ALLPERMS_CLIENT_ID")
+	}
+
+	if clientSecret, exists = os.LookupEnv("OVERMIND_NTE_ALLPERMS_CLIENT_SECRET"); !exists || clientSecret == "" {
+		return nil, fmt.Errorf(errorFormat, "OVERMIND_NTE_ALLPERMS_CLIENT_SECRET")
+	}
+
+	c := NewOAuthTokenClient(
+		clientID,
+		clientSecret,
+		fmt.Sprintf("https://%v/oauth/token", domain),
+		"http://nats-token-exchange:8080",
+	)
+
+	return c, nil
+}
 
 func TestBasicTokenClient(t *testing.T) {
 	c := NewBasicTokenClient("tokeny_mc_tokenface")
@@ -32,12 +64,11 @@ func TestBasicTokenClient(t *testing.T) {
 }
 
 func TestOAuthTokenClient(t *testing.T) {
-	c := NewOAuthTokenClient(
-		"SDhOZYZhqMATxNDlhyzdnRu366qETDfS",
-		"GEhibCMxerzBsanfEyUaQG6kCvpvLinDOxpcNDg8_bKpYQnkdrIakefIv_8PyxWg",
-		"https://dev-qsurrmp8.eu.auth0.com/oauth/token",
-		"http://nats-token-exchange:8080",
-	)
+	c, err := GetAllPermissionsConfig()
+
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	EnsureTestAccount(c.natsClient.AuthApi)
 
