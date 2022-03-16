@@ -1,82 +1,129 @@
 package discovery
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"net/url"
+	"os"
+	"runtime"
 
+	"github.com/nats-io/nkeys"
 	"github.com/overmindtech/nats-token-exchange/client"
+	"golang.org/x/oauth2/clientcredentials"
 )
 
-type GrantType string
+const UserAgentVersion = "0.1"
 
-const ClientCredentials GrantType = "client_credentials"
-
-// OAuthPayload The payload that will be sent in order to obtain an OAuth token
-type OAuthPayload struct {
-	ClientID     string    `json:"client_id"`
-	ClientSecret string    `json:"client_secret"`
-	Audience     string    `json:"audience"`
-	GrantType    GrantType `json:"grant_type"`
+// TokenClient Represents something that is capable of getting NATS JWT tokens
+// for a given set of NKeys
+type TokenClient interface {
+	GetNATSToken(ctx context.Context, keys nkeys.KeyPair) (string, error)
 }
 
-// OAuthResponse Represents the responses that are returns from the OAuth server
-type OAuthResponse struct {
-	AccessToken string `json:"access_token"`
-	TokenType   string `json:"token_type"`
+// BasicTokenClient stores a static token and returns it when called, ignoring
+// any provided NKeys or context since it already has the token and doesn't need
+// to make any requests
+type BasicTokenClient struct {
+	staticToken string
 }
 
-// GetOAuthToken Gets a new OAuth token using a given payload
-func GetOAuthToken(tokenURL string, payload OAuthPayload) (OAuthResponse, error) {
-	var response OAuthResponse
-
-	payloadBytes, err := json.Marshal(payload)
-
-	if err != nil {
-		return response, err
+// NewBasicTokenClient Creates a new basic token client that simply returns a static token
+func NewBasicTokenClient(token string) *BasicTokenClient {
+	return &BasicTokenClient{
+		staticToken: token,
 	}
-
-	payloadReader := bytes.NewReader(payloadBytes)
-
-	// payload := strings.NewReader("{\"client_id\":\"SDhOZYZhqMATxNDlhyzdnRu366qETDfS\",\"client_secret\":\"GEhibCMxerzBsanfEyUaQG6kCvpvLinDOxpcNDg8_bKpYQnkdrIakefIv_8PyxWg\",\"audience\":\"https://auth.overmind.tech\",\"grant_type\":\"client_credentials\"}")
-
-	req, err := http.NewRequest("POST", tokenURL, payloadReader)
-
-	if err != nil {
-		return response, err
-	}
-
-	req.Header.Add("content-type", "application/json")
-
-	var res *http.Response
-
-	res, err = http.DefaultClient.Do(req)
-
-	if err != nil {
-		return response, err
-	}
-
-	defer res.Body.Close()
-	body, _ := ioutil.ReadAll(res.Body)
-
-	err = json.Unmarshal(body, &response)
-
-	return response, err
 }
 
-func foo() {
-	config := client.NewConfiguration()
+func (b *BasicTokenClient) GetNATSToken(_ context.Context, _ nkeys.KeyPair) (string, error) {
+	return b.staticToken, nil
+}
 
-	c := client.NewAPIClient(config)
+// OAuthTokenClient Gets a NATS token by first authenticating to OAuth using the
+// Client Credentials Flow, then using that token to retrieve a NATS token
+type OAuthTokenClient struct {
+	oAuthClient *clientcredentials.Config
+	natsConfig  *client.Configuration
+	natsClient  *client.APIClient
+}
 
-	healthCheck := c.DefaultApi.HealthzGet(context.Background())
+// NewOAuthTokenClient Generates a token client that authenticates to OAuth
+// using the client credentials flow, then uses that auth to get a NATS token.
+// `clientID` and `clientSecret` are used to authenticate using the client
+// credentials flow with an API at `oAuthTokenURL`. `natsTokenExchangeURL` is
+// the root URL of the NATS token exchange API that will be used e.g.
+// https://api.server.test/v1
+func NewOAuthTokenClient(clientID string, clientSecret string, oAuthTokenURL string, natsTokenExchangeURL string) *OAuthTokenClient {
+	conf := &clientcredentials.Config{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		TokenURL:     oAuthTokenURL,
+		EndpointParams: url.Values{
+			"audience": []string{"https://auth.overmind.tech"},
+		},
+	}
 
-	resp, err := healthCheck.Execute()
+	// Get an authenticated client that we can then make more HTTP calls with
+	authenticatedClient := conf.Client(context.TODO())
 
-	fmt.Println(resp)
-	fmt.Println(err)
+	// Configure the token exchange client to use the newly authenticated HTTP
+	// client among other things
+	tokenExchangeConf := &client.Configuration{
+		DefaultHeader: make(map[string]string),
+		UserAgent:     fmt.Sprintf("Overmind/%v (%v/%v)", UserAgentVersion, runtime.GOOS, runtime.GOARCH),
+		Debug:         false,
+		Servers: client.ServerConfigurations{
+			{
+				URL:         natsTokenExchangeURL,
+				Description: "NATS Token Exchange Server",
+			},
+		},
+		OperationServers: map[string]client.ServerConfigurations{},
+		HTTPClient:       authenticatedClient,
+	}
 
+	nClient := client.NewAPIClient(tokenExchangeConf)
+
+	return &OAuthTokenClient{
+		oAuthClient: conf,
+		natsConfig:  tokenExchangeConf,
+		natsClient:  nClient,
+	}
+}
+
+// GetNATSToken Authenticates to OAuth, gets a token, then exchanges that at the
+// nats-token-exchange for a NATS token that will work for the supplied set of
+// NKeys
+func (o *OAuthTokenClient) GetNATSToken(ctx context.Context, keys nkeys.KeyPair) (string, error) {
+	var pubKey string
+	var hostname string
+	var token string
+	var response *http.Response
+	var err error
+
+	pubKey, err = keys.PublicKey()
+
+	if err != nil {
+		return "", err
+	}
+
+	hostname, err = os.Hostname()
+
+	if err != nil {
+		return "", err
+	}
+
+	// Create the request for a NATS token
+	request := o.natsClient.AuthApi.TokensPost(ctx).InlineObject(client.InlineObject{
+		UserPubKey: &pubKey,
+		UserName:   &hostname,
+	})
+
+	token, response, err = request.Execute()
+
+	if err != nil {
+		return "", fmt.Errorf("getting NATS token failed: %v\nResponse: %v", err, response)
+	}
+
+	return token, nil
 }

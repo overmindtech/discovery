@@ -29,7 +29,7 @@ services:
   # Runs the token exchange
   nats-token-exchange:
     image: ghcr.io/overmindtech/nats-token-exchange:main
-    command: run --nsc-operator overmind-testing --nsc-storage /nsc --auth0-domain dev-qsurrmp8.eu.auth0.com
+    command: run --nsc-operator overmind-testing --nsc-storage /nsc --auth0-domain dev-qsurrmp8.eu.auth0.com --nats-server nats://nats-auth:4222
     volumes:
       - nsc-storage:/nsc
     networks:
