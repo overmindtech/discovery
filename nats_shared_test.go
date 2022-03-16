@@ -1,41 +1,49 @@
 package discovery
 
 import (
+	"fmt"
 	"net"
 	"net/url"
 	"testing"
 	"time"
 )
 
-var NatsTestURLs = []string{
-	"nats://nats:4222",
-	"nats://127.0.0.1:4222",
-}
+var NatsTestURL = "nats://nats:4222"
+var NatsAuthTestURL = "nats://nats-auth:4222"
 
 // SkipWithoutNats Skips a test if NATS is not available
 func SkipWithoutNats(t *testing.T) {
-	errors := make([]error, 0)
+	err := testURL(NatsTestURL)
 
-	for _, urlString := range NatsTestURLs {
-		url, err := url.Parse(urlString)
+	if err != nil {
+		t.Error(err)
+		t.Skip("NATS not available")
+	}
+}
 
-		if err != nil {
-			t.Errorf("could not parse NATS URL: %v. Error: %v", urlString, err)
-		}
+// SkipWithoutNatsAuth Skips a test if authenticated NATS is not available
+func SkipWithoutNatsAuth(t *testing.T) {
+	err := testURL(NatsAuthTestURL)
 
-		conn, err := net.DialTimeout("tcp", net.JoinHostPort(url.Hostname(), url.Port()), time.Second)
+	if err != nil {
+		t.Error(err)
+		t.Skip("NATS not available")
+	}
+}
 
-		if err == nil {
-			conn.Close()
-			return
-		}
+func testURL(testURL string) error {
+	url, err := url.Parse(testURL)
 
-		errors = append(errors, err)
+	if err != nil {
+		return fmt.Errorf("could not parse NATS URL: %v. Error: %v", testURL, err)
 	}
 
-	for _, e := range errors {
-		t.Log(e)
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort(url.Hostname(), url.Port()), time.Second)
+
+	if err == nil {
+		conn.Close()
+		return nil
 	}
 
-	t.Skip("NATS not available")
+	return err
 }

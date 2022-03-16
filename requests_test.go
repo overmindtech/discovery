@@ -276,7 +276,7 @@ func TestSendRequestSync(t *testing.T) {
 	e := Engine{
 		Name: "nats-test",
 		NATSOptions: &NATSOptions{
-			URLs:           NatsTestURLs,
+			URLs:           []string{NatsTestURL},
 			ConnectionName: "test-connection",
 			ConnectTimeout: time.Second,
 			MaxReconnect:   5,

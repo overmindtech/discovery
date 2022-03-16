@@ -10,7 +10,43 @@ import (
 	"github.com/overmindtech/nats-token-exchange/client"
 )
 
-func GetAllPermissionsConfig() (*OAuthTokenClient, error) {
+func TestBasicTokenClient(t *testing.T) {
+	keys, err := nkeys.CreateUser()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c := NewBasicTokenClient("tokeny_mc_tokenface", keys)
+
+	var token string
+
+	token, err = c.GetJWT()
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	if token != "tokeny_mc_tokenface" {
+		t.Error("token mismatch")
+	}
+
+	data := []byte{1, 156, 230, 4, 23, 175, 11}
+
+	signed, err := c.Sign(data)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = keys.Verify(data, signed)
+
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func GetTestOAuthTokenClient(t *testing.T) *OAuthTokenClient {
 	var domain string
 	var clientID string
 	var clientSecret string
@@ -20,73 +56,47 @@ func GetAllPermissionsConfig() (*OAuthTokenClient, error) {
 
 	// Read secrets form the environment
 	if domain, exists = os.LookupEnv("OVERMIND_NTE_ALLPERMS_DOMAIN"); !exists || domain == "" {
-		return nil, fmt.Errorf(errorFormat, "OVERMIND_NTE_ALLPERMS_DOMAIN")
+		t.Fatalf(errorFormat, "OVERMIND_NTE_ALLPERMS_DOMAIN")
 	}
 
 	if clientID, exists = os.LookupEnv("OVERMIND_NTE_ALLPERMS_CLIENT_ID"); !exists || clientID == "" {
-		return nil, fmt.Errorf(errorFormat, "OVERMIND_NTE_ALLPERMS_CLIENT_ID")
+		t.Fatalf(errorFormat, "OVERMIND_NTE_ALLPERMS_CLIENT_ID")
 	}
 
 	if clientSecret, exists = os.LookupEnv("OVERMIND_NTE_ALLPERMS_CLIENT_SECRET"); !exists || clientSecret == "" {
-		return nil, fmt.Errorf(errorFormat, "OVERMIND_NTE_ALLPERMS_CLIENT_SECRET")
+		t.Fatalf(errorFormat, "OVERMIND_NTE_ALLPERMS_CLIENT_SECRET")
 	}
 
-	c := NewOAuthTokenClient(
+	return NewOAuthTokenClient(
 		clientID,
 		clientSecret,
 		fmt.Sprintf("https://%v/oauth/token", domain),
 		"http://nats-token-exchange:8080",
 	)
-
-	return c, nil
-}
-
-func TestBasicTokenClient(t *testing.T) {
-	c := NewBasicTokenClient("tokeny_mc_tokenface")
-
-	keys, err := nkeys.CreateUser()
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var token string
-
-	token, err = c.GetNATSToken(context.Background(), keys)
-
-	if err != nil {
-		t.Error(err)
-	}
-
-	if token != "tokeny_mc_tokenface" {
-		t.Error("token mismatch")
-	}
 }
 
 func TestOAuthTokenClient(t *testing.T) {
-	c, err := GetAllPermissionsConfig()
-
-	if err != nil {
-		t.Fatal(err)
-	}
+	c := GetTestOAuthTokenClient(t)
 
 	EnsureTestAccount(c.natsClient.AuthApi)
 
-	keys, err := nkeys.CreateUser()
+	var err error
 
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var token string
-
-	token, err = c.GetNATSToken(context.Background(), keys)
+	_, err = c.GetJWT()
 
 	if err != nil {
 		t.Error(err)
 	}
 
-	fmt.Print(token)
+	// Make sure it can sign
+	data := []byte{1, 156, 230, 4, 23, 175, 11}
+
+	_, err = c.Sign(data)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
 }
 
 var TestAccountCreated bool

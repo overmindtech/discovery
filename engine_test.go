@@ -151,7 +151,7 @@ func TestNats(t *testing.T) {
 	e := Engine{
 		Name: "nats-test",
 		NATSOptions: &NATSOptions{
-			URLs:           NatsTestURLs,
+			URLs:           []string{NatsTestURL},
 			ConnectionName: "test-connection",
 			ConnectTimeout: time.Second,
 			MaxReconnect:   5,
@@ -252,7 +252,7 @@ func TestNatsCancel(t *testing.T) {
 	e := Engine{
 		Name: "nats-test",
 		NATSOptions: &NATSOptions{
-			URLs:           NatsTestURLs,
+			URLs:           []string{NatsTestURL},
 			ConnectionName: "test-connection",
 			ConnectTimeout: time.Second,
 			QueueName:      "test",
@@ -550,4 +550,44 @@ func TestNATSFailureRestart(t *testing.T) {
 	if !e.IsNATSConnected() {
 		t.Error("NATS didn't manage to reconnect")
 	}
+}
+
+func TestNatsAuth(t *testing.T) {
+	SkipWithoutNatsAuth(t)
+
+	e := Engine{
+		Name: "nats-test",
+		NATSOptions: &NATSOptions{
+			URLs:           []string{NatsAuthTestURL},
+			ConnectionName: "test-connection",
+			ConnectTimeout: time.Second,
+			MaxReconnect:   5,
+			QueueName:      "test",
+			TokenClient:    GetTestOAuthTokenClient(t),
+		},
+		MaxParallelExecutions: 10,
+	}
+
+	src := TestSource{}
+
+	e.AddSources(
+		&src,
+		&TestSource{
+			ReturnContexts: []string{
+				sdp.WILDCARD,
+			},
+		},
+	)
+
+	t.Run("Starting", func(t *testing.T) {
+		err := e.Start()
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if len(e.subscriptions) != 4 {
+			t.Errorf("Expected engine to have 4 subscriptions, got %v", len(e.subscriptions))
+		}
+	})
 }
