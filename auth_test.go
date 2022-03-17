@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/nats-io/nkeys"
-	"github.com/overmindtech/nats-token-exchange/client"
+	"github.com/overmindtech/tokenx-client"
 )
 
 func TestBasicTokenClient(t *testing.T) {
@@ -101,13 +101,13 @@ func TestOAuthTokenClient(t *testing.T) {
 
 var TestAccountCreated bool
 
-func EnsureTestAccount(a *client.AuthApiService) error {
+func EnsureTestAccount(a *tokenx.AuthApiService) error {
 	if !TestAccountCreated {
 		// This is the account that OAuth embeds in test tokens and therefore must
 		// be created
 		name := "test-account"
 
-		req := a.AccountsPost(context.Background()).InlineObject1(client.InlineObject1{
+		req := a.AccountsPost(context.Background()).AccountRequestData(tokenx.AccountRequestData{
 			Name: &name,
 		})
 
