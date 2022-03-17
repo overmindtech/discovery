@@ -590,4 +590,67 @@ func TestNatsAuth(t *testing.T) {
 			t.Errorf("Expected engine to have 4 subscriptions, got %v", len(e.subscriptions))
 		}
 	})
+
+	t.Run("Handling a basic request", func(t *testing.T) {
+		t.Cleanup(func() {
+			src.ClearCalls()
+			e.ClearCache()
+		})
+
+		req := sdp.ItemRequest{
+			Type:            "person",
+			Method:          sdp.RequestMethod_GET,
+			Query:           "basic",
+			LinkDepth:       0,
+			Context:         "test",
+			ResponseSubject: NewResponseSubject(),
+			ItemSubject:     NewItemSubject(),
+		}
+
+		_, _, err := e.SendRequestSync(&req)
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if len(src.GetCalls) != 1 {
+			t.Errorf("expected 1 get call, got %v: %v", len(src.GetCalls), src.GetCalls)
+		}
+	})
+
+	t.Run("Handling a deeply linking request", func(t *testing.T) {
+		t.Cleanup(func() {
+			src.ClearCalls()
+			e.ClearCache()
+		})
+
+		req := sdp.ItemRequest{
+			Type:            "person",
+			Method:          sdp.RequestMethod_GET,
+			Query:           "deeplink",
+			LinkDepth:       10,
+			Context:         "test",
+			ResponseSubject: NewResponseSubject(),
+			ItemSubject:     NewItemSubject(),
+		}
+
+		_, _, err := e.SendRequestSync(&req)
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if len(src.GetCalls) != 11 {
+			t.Errorf("expected 11 get calls, got %v: %v", len(src.GetCalls), src.GetCalls)
+		}
+	})
+
+	t.Run("stopping", func(t *testing.T) {
+		err := e.Stop()
+
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
 }
