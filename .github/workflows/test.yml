@@ -13,6 +13,16 @@ jobs:
         image: nats
         ports:
           - 4222:4222
+      nats-auth:
+        image: ghcr.io/overmindtech/nats-test-populated:main
+        ports:
+          - 4222:4223
+      nats-token-exchange:
+        image: ghcr.io/overmindtech/nats-token-exchange-test-populated:main
+        env:
+          NATS_SERVER: nats://localhost:4223
+        ports:
+          - 8080:8080
     steps:
 
     - name: Set up Go

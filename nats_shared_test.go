@@ -13,7 +13,15 @@ var NatsTestURLs = []string{
 	"nats://localhost:4222",
 }
 
-var NatsAuthTestURLs = []string{"nats://nats-auth:4222"}
+var NatsAuthTestURLs = []string{
+	"nats://nats-auth:4222",
+	"nats://localhost:4223",
+}
+
+var tokenExchangeURLs = []string{
+	"http://nats-token-exchange:8080",
+	"http://localhost:8080",
+}
 
 // SkipWithoutNats Skips a test if NATS is not available
 func SkipWithoutNats(t *testing.T) {
@@ -49,6 +57,18 @@ func SkipWithoutNatsAuth(t *testing.T) {
 		t.Error(err)
 		t.Skip("NATS not available")
 	}
+}
+
+func GetWorkingTokenExchange() (string, error) {
+	var err error
+
+	for _, url := range tokenExchangeURLs {
+		if err = testURL(url); err == nil {
+			return url, nil
+		}
+	}
+
+	return "", fmt.Errorf("no working token exchanges found: %v", err)
 }
 
 func testURL(testURL string) error {

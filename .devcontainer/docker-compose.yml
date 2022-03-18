@@ -1,24 +1,10 @@
 version: "3"
 services:
-  # Creates operator for testing
-  token-exchange-init:
-    image: ghcr.io/overmindtech/nats-token-exchange:main
-    entrypoint: /workspace/.devcontainer/init-nsc.sh
-    volumes:
-      - nsc-storage:/nsc
-      - ..:/workspace
-
   # Authenticted NATS for testing auth mechanisms
   nats-auth:
-    image: nats
-    command: "-c /nsc/nats-server.conf -DV" #-c /etc/nats/nats.conf --cluster nats://0.0.0.0:6222 --routes=nats://ruser:T0pS3cr3t@nats:6222
-    volumes:
-      - nsc-storage:/nsc
+    image: ghcr.io/overmindtech/nats-test-populated:main
     networks:
       - nats
-    depends_on:
-      token-exchange-init:
-        condition: service_completed_successfully
 
   # Unauthenticated NATS for simpler testing
   nats:
@@ -28,17 +14,10 @@ services:
 
   # Runs the token exchange
   nats-token-exchange:
-    image: ghcr.io/overmindtech/nats-token-exchange:main
-    command: run --nsc-operator overmind-testing --nsc-storage /nsc --auth0-domain dev-qsurrmp8.eu.auth0.com --nats-server nats://nats-auth:4222
-    volumes:
-      - nsc-storage:/nsc
+    image: ghcr.io/overmindtech/nats-token-exchange-test-populated:main
+    command: --nats-server nats://nats-auth:4222
     networks:
       - nats
-    depends_on:
-      token-exchange-init:
-        condition: service_completed_successfully
-      nats:
-        condition: service_started
 
   devcontainer:
     build: 

@@ -56,22 +56,31 @@ func GetTestOAuthTokenClient(t *testing.T) *OAuthTokenClient {
 
 	// Read secrets form the environment
 	if domain, exists = os.LookupEnv("OVERMIND_NTE_ALLPERMS_DOMAIN"); !exists || domain == "" {
-		t.Fatalf(errorFormat, "OVERMIND_NTE_ALLPERMS_DOMAIN")
+		t.Errorf(errorFormat, "OVERMIND_NTE_ALLPERMS_DOMAIN")
+		t.Skip("Skipping due to missing environment setup")
 	}
 
 	if clientID, exists = os.LookupEnv("OVERMIND_NTE_ALLPERMS_CLIENT_ID"); !exists || clientID == "" {
-		t.Fatalf(errorFormat, "OVERMIND_NTE_ALLPERMS_CLIENT_ID")
+		t.Errorf(errorFormat, "OVERMIND_NTE_ALLPERMS_CLIENT_ID")
+		t.Skip("Skipping due to missing environment setup")
 	}
 
 	if clientSecret, exists = os.LookupEnv("OVERMIND_NTE_ALLPERMS_CLIENT_SECRET"); !exists || clientSecret == "" {
-		t.Fatalf(errorFormat, "OVERMIND_NTE_ALLPERMS_CLIENT_SECRET")
+		t.Errorf(errorFormat, "OVERMIND_NTE_ALLPERMS_CLIENT_SECRET")
+		t.Skip("Skipping due to missing environment setup")
+	}
+
+	exchangeURL, err := GetWorkingTokenExchange()
+
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	return NewOAuthTokenClient(
 		clientID,
 		clientSecret,
 		fmt.Sprintf("https://%v/oauth/token", domain),
-		"http://nats-token-exchange:8080",
+		exchangeURL,
 	)
 }
 
