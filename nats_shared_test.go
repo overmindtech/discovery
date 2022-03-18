@@ -8,12 +8,24 @@ import (
 	"time"
 )
 
-var NatsTestURL = "nats://nats:4222"
-var NatsAuthTestURL = "nats://nats-auth:4222"
+var NatsTestURLs = []string{
+	"nats://nats:4222",
+	"nats://localhost:4222",
+}
+
+var NatsAuthTestURLs = []string{"nats://nats-auth:4222"}
 
 // SkipWithoutNats Skips a test if NATS is not available
 func SkipWithoutNats(t *testing.T) {
-	err := testURL(NatsTestURL)
+	var err error
+
+	for _, url := range NatsTestURLs {
+		err := testURL(url)
+
+		if err == nil {
+			return
+		}
+	}
 
 	if err != nil {
 		t.Error(err)
@@ -23,7 +35,15 @@ func SkipWithoutNats(t *testing.T) {
 
 // SkipWithoutNatsAuth Skips a test if authenticated NATS is not available
 func SkipWithoutNatsAuth(t *testing.T) {
-	err := testURL(NatsAuthTestURL)
+	var err error
+
+	for _, url := range NatsAuthTestURLs {
+		err := testURL(url)
+
+		if err == nil {
+			return
+		}
+	}
 
 	if err != nil {
 		t.Error(err)

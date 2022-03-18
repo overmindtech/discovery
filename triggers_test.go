@@ -220,7 +220,7 @@ func TestNATSTriggers(t *testing.T) {
 	engine := Engine{
 		Name: "trigger-testing",
 		NATSOptions: &NATSOptions{
-			URLs: []string{NatsTestURL},
+			URLs: NatsTestURLs,
 		},
 		MaxParallelExecutions: 1,
 	}
