@@ -23,6 +23,10 @@ jobs:
       nats-token-exchange:
         image: ghcr.io/overmindtech/nats-token-exchange-test-populated:main
         env:
+          # This is the URL of the nats-auth container above. Thankfully github
+          # creates all service containers on the same network, and with a nice
+          # network alias so we can use docker-provided DNS to have them talk to
+          # one another
           NATS_SERVER: nats://nats-auth:4222
         credentials:
           username: dylanratcliffe
