@@ -19,7 +19,7 @@ const UserAgentVersion = "0.1"
 // TokenClient Represents something that is capable of getting NATS JWT tokens
 // for a given set of NKeys
 type TokenClient interface {
-	// Retuns a NATS token that can be used to connect
+	// Returns a NATS token that can be used to connect
 	GetJWT() (string, error)
 
 	// Uses the NKeys associated with the token to sign some binary data
