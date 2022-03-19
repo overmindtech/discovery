@@ -1,26 +1,23 @@
 version: "3"
 services:
-  nats:
-    image: nats
-    command: "-c /etc/nats/nats.conf -DV" #-c /etc/nats/nats.conf --cluster nats://0.0.0.0:6222 --routes=nats://ruser:T0pS3cr3t@nats:6222
-    ports:
-      - "4222:4222"
-      - "8222:8222"
-      - "6222:6222"
-      - "4433:4433"
-    volumes:
-      - ./nats/nats-server.conf:/etc/nats/nats.conf
+  # Authenticted NATS for testing auth mechanisms
+  nats-auth:
+    image: ghcr.io/overmindtech/nats-test-populated:main
     networks:
       - nats
-  # nats-1:
-  #   image: nats
-  #   command: "-c nats-server.conf --routes=nats-route://ruser:T0pS3cr3t@nats:6222 -DV"
-  #link:
-  #  # Will build from a local copy
-  #  build: ../redacted_link
-  #  environment:
-  #    - REDACTED_NATS_URLS=nats
-  #    - REDACTED_VERBOSITY=debug
+
+  # Unauthenticated NATS for simpler testing
+  nats:
+    image: nats
+    networks:
+      - nats
+
+  # Runs the token exchange
+  nats-token-exchange:
+    image: ghcr.io/overmindtech/nats-token-exchange-test-populated:main
+    command: --nats-server nats://nats-auth:4222
+    networks:
+      - nats
 
   devcontainer:
     build: 
@@ -50,3 +47,6 @@ services:
 
 networks:
   nats:
+
+volumes:
+  nsc-storage:

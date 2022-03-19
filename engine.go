@@ -42,14 +42,10 @@ type NATSOptions struct {
 	// Note that any jitter is capped with ReconnectJitterMax.
 	ReconnectJitter time.Duration
 
-	// Path to the customer CA file to use when using TLS (if required)
-	CAFile string
-
-	// Path to the NKey seed file
-	NkeyFile string
-
-	// Path to the JWT
-	JWTFile string
+	// TokenClient Is the client that should be used to get a token to connect
+	// to NATS. This could be for example a BasicTokenClient which uses a static
+	// token, or an OAuthTokenClient that gets one using OAuth credentials
+	TokenClient TokenClient
 
 	// The name of the queue to join when subscribing to subjects
 	QueueName string
@@ -72,6 +68,10 @@ type Engine struct {
 	// to the number of CPUs
 	MaxParallelExecutions int
 
+	// How often to check for closed connections and try to recover
+	ConnectionWatchInterval time.Duration
+	ConnectionWatcher       NATSWatcher
+
 	// Internal throttle used to limit MaxParallelExecutions
 	throttle Throttle
 
@@ -81,10 +81,6 @@ type Engine struct {
 	// The NATS connection
 	natsConnection      *nats.EncodedConn
 	natsConnectionMutex sync.Mutex
-
-	// How often to check for closed connections and try to recover
-	ConnectionWatchInterval time.Duration
-	ConnectionWatcher       NATSWatcher
 
 	// List of all current subscriptions
 	subscriptions []*nats.Subscription
@@ -317,20 +313,16 @@ func (e *Engine) connect() error {
 			}),
 		}
 
+		if no.TokenClient != nil {
+			options = append(options, nats.UserJWT(no.TokenClient.GetJWT, no.TokenClient.Sign))
+		}
+
 		if no.ReconnectWait > 0 {
 			options = append(options, nats.ReconnectWait(no.ReconnectWait))
 		}
 
 		if no.ReconnectJitter > 0 {
 			options = append(options, nats.ReconnectJitter(no.ReconnectJitter, no.ReconnectJitter))
-		}
-
-		if no.CAFile != "" {
-			options = append(options, nats.RootCAs(no.CAFile))
-		}
-
-		if no.NkeyFile != "" && no.JWTFile != "" {
-			options = append(options, nats.UserCredentials(no.JWTFile, no.NkeyFile))
 		}
 
 		log.WithFields(log.Fields{

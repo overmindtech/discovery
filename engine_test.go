@@ -551,3 +551,106 @@ func TestNATSFailureRestart(t *testing.T) {
 		t.Error("NATS didn't manage to reconnect")
 	}
 }
+
+func TestNatsAuth(t *testing.T) {
+	SkipWithoutNatsAuth(t)
+
+	e := Engine{
+		Name: "nats-test",
+		NATSOptions: &NATSOptions{
+			URLs:           NatsAuthTestURLs,
+			ConnectionName: "test-connection",
+			ConnectTimeout: time.Second,
+			MaxReconnect:   5,
+			QueueName:      "test",
+			TokenClient:    GetTestOAuthTokenClient(t),
+		},
+		MaxParallelExecutions: 10,
+	}
+
+	src := TestSource{}
+
+	e.AddSources(
+		&src,
+		&TestSource{
+			ReturnContexts: []string{
+				sdp.WILDCARD,
+			},
+		},
+	)
+
+	t.Run("Starting", func(t *testing.T) {
+		err := e.Start()
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if len(e.subscriptions) != 4 {
+			t.Errorf("Expected engine to have 4 subscriptions, got %v", len(e.subscriptions))
+		}
+	})
+
+	t.Run("Handling a basic request", func(t *testing.T) {
+		t.Cleanup(func() {
+			src.ClearCalls()
+			e.ClearCache()
+		})
+
+		req := sdp.ItemRequest{
+			Type:            "person",
+			Method:          sdp.RequestMethod_GET,
+			Query:           "basic",
+			LinkDepth:       0,
+			Context:         "test",
+			ResponseSubject: NewResponseSubject(),
+			ItemSubject:     NewItemSubject(),
+		}
+
+		_, _, err := e.SendRequestSync(&req)
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if len(src.GetCalls) != 1 {
+			t.Errorf("expected 1 get call, got %v: %v", len(src.GetCalls), src.GetCalls)
+		}
+	})
+
+	t.Run("Handling a deeply linking request", func(t *testing.T) {
+		t.Cleanup(func() {
+			src.ClearCalls()
+			e.ClearCache()
+		})
+
+		req := sdp.ItemRequest{
+			Type:            "person",
+			Method:          sdp.RequestMethod_GET,
+			Query:           "deeplink",
+			LinkDepth:       10,
+			Context:         "test",
+			ResponseSubject: NewResponseSubject(),
+			ItemSubject:     NewItemSubject(),
+		}
+
+		_, _, err := e.SendRequestSync(&req)
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if len(src.GetCalls) != 11 {
+			t.Errorf("expected 11 get calls, got %v: %v", len(src.GetCalls), src.GetCalls)
+		}
+	})
+
+	t.Run("stopping", func(t *testing.T) {
+		err := e.Stop()
+
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+}
