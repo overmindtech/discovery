@@ -16,8 +16,8 @@ jobs:
       nats-auth:
         image: ghcr.io/overmindtech/nats-test-populated:main
         credentials:
-          username: dylanratcliffe
-          password: ${{ secrets.GHCR_PULL }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         ports:
           - 4223:4222
       nats-token-exchange:
@@ -29,8 +29,8 @@ jobs:
           # one another
           NATS_SERVER: nats://nats-auth:4222
         credentials:
-          username: dylanratcliffe
-          password: ${{ secrets.GHCR_PULL }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         ports:
           - 8080:8080
     steps:
