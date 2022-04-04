@@ -14,14 +14,14 @@ jobs:
         ports:
           - 4222:4222
       nats-auth:
-        image: ghcr.io/overmindtech/nats-test-populated:main
+        image: ghcr.io/overmindtech/test-populated-nats:main
         credentials:
-          username: dylanratcliffe
-          password: ${{ secrets.GHCR_PULL }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         ports:
           - 4223:4222
       nats-token-exchange:
-        image: ghcr.io/overmindtech/nats-token-exchange-test-populated:main
+        image: ghcr.io/overmindtech/test-populated-nats-token-exchange:main
         env:
           # This is the URL of the nats-auth container above. Thankfully github
           # creates all service containers on the same network, and with a nice
@@ -29,8 +29,8 @@ jobs:
           # one another
           NATS_SERVER: nats://nats-auth:4222
         credentials:
-          username: dylanratcliffe
-          password: ${{ secrets.GHCR_PULL }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         ports:
           - 8080:8080
     steps:
