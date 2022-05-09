@@ -4,10 +4,8 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
@@ -41,12 +39,12 @@ func (e *Engine) ItemRequestHandler(itemRequest *sdp.ItemRequest) {
 		ResponseSubject: itemRequest.ResponseSubject,
 	}
 
-	var pub sdp.EncodedPublisher
+	var pub sdp.EncodedConnection
 
 	if e.IsNATSConnected() {
 		pub = e.natsConnection
 	} else {
-		pub = NilPublisher{}
+		pub = NilConnection{}
 	}
 
 	responder.Start(
@@ -340,88 +338,6 @@ func (e *Engine) ExpandRequest(request *sdp.ItemRequest) map[*sdp.ItemRequest][]
 	}
 
 	return finalMap
-}
-
-// SendRequest Uses the connection to the NATS network that the engine manages
-// to send an SDP request. It will wait for all responders to be complete before
-// returning the request progress, all items, and optionally an error
-func (e *Engine) SendRequestSync(r *sdp.ItemRequest) (*sdp.RequestProgress, []*sdp.Item, error) {
-	var responseSubscription *nats.Subscription
-	var itemSubscription *nats.Subscription
-	var err error
-	var itemsWG sync.WaitGroup
-	var itemsMutex sync.Mutex
-	progress := sdp.NewRequestProgress()
-	items := make([]*sdp.Item, 0)
-
-	addItem := func(i *sdp.Item) {
-		itemsWG.Add(1)
-		defer itemsWG.Done()
-
-		itemsMutex.Lock()
-		items = append(items, i)
-		itemsMutex.Unlock()
-	}
-
-	if r == nil {
-		return progress, items, errors.New("ItemRequest cannot be nil")
-	}
-
-	if e.natsConnection == nil {
-		return progress, items, errors.New("Engine has no NATS connection. Has it been started?")
-	}
-
-	responseSubscription, err = e.natsConnection.Subscribe(r.ResponseSubject, progress.ProcessResponse)
-
-	if err != nil {
-		return progress, items, err
-	}
-
-	itemSubscription, err = e.natsConnection.Subscribe(r.ItemSubject, addItem)
-
-	if err != nil {
-		return progress, items, err
-	}
-
-	// Calculate the correct subject
-	var subject string
-
-	if r.Context == sdp.WILDCARD {
-		subject = "request.all"
-	} else {
-		subject = fmt.Sprintf("request.context.%v", r.Context)
-	}
-
-	err = e.natsConnection.Publish(subject, r)
-
-	if err != nil {
-		return progress, items, err
-	}
-
-	// Wait for all responders
-	<-progress.Done()
-
-	// Drain subscriptions
-	responseSubscription.Drain()
-	itemSubscription.Drain()
-
-	// NOTE: This is a nasty hack that is in place to ensure that we can wait
-	// for all items to be processed before returning. The better solution to
-	// this would be to actually know how many messages to expect, but this will
-	// require changes ot the SDP protocol and will probably coincide with a
-	// move to NATS JetStream. For now this works
-	for {
-		if n, _, err := itemSubscription.Pending(); n == 0 || err != nil {
-			break
-		}
-
-		time.Sleep(10 * time.Millisecond)
-	}
-
-	// Take a lock to make certain all items have been added
-	itemsWG.Wait()
-
-	return progress, items, nil
 }
 
 // requestHash Calculates a hash for a given request which can be used to

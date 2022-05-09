@@ -10,7 +10,7 @@ require (
 	github.com/nats-io/nats-server/v2 v2.8.2
 	github.com/nats-io/nats.go v1.15.0
 	github.com/nats-io/nkeys v0.3.0
-	github.com/overmindtech/sdp-go v0.6.1
+	github.com/overmindtech/sdp-go v0.8.3
 	github.com/overmindtech/sdpcache v0.3.1
 	github.com/overmindtech/tokenx-client v0.1.2
 	github.com/sirupsen/logrus v1.8.1

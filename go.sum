@@ -144,6 +144,8 @@ github.com/overmindtech/sdp-go v0.6.1 h1:0pFYhHDcfz2u5Uk9yvCF0SVvjFwIvHhq4Ud05n1
 github.com/overmindtech/sdp-go v0.6.1/go.mod h1:JPeGuRR8VMlUZJZmxVPE0S3PqFtB9p50I+QDjZwSuic=
 github.com/overmindtech/sdp-go v0.8.2 h1:1PnxlzNTmOsx3oxQdX68bwftj4GAHFETJAXAkAiPp+0=
 github.com/overmindtech/sdp-go v0.8.2/go.mod h1:S/Uqe9TGVcdWuWx+MAbOVcdLgnFqn79fTp1h5AANbtw=
+github.com/overmindtech/sdp-go v0.8.3 h1:OGV21SxxRY2XGoHml6Idin91y21FzeC3UFizg6pA46I=
+github.com/overmindtech/sdp-go v0.8.3/go.mod h1:S/Uqe9TGVcdWuWx+MAbOVcdLgnFqn79fTp1h5AANbtw=
 github.com/overmindtech/sdpcache v0.3.1 h1:AgdG/F7YpbUfNjB6IYK77pztnS17SVfCNqOwkny+rdw=
 github.com/overmindtech/sdpcache v0.3.1/go.mod h1:nRvqKJQdaD69DzYgh0DLTRdMdeQE59Ej02SqqEj5/V8=
 github.com/overmindtech/tokenx-client v0.1.2 h1:lZhmKzpv+evfnutvGd7B6bsjQCUvoxPW9cGyNMMi27s=
