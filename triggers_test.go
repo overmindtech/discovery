@@ -263,7 +263,7 @@ func TestNATSTriggers(t *testing.T) {
 
 			// Track progress. Note that this engine should be sending responses on
 			// the same subject that the original request was sent on
-			progress := sdp.NewRequestProgress()
+			progress := sdp.NewRequestProgress(tt.Item.Metadata.SourceRequest)
 			_, err = engine.natsConnection.Subscribe(
 				tt.Item.Metadata.SourceRequest.ResponseSubject,
 				progress.ProcessResponse,
@@ -283,7 +283,13 @@ func TestNATSTriggers(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			<-progress.Done()
+			items := make(chan *sdp.Item, 1000)
+
+			progress.Start(engine.natsConnection, items)
+
+			for range items {
+				// Do nothing
+			}
 
 			if len(source.SearchCalls) != 1 {
 				t.Fatalf("expected 1 search call, got %v", len(source.SearchCalls))

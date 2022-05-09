@@ -189,7 +189,7 @@ func TestNats(t *testing.T) {
 			e.ClearCache()
 		})
 
-		req := sdp.ItemRequest{
+		req := sdp.NewRequestProgress(&sdp.ItemRequest{
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
 			Query:           "basic",
@@ -197,9 +197,9 @@ func TestNats(t *testing.T) {
 			Context:         "test",
 			ResponseSubject: NewResponseSubject(),
 			ItemSubject:     NewItemSubject(),
-		}
+		})
 
-		_, _, err := e.SendRequestSync(&req)
+		_, err := req.Execute(e.natsConnection)
 
 		if err != nil {
 			t.Error(err)
@@ -216,7 +216,7 @@ func TestNats(t *testing.T) {
 			e.ClearCache()
 		})
 
-		req := sdp.ItemRequest{
+		req := sdp.NewRequestProgress(&sdp.ItemRequest{
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
 			Query:           "deeplink",
@@ -224,9 +224,9 @@ func TestNats(t *testing.T) {
 			Context:         "test",
 			ResponseSubject: NewResponseSubject(),
 			ItemSubject:     NewItemSubject(),
-		}
+		})
 
-		_, _, err := e.SendRequestSync(&req)
+		_, err := req.Execute(e.natsConnection)
 
 		if err != nil {
 			t.Error(err)
@@ -281,22 +281,20 @@ func TestNatsCancel(t *testing.T) {
 		conn := e.natsConnection
 		u := uuid.New()
 
-		req := sdp.ItemRequest{
+		progress := sdp.NewRequestProgress(&sdp.ItemRequest{
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
 			Query:           "foo",
 			LinkDepth:       100,
-			Context:         "test",
+			Context:         "*",
 			ResponseSubject: nats.NewInbox(),
 			ItemSubject:     "items.bin",
 			UUID:            u[:],
-		}
+		})
 
-		progress := sdp.NewRequestProgress()
+		items := make(chan *sdp.Item)
 
-		conn.Subscribe(req.ResponseSubject, progress.ProcessResponse)
-
-		err := conn.Publish("request.all", &req)
+		err := progress.Start(conn, items)
 
 		if err != nil {
 			t.Error(err)
@@ -308,7 +306,8 @@ func TestNatsCancel(t *testing.T) {
 			UUID: u[:],
 		})
 
-		<-progress.Done()
+		for range items {
+		}
 
 		if progress.NumCancelled() != 1 {
 			t.Errorf("Expected query to be cancelled, got\n%v", progress.String())
@@ -318,31 +317,32 @@ func TestNatsCancel(t *testing.T) {
 	t.Run("Cancelling requests without a UUID", func(t *testing.T) {
 		conn := e.natsConnection
 
-		req := sdp.ItemRequest{
+		progress := sdp.NewRequestProgress(&sdp.ItemRequest{
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
 			Query:           "bad-uuid",
 			LinkDepth:       4,
-			Context:         "test",
+			Context:         "*",
 			ResponseSubject: nats.NewInbox(),
 			ItemSubject:     "items.bin",
-		}
+		})
 
-		progress := sdp.NewRequestProgress()
+		items := make(chan *sdp.Item)
 
-		conn.Subscribe(req.ResponseSubject, progress.ProcessResponse)
-
-		err := conn.Publish("request.all", &req)
+		err := progress.Start(conn, items)
 
 		if err != nil {
 			t.Error(err)
 		}
 
-		conn.Publish("cancel.all", &sdp.CancelItemRequest{
-			UUID: []byte{},
-		})
+		err = progress.Cancel(conn)
 
-		<-progress.Done()
+		if err != nil {
+			t.Error(err)
+		}
+
+		for range items {
+		}
 
 		// You shouldn't be able to cancel requests that don't have a UUID
 		if progress.NumCancelled() != 0 {
@@ -597,7 +597,7 @@ func TestNatsAuth(t *testing.T) {
 			e.ClearCache()
 		})
 
-		req := sdp.ItemRequest{
+		_, err := sdp.NewRequestProgress(&sdp.ItemRequest{
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
 			Query:           "basic",
@@ -605,9 +605,7 @@ func TestNatsAuth(t *testing.T) {
 			Context:         "test",
 			ResponseSubject: NewResponseSubject(),
 			ItemSubject:     NewItemSubject(),
-		}
-
-		_, _, err := e.SendRequestSync(&req)
+		}).Execute(e.natsConnection)
 
 		if err != nil {
 			t.Error(err)
@@ -624,7 +622,7 @@ func TestNatsAuth(t *testing.T) {
 			e.ClearCache()
 		})
 
-		req := sdp.ItemRequest{
+		_, err := sdp.NewRequestProgress(&sdp.ItemRequest{
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
 			Query:           "deeplink",
@@ -632,9 +630,7 @@ func TestNatsAuth(t *testing.T) {
 			Context:         "test",
 			ResponseSubject: NewResponseSubject(),
 			ItemSubject:     NewItemSubject(),
-		}
-
-		_, _, err := e.SendRequestSync(&req)
+		}).Execute(e.natsConnection)
 
 		if err != nil {
 			t.Error(err)

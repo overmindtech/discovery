@@ -306,7 +306,7 @@ func TestSendRequestSync(t *testing.T) {
 		var progress *sdp.RequestProgress
 		var items []*sdp.Item
 
-		progress, items, err = e.SendRequestSync(&sdp.ItemRequest{
+		progress = sdp.NewRequestProgress(&sdp.ItemRequest{
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
 			Query:           "Dylan",
@@ -318,6 +318,8 @@ func TestSendRequestSync(t *testing.T) {
 			ItemSubject:     NewItemSubject(),
 			ResponseSubject: NewResponseSubject(),
 		})
+
+		items, err := progress.Execute(e.natsConnection)
 
 		if err != nil {
 			t.Fatal(err)
