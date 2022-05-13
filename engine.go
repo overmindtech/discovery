@@ -385,7 +385,7 @@ func (e *Engine) connect() error {
 			return err
 		}
 
-		err = e.subscribe("cancel.all", e.CancelItemRequestHandler)
+		err = e.subscribe("cancel.all", e.CancelHandler)
 
 		if err != nil {
 			return err
@@ -423,11 +423,11 @@ func (e *Engine) connect() error {
 		// Now actually create the required subscriptions
 		if wildcardExists {
 			e.subscribe("request.context.>", e.ItemRequestHandler)
-			e.subscribe("cancel.context.>", e.CancelItemRequestHandler)
+			e.subscribe("cancel.context.>", e.CancelHandler)
 		} else {
 			for suffix := range subscriptionMap {
 				e.subscribe(fmt.Sprintf("request.context.%v", suffix), e.ItemRequestHandler)
-				e.subscribe(fmt.Sprintf("cancel.context.%v", suffix), e.CancelItemRequestHandler)
+				e.subscribe(fmt.Sprintf("cancel.context.%v", suffix), e.CancelHandler)
 			}
 		}
 
@@ -566,8 +566,13 @@ func (e *Engine) IsNATSConnected() bool {
 	return false
 }
 
-// CancelItemRequestHandler Takes a CancelItemRequest and cancels that request if it exists
-func (e *Engine) CancelItemRequestHandler(cancelRequest *sdp.CancelItemRequest) {
+// CancelHandler calls HandleCancelItemRequest in a goroutine
+func (e *Engine) CancelHandler(cancelRequest *sdp.CancelItemRequest) {
+	go e.HandleCancelItemRequest(cancelRequest)
+}
+
+// HandleCancelItemRequest Takes a CancelItemRequest and cancels that request if it exists
+func (e *Engine) HandleCancelItemRequest(cancelRequest *sdp.CancelItemRequest) {
 	u, err := uuid.FromBytes(cancelRequest.UUID)
 
 	if err != nil {
