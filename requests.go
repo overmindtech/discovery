@@ -26,9 +26,15 @@ func NewResponseSubject() string {
 	return fmt.Sprintf("return.response.%v", nats.NewInbox())
 }
 
-// NewItemRequestHandler Returns a function whose job is to handle a single
-// request. This includes responses, linking etc.
+// ItemRequestHandler Calls HandleItemRequest but in a goroutine so that it can
+// happen in parallel
 func (e *Engine) ItemRequestHandler(itemRequest *sdp.ItemRequest) {
+	go e.HandleItemRequest(itemRequest)
+}
+
+// HandleItemRequest Handles a single request. This includes responses, linking
+// etc.
+func (e *Engine) HandleItemRequest(itemRequest *sdp.ItemRequest) {
 	if !e.WillRespond(itemRequest) {
 		// If we don't have any relevant sources, exit
 		return
