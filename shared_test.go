@@ -12,19 +12,24 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-func randSeq(n int) string {
-	b := make([]rune, n)
+func randString(length int) string {
+	var seededRand *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	b := make([]byte, length)
 	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
+		b[i] = charset[seededRand.Intn(len(charset))]
 	}
 	return string(b)
 }
 
 func RandomName() string {
-	n := namegenerator.NewNameGenerator(time.Now().UTC().UnixNano())
-	return n.Generate() + " " + n.Generate() + "-" + randSeq(10)
+	seed := time.Now().UTC().UnixNano()
+	nameGenerator := namegenerator.NewNameGenerator(seed)
+	name := nameGenerator.Generate()
+	randGarbage := randString(10)
+	return fmt.Sprintf("%v-%v", name, randGarbage)
 }
 
 func (s *TestSource) NewTestItem(itemContext string, query string) *sdp.Item {

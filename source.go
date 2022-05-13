@@ -3,7 +3,6 @@ package discovery
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/overmindtech/sdp-go"
@@ -161,7 +160,6 @@ func (e *Engine) Get(ctx context.Context, r *sdp.ItemRequest, relevantSources []
 			}
 		}
 
-		e.throttle.Lock()
 		log.WithFields(logFields).Debug("Executing get for backend")
 
 		var getDuration time.Duration
@@ -171,8 +169,6 @@ func (e *Engine) Get(ctx context.Context, r *sdp.ItemRequest, relevantSources []
 		getDuration = timeOperation(func() {
 			item, err = src.Get(ctx, r.Context, r.Query)
 		})
-
-		e.throttle.Unlock()
 
 		logFields["itemFound"] = (err == nil)
 		logFields["error"] = err
@@ -235,9 +231,6 @@ func (e *Engine) Get(ctx context.Context, r *sdp.ItemRequest, relevantSources []
 // results. Only returns an error if all sources fail, in which case returns the
 // first error
 func (e *Engine) Find(ctx context.Context, r *sdp.ItemRequest, relevantSources []Source) ([]*sdp.Item, error) {
-	var storageMutex sync.Mutex
-	var workingSources sync.WaitGroup
-
 	if len(relevantSources) == 0 {
 		return nil, &sdp.ItemRequestError{
 			ErrorType:   sdp.ItemRequestError_NOCONTEXT,
@@ -253,123 +246,107 @@ func (e *Engine) Find(ctx context.Context, r *sdp.ItemRequest, relevantSources [
 	errors := make([]error, 0)
 
 	for _, src := range relevantSources {
-		workingSources.Add(1)
-		go func(source Source) {
-			defer workingSources.Done()
+		tags := sdpcache.Tags{
+			"method":     "find",
+			"sourceName": src.Name(),
+			"context":    r.Context,
+		}
 
-			tags := sdpcache.Tags{
-				"method":     "find",
-				"sourceName": source.Name(),
-				"context":    r.Context,
-			}
+		logFields := log.Fields{
+			"sourceName": src.Name(),
+			"type":       r.Type,
+			"context":    r.Context,
+		}
 
-			logFields := log.Fields{
-				"sourceName": source.Name(),
-				"type":       r.Type,
-				"context":    r.Context,
-			}
+		if !r.IgnoreCache {
+			cachedItems, err := e.cache.Search(tags)
 
-			if !r.IgnoreCache {
-				cachedItems, err := e.cache.Search(tags)
+			switch err := err.(type) {
+			case sdpcache.CacheNotFoundError:
+				// If the item/error wasn't found in the cache then just
+				// continue on
+			case *sdp.ItemRequestError:
+				if err.ErrorType == sdp.ItemRequestError_NOTFOUND {
+					log.WithFields(logFields).Debug("Found cached empty FIND, not executing")
 
-				switch err := err.(type) {
-				case sdpcache.CacheNotFoundError:
-					// If the item/error wasn't found in the cache then just
-					// continue on
-				case *sdp.ItemRequestError:
-					if err.ErrorType == sdp.ItemRequestError_NOTFOUND {
-						log.WithFields(logFields).Debug("Found cached empty FIND, not executing")
-
-						return
-					}
-				default:
-					// If we get a result from the cache then return that
-					if len(cachedItems) > 0 {
-						logFields["items"] = len(cachedItems)
-
-						log.WithFields(logFields).Debug("Found items from cache")
-
-						storageMutex.Lock()
-						items = append(items, cachedItems...)
-						errors = append(errors, err)
-						storageMutex.Unlock()
-
-						return
-					}
-				}
-			}
-
-			e.throttle.Lock()
-			log.WithFields(logFields).Debug("Executing find")
-
-			finds := make([]*sdp.Item, 0)
-			var err error
-
-			findDuration := timeOperation(func() {
-				finds, err = source.Find(ctx, r.Context)
-			})
-
-			e.throttle.Unlock()
-
-			logFields["items"] = len(finds)
-			logFields["error"] = err
-
-			if err == nil {
-				log.WithFields(logFields).Debug("Find complete")
-
-				// Check too see if nothing was found, make sure we cache the
-				// nothing
-				if len(finds) == 0 {
-					e.cache.StoreError(&sdp.ItemRequestError{
-						ErrorType: sdp.ItemRequestError_NOTFOUND,
-					}, GetCacheDuration(source), tags)
-				}
-			} else {
-				log.WithFields(logFields).Error("Error during find")
-
-				e.cache.StoreError(err, GetCacheDuration(source), tags)
-			}
-
-			// For each found item, add more details
-			//
-			// Use the index here to ensure that we're actually editing the
-			// right thing
-			for i := range finds {
-				// Get a pointer to the item we're dealing with
-				item := finds[i]
-
-				// Handle the case where we are given a nil pointer
-				if item == nil {
 					continue
 				}
+			default:
+				// If we get a result from the cache then return that
+				if len(cachedItems) > 0 {
+					logFields["items"] = len(cachedItems)
 
-				// Store metadata
-				item.Metadata = &sdp.Metadata{
-					Timestamp:             timestamppb.New(time.Now()),
-					SourceDuration:        durationpb.New(findDuration),
-					SourceDurationPerItem: durationpb.New(time.Duration(findDuration.Nanoseconds() / int64(len(finds)))),
-					SourceName:            source.Name(),
+					log.WithFields(logFields).Debug("Found items from cache")
+
+					items = append(items, cachedItems...)
+					errors = append(errors, err)
+
+					continue
 				}
+			}
+		}
 
-				// Mark the item as hidden if the source is a hidden source
-				if hs, ok := source.(HiddenSource); ok {
-					item.Metadata.Hidden = hs.Hidden()
-				}
+		log.WithFields(logFields).Debug("Executing find")
 
-				// Cache the item
-				e.cache.StoreItem(item, GetCacheDuration(source), tags)
+		finds := make([]*sdp.Item, 0)
+		var err error
+
+		findDuration := timeOperation(func() {
+			finds, err = src.Find(ctx, r.Context)
+		})
+
+		logFields["items"] = len(finds)
+		logFields["error"] = err
+
+		if err == nil {
+			log.WithFields(logFields).Debug("Find complete")
+
+			// Check too see if nothing was found, make sure we cache the
+			// nothing
+			if len(finds) == 0 {
+				e.cache.StoreError(&sdp.ItemRequestError{
+					ErrorType: sdp.ItemRequestError_NOTFOUND,
+				}, GetCacheDuration(src), tags)
+			}
+		} else {
+			log.WithFields(logFields).Error("Error during find")
+
+			e.cache.StoreError(err, GetCacheDuration(src), tags)
+		}
+
+		// For each found item, add more details
+		//
+		// Use the index here to ensure that we're actually editing the
+		// right thing
+		for i := range finds {
+			// Get a pointer to the item we're dealing with
+			item := finds[i]
+
+			// Handle the case where we are given a nil pointer
+			if item == nil {
+				continue
 			}
 
-			storageMutex.Lock()
-			items = append(items, finds...)
-			errors = append(errors, err)
-			storageMutex.Unlock()
-		}(src)
-	}
+			// Store metadata
+			item.Metadata = &sdp.Metadata{
+				Timestamp:             timestamppb.New(time.Now()),
+				SourceDuration:        durationpb.New(findDuration),
+				SourceDurationPerItem: durationpb.New(time.Duration(findDuration.Nanoseconds() / int64(len(finds)))),
+				SourceName:            src.Name(),
+			}
 
-	workingSources.Wait()
-	storageMutex.Lock()
-	defer storageMutex.Unlock()
+			// Mark the item as hidden if the source is a hidden source
+			if hs, ok := src.(HiddenSource); ok {
+				item.Metadata.Hidden = hs.Hidden()
+			}
+
+			// Cache the item
+			e.cache.StoreItem(item, GetCacheDuration(src), tags)
+		}
+
+		items = append(items, finds...)
+		errors = append(errors, err)
+	}
 
 	// Check if there were any successful runs and if so return the items
 	for _, e := range errors {
@@ -389,9 +366,6 @@ func (e *Engine) Find(ctx context.Context, r *sdp.ItemRequest, relevantSources [
 // results. Only returns an error if all sources fail, in which case returns the
 // first error
 func (e *Engine) Search(ctx context.Context, r *sdp.ItemRequest, relevantSources []Source) ([]*sdp.Item, error) {
-	var storageMutex sync.Mutex
-	var workingSources sync.WaitGroup
-
 	searchableSources := make([]SearchableSource, 0)
 
 	// Filter further by searchability
@@ -416,124 +390,108 @@ func (e *Engine) Search(ctx context.Context, r *sdp.ItemRequest, relevantSources
 	errors := make([]error, 0)
 
 	for _, src := range searchableSources {
-		workingSources.Add(1)
-		go func(source SearchableSource) {
-			defer workingSources.Done()
+		tags := sdpcache.Tags{
+			"method":     "find",
+			"sourceName": src.Name(),
+			"query":      r.Query,
+			"context":    r.Context,
+		}
 
-			tags := sdpcache.Tags{
-				"method":     "find",
-				"sourceName": source.Name(),
-				"query":      r.Query,
-				"context":    r.Context,
-			}
+		logFields := log.Fields{
+			"sourceName": src.Name(),
+			"type":       r.Type,
+			"context":    r.Context,
+		}
 
-			logFields := log.Fields{
-				"sourceName": source.Name(),
-				"type":       r.Type,
-				"context":    r.Context,
-			}
+		if !r.IgnoreCache {
+			cachedItems, err := e.cache.Search(tags)
 
-			if !r.IgnoreCache {
-				cachedItems, err := e.cache.Search(tags)
+			switch err := err.(type) {
+			case sdpcache.CacheNotFoundError:
+				// If the item/error wasn't found in the cache then just
+				// continue on
+			case *sdp.ItemRequestError:
+				if err.ErrorType == sdp.ItemRequestError_NOTFOUND {
+					log.WithFields(logFields).Debug("Found cached empty result, not executing")
 
-				switch err := err.(type) {
-				case sdpcache.CacheNotFoundError:
-					// If the item/error wasn't found in the cache then just
-					// continue on
-				case *sdp.ItemRequestError:
-					if err.ErrorType == sdp.ItemRequestError_NOTFOUND {
-						log.WithFields(logFields).Debug("Found cached empty result, not executing")
-
-						return
-					}
-				default:
-					// If we get a result from the cache then return that
-					if len(cachedItems) > 0 {
-						logFields["items"] = len(cachedItems)
-
-						log.WithFields(logFields).Debug("Found items from cache")
-
-						storageMutex.Lock()
-						items = append(items, cachedItems...)
-						errors = append(errors, err)
-						storageMutex.Unlock()
-
-						return
-					}
-				}
-			}
-
-			e.throttle.Lock()
-			log.WithFields(logFields).Debug("Executing search")
-
-			var searchItems []*sdp.Item
-			var err error
-
-			searchDuration := timeOperation(func() {
-				searchItems, err = source.Search(ctx, r.Context, r.Query)
-			})
-
-			e.throttle.Unlock()
-
-			logFields["items"] = len(searchItems)
-			logFields["error"] = err
-
-			if err == nil {
-				log.WithFields(logFields).Debug("Search completed")
-
-				// Check too see if nothing was found, make sure we cache the
-				// nothing
-				if len(searchItems) == 0 {
-					e.cache.StoreError(&sdp.ItemRequestError{
-						ErrorType: sdp.ItemRequestError_NOTFOUND,
-					}, GetCacheDuration(source), tags)
-				}
-			} else {
-				log.WithFields(logFields).Error("Error during search")
-
-				e.cache.StoreError(err, GetCacheDuration(source), tags)
-			}
-
-			// For each found item, add more details
-			//
-			// Use the index here to ensure that we're actually editing the
-			// right thing
-			for i := range searchItems {
-				// Get a pointer to the item we're dealing with
-				item := searchItems[i]
-
-				// Handle the case where we are given a nil pointer
-				if item == nil {
 					continue
 				}
+			default:
+				// If we get a result from the cache then return that
+				if len(cachedItems) > 0 {
+					logFields["items"] = len(cachedItems)
 
-				// Store metadata
-				item.Metadata = &sdp.Metadata{
-					Timestamp:             timestamppb.New(time.Now()),
-					SourceDuration:        durationpb.New(searchDuration),
-					SourceDurationPerItem: durationpb.New(time.Duration(searchDuration.Nanoseconds() / int64(len(searchItems)))),
-					SourceName:            source.Name(),
+					log.WithFields(logFields).Debug("Found items from cache")
+
+					items = append(items, cachedItems...)
+					errors = append(errors, err)
+
+					continue
 				}
+			}
+		}
 
-				// Mark the item as hidden if the source is a hidden source
-				if hs, ok := source.(HiddenSource); ok {
-					item.Metadata.Hidden = hs.Hidden()
-				}
+		log.WithFields(logFields).Debug("Executing search")
 
-				// Cache the item
-				e.cache.StoreItem(item, GetCacheDuration(source), tags)
+		var searchItems []*sdp.Item
+		var err error
+
+		searchDuration := timeOperation(func() {
+			searchItems, err = src.Search(ctx, r.Context, r.Query)
+		})
+
+		logFields["items"] = len(searchItems)
+		logFields["error"] = err
+
+		if err == nil {
+			log.WithFields(logFields).Debug("Search completed")
+
+			// Check too see if nothing was found, make sure we cache the
+			// nothing
+			if len(searchItems) == 0 {
+				e.cache.StoreError(&sdp.ItemRequestError{
+					ErrorType: sdp.ItemRequestError_NOTFOUND,
+				}, GetCacheDuration(src), tags)
+			}
+		} else {
+			log.WithFields(logFields).Error("Error during search")
+
+			e.cache.StoreError(err, GetCacheDuration(src), tags)
+		}
+
+		// For each found item, add more details
+		//
+		// Use the index here to ensure that we're actually editing the
+		// right thing
+		for i := range searchItems {
+			// Get a pointer to the item we're dealing with
+			item := searchItems[i]
+
+			// Handle the case where we are given a nil pointer
+			if item == nil {
+				continue
 			}
 
-			storageMutex.Lock()
-			items = append(items, searchItems...)
-			errors = append(errors, err)
-			storageMutex.Unlock()
-		}(src)
-	}
+			// Store metadata
+			item.Metadata = &sdp.Metadata{
+				Timestamp:             timestamppb.New(time.Now()),
+				SourceDuration:        durationpb.New(searchDuration),
+				SourceDurationPerItem: durationpb.New(time.Duration(searchDuration.Nanoseconds() / int64(len(searchItems)))),
+				SourceName:            src.Name(),
+			}
 
-	workingSources.Wait()
-	storageMutex.Lock()
-	defer storageMutex.Unlock()
+			// Mark the item as hidden if the source is a hidden source
+			if hs, ok := src.(HiddenSource); ok {
+				item.Metadata.Hidden = hs.Hidden()
+			}
+
+			// Cache the item
+			e.cache.StoreItem(item, GetCacheDuration(src), tags)
+		}
+
+		items = append(items, searchItems...)
+		errors = append(errors, err)
+	}
 
 	// Check if there were any successful runs and if so return the items
 	for _, e := range errors {

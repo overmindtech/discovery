@@ -2,7 +2,6 @@ package discovery
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -84,96 +83,6 @@ func (s *SpeedTestSource) Find(ctx context.Context, itemContext string) ([]*sdp.
 
 func (s *SpeedTestSource) Weight() int {
 	return 10
-}
-
-func TestExecuteParallel(t *testing.T) {
-	queryDelay := (200 * time.Millisecond)
-	numSources := 10
-	sources := make([]Source, numSources)
-
-	// Create a number of sources
-	for i := 0; i < len(sources); i++ {
-		sources[i] = &SpeedTestSource{
-			QueryDelay: queryDelay,
-			ReturnType: fmt.Sprintf("type%v", i),
-		}
-	}
-
-	t.Run("With no parallelism", func(t *testing.T) {
-		t.Parallel()
-
-		engine := Engine{
-			Name:                  "no-parallel",
-			MaxParallelExecutions: 1,
-		}
-
-		engine.AddSources(sources...)
-		engine.SetupThrottle()
-
-		tracker := RequestTracker{
-			Engine: &engine,
-			Request: &sdp.ItemRequest{
-				Type:      "*",
-				Method:    sdp.RequestMethod_FIND,
-				LinkDepth: 0,
-				Context:   "*",
-			},
-		}
-
-		timeStart := time.Now()
-
-		_, err := tracker.Execute()
-
-		timeTaken := time.Since(timeStart)
-
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		expectedTime := time.Duration(int64(queryDelay) * int64(numSources))
-
-		if timeTaken < expectedTime {
-			t.Errorf("Query with no parallelism took < %v. This means it must have run in parallel", expectedTime)
-		}
-	})
-
-	t.Run("With lots of parallelism", func(t *testing.T) {
-		t.Parallel()
-
-		engine := Engine{
-			Name:                  "no-parallel",
-			MaxParallelExecutions: 999,
-		}
-
-		engine.AddSources(sources...)
-		engine.SetupThrottle()
-
-		tracker := RequestTracker{
-			Engine: &engine,
-			Request: &sdp.ItemRequest{
-				Type:      "*",
-				Method:    sdp.RequestMethod_FIND,
-				LinkDepth: 0,
-				Context:   "*",
-			},
-		}
-
-		timeStart := time.Now()
-
-		_, err := tracker.Execute()
-
-		timeTaken := time.Since(timeStart)
-
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		expectedTime := (queryDelay * 2) // Double it give us some wiggle room
-
-		if timeTaken > expectedTime {
-			t.Errorf("Query with no parallelism took %v which is > than the expected max of %v. This means it must not have run in parallel", timeTaken, expectedTime)
-		}
-	})
 }
 
 func TestExecute(t *testing.T) {
