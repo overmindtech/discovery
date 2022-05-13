@@ -133,6 +133,12 @@ func TimeRequests(numRequests int, linkDepth int, numParallel int) TimedResults 
 	var expectedDuration time.Duration
 	for i := 0; i <= linkDepth; i++ {
 		thisLayer := int(math.Pow(2, float64(i))) * numRequests
+
+		// Expect that it'll take no longer that 200% of the sleep time. This is
+		// actually quite a lot of slack, and you likely won't need this much
+		// when running tests locally. But testing on shared platforms like
+		// Github actions you can see some pretty serious slowdowns that don't
+		// seem to be related to the tests
 		thisDuration := 200 * math.Ceil(float64(thisLayer)/float64(numParallel))
 		expectedDuration = expectedDuration + (time.Duration(thisDuration) * time.Millisecond)
 		expectedItems = expectedItems + thisLayer
