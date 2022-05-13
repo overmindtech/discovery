@@ -149,7 +149,7 @@ func TestExecuteRequest(t *testing.T) {
 
 }
 
-func TestNewItemRequestHandler(t *testing.T) {
+func TestHandleItemRequest(t *testing.T) {
 	e := Engine{
 		Name: "test",
 	}
@@ -188,7 +188,7 @@ func TestNewItemRequestHandler(t *testing.T) {
 		}
 
 		// Run the handler
-		e.ItemRequestHandler(&req)
+		e.HandleItemRequest(&req)
 
 		// I'm expecting both sources to get a request since the type was *
 		if l := len(personSource.GetCalls); l != 1 {
@@ -215,7 +215,7 @@ func TestNewItemRequestHandler(t *testing.T) {
 		}
 
 		// Run the handler
-		e.ItemRequestHandler(&req)
+		e.HandleItemRequest(&req)
 
 		if l := len(personSource.GetCalls); l != 2 {
 			t.Errorf("expected person backend to have 2 Get calls, got %v", l)
@@ -252,7 +252,7 @@ func TestWildcardSourceExpansion(t *testing.T) {
 		}
 
 		// Run the handler
-		e.ItemRequestHandler(&req)
+		e.HandleItemRequest(&req)
 
 		if len(personSource.GetCalls) != 1 {
 			t.Errorf("expected 1 get call got %v", len(personSource.GetCalls))
@@ -356,7 +356,7 @@ func TestExpandRequest(t *testing.T) {
 
 		e.AddSources(&simple)
 
-		e.ItemRequestHandler(&sdp.ItemRequest{
+		e.HandleItemRequest(&sdp.ItemRequest{
 			Type:    "person",
 			Method:  sdp.RequestMethod_GET,
 			Query:   "Debby",
@@ -385,7 +385,7 @@ func TestExpandRequest(t *testing.T) {
 
 		e.AddSources(&many)
 
-		e.ItemRequestHandler(&sdp.ItemRequest{
+		e.HandleItemRequest(&sdp.ItemRequest{
 			Type:    "person",
 			Method:  sdp.RequestMethod_GET,
 			Query:   "Debby",
@@ -420,7 +420,7 @@ func TestExpandRequest(t *testing.T) {
 		e.AddSources(&sx)
 		e.AddSources(&sy)
 
-		e.ItemRequestHandler(&sdp.ItemRequest{
+		e.HandleItemRequest(&sdp.ItemRequest{
 			Type:    "person",
 			Method:  sdp.RequestMethod_GET,
 			Query:   "Daniel",
@@ -463,7 +463,7 @@ func TestExpandRequest(t *testing.T) {
 		e.AddSources(&sx)
 		e.AddSources(&sy)
 
-		e.ItemRequestHandler(&sdp.ItemRequest{
+		e.HandleItemRequest(&sdp.ItemRequest{
 			Type:    "person",
 			Method:  sdp.RequestMethod_GET,
 			Query:   "Steven",
@@ -508,7 +508,7 @@ func TestExpandRequest(t *testing.T) {
 		e.AddSources(&sx)
 		e.AddSources(&sy)
 
-		e.ItemRequestHandler(&sdp.ItemRequest{
+		e.HandleItemRequest(&sdp.ItemRequest{
 			Type:    "person",
 			Method:  sdp.RequestMethod_GET,
 			Query:   "Jane",
@@ -551,7 +551,7 @@ func TestExpandRequest(t *testing.T) {
 		e.AddSources(&sx)
 		e.AddSources(&sy)
 
-		e.ItemRequestHandler(&sdp.ItemRequest{
+		e.HandleItemRequest(&sdp.ItemRequest{
 			Type:    "person",
 			Method:  sdp.RequestMethod_FIND,
 			Query:   "Jane",
@@ -582,7 +582,7 @@ func TestExpandRequest(t *testing.T) {
 
 		e.AddSources(&sx)
 
-		e.ItemRequestHandler(&sdp.ItemRequest{
+		e.HandleItemRequest(&sdp.ItemRequest{
 			Type:    "person",
 			Method:  sdp.RequestMethod_FIND,
 			Query:   "Rachel",
@@ -625,7 +625,7 @@ func TestExpandRequest(t *testing.T) {
 		e.AddSources(&sy)
 		e.AddSources(&sz)
 
-		e.ItemRequestHandler(&sdp.ItemRequest{
+		e.HandleItemRequest(&sdp.ItemRequest{
 			Type:    "person",
 			Method:  sdp.RequestMethod_FIND,
 			Query:   "Ross",
@@ -677,7 +677,7 @@ func TestExpandRequest(t *testing.T) {
 		e.AddSources(&sy)
 		e.AddSources(&sz)
 
-		e.ItemRequestHandler(&sdp.ItemRequest{
+		e.HandleItemRequest(&sdp.ItemRequest{
 			Type:    "person",
 			Method:  sdp.RequestMethod_FIND,
 			Query:   "Ross",
