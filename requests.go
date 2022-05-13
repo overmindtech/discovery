@@ -140,10 +140,31 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest) ([]*s
 		}
 	}
 
+	allItems := make([]*sdp.Item, 0)
+	allErrors := make([]error, 0)
+
+	go func() {
+		for item := range items {
+			allItems = append(allItems, item)
+		}
+		done <- true
+	}()
+
+	go func() {
+		for err := range errors {
+			allErrors = append(allErrors, err)
+		}
+		done <- true
+	}()
+
 	for request, sources := range expanded {
 		wg.Add(1)
+
+		e.throttle.Lock()
+
 		go func(r *sdp.ItemRequest, sources []Source) {
 			defer wg.Done()
+			defer e.throttle.Unlock()
 			var requestItems []*sdp.Item
 			var requestError error
 
@@ -187,23 +208,6 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest) ([]*s
 			errors <- requestError
 		}(request, sources)
 	}
-
-	allItems := make([]*sdp.Item, 0)
-	allErrors := make([]error, 0)
-
-	go func() {
-		for item := range items {
-			allItems = append(allItems, item)
-		}
-		done <- true
-	}()
-
-	go func() {
-		for err := range errors {
-			allErrors = append(allErrors, err)
-		}
-		done <- true
-	}()
 
 	// Wait for all requests to complete
 	wg.Wait()
