@@ -133,7 +133,7 @@ func TimeRequests(numRequests int, linkDepth int, numParallel int) TimedResults 
 	var expectedDuration time.Duration
 	for i := 0; i <= linkDepth; i++ {
 		thisLayer := int(math.Pow(2, float64(i))) * numRequests
-		thisDuration := 150 * math.Ceil(float64(thisLayer)/float64(numParallel))
+		thisDuration := 200 * math.Ceil(float64(thisLayer)/float64(numParallel))
 		expectedDuration = expectedDuration + (time.Duration(thisDuration) * time.Millisecond)
 		expectedItems = expectedItems + thisLayer
 	}
