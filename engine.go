@@ -239,7 +239,9 @@ func (e *Engine) connect() error {
 			return err
 		}
 
+		e.natsConnectionMutex.Lock()
 		e.natsConnection = enc
+		e.natsConnectionMutex.Unlock()
 
 		e.ConnectionWatcher = NATSWatcher{
 			Connection: e.natsConnection.Conn,
@@ -384,6 +386,9 @@ func (e *Engine) Start() error {
 func (e *Engine) subscribe(subject string, handler nats.Handler) error {
 	var subscription *nats.Subscription
 	var err error
+
+	e.natsConnectionMutex.Lock()
+	defer e.natsConnectionMutex.Unlock()
 
 	if e.natsConnection == nil {
 		return errors.New("cannot subscribe. NATS connection is nil")
