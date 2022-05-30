@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"
+	"github.com/overmindtech/multiconn"
 	"github.com/overmindtech/sdp-go"
 )
 
@@ -150,13 +152,17 @@ func TestNats(t *testing.T) {
 
 	e := Engine{
 		Name: "nats-test",
-		NATSOptions: &NATSOptions{
-			URLs:           NatsTestURLs,
-			ConnectionName: "test-connection",
-			ConnectTimeout: time.Second,
-			MaxReconnect:   5,
-			QueueName:      "test",
+		NATSOptions: &multiconn.NATSConnectionOptions{
+			CommonOptions: multiconn.CommonOptions{
+				NumRetries: 5,
+				RetryDelay: time.Second,
+			},
+			Servers:           NatsTestURLs,
+			ConnectionName:    "test-connection",
+			ConnectionTimeout: time.Second,
+			MaxReconnects:     5,
 		},
+		NATSQueueName:         "test",
 		MaxParallelExecutions: 10,
 	}
 
@@ -251,13 +257,17 @@ func TestNatsCancel(t *testing.T) {
 
 	e := Engine{
 		Name: "nats-test",
-		NATSOptions: &NATSOptions{
-			URLs:           NatsTestURLs,
-			ConnectionName: "test-connection",
-			ConnectTimeout: time.Second,
-			QueueName:      "test",
-			MaxReconnect:   5,
+		NATSOptions: &multiconn.NATSConnectionOptions{
+			CommonOptions: multiconn.CommonOptions{
+				NumRetries: 5,
+				RetryDelay: time.Second,
+			},
+			Servers:           NatsTestURLs,
+			ConnectionName:    "test-connection",
+			ConnectionTimeout: time.Second,
+			MaxReconnects:     5,
 		},
+		NATSQueueName:         "test",
 		MaxParallelExecutions: 1,
 	}
 
@@ -366,13 +376,13 @@ func TestNatsConnections(t *testing.T) {
 	t.Run("with a bad hostname", func(t *testing.T) {
 		e := Engine{
 			Name: "nats-test",
-			NATSOptions: &NATSOptions{
-				URLs:           []string{"nats://bad.server"},
-				ConnectionName: "test-disconnection",
-				ConnectTimeout: time.Second,
-				QueueName:      "test",
-				MaxReconnect:   1,
+			NATSOptions: &multiconn.NATSConnectionOptions{
+				Servers:           []string{"nats://bad.server"},
+				ConnectionName:    "test-disconnection",
+				ConnectionTimeout: time.Second,
+				MaxReconnects:     1,
 			},
+			NATSQueueName:         "test",
 			MaxParallelExecutions: 1,
 		}
 
@@ -399,15 +409,19 @@ func TestNatsConnections(t *testing.T) {
 
 		e := Engine{
 			Name: "nats-test",
-			NATSOptions: &NATSOptions{
-				URLs:            []string{"127.0.0.1:4111"},
-				ConnectionName:  "test-disconnection",
-				ConnectTimeout:  time.Second,
-				QueueName:       "test",
-				MaxReconnect:    10,
-				ReconnectWait:   time.Second,
-				ReconnectJitter: time.Second,
+			NATSOptions: &multiconn.NATSConnectionOptions{
+				CommonOptions: multiconn.CommonOptions{
+					NumRetries: 5,
+					RetryDelay: time.Second,
+				},
+				Servers:           []string{"127.0.0.1:4111"},
+				ConnectionName:    "test-disconnection",
+				ConnectionTimeout: time.Second,
+				MaxReconnects:     10,
+				ReconnectWait:     time.Second,
+				ReconnectJitter:   time.Second,
 			},
+			NATSQueueName:         "test",
 			MaxParallelExecutions: 1,
 		}
 
@@ -455,15 +469,19 @@ func TestNatsConnections(t *testing.T) {
 	t.Run("with a server that takes a while to start", func(t *testing.T) {
 		e := Engine{
 			Name: "nats-test",
-			NATSOptions: &NATSOptions{
-				URLs:            []string{"127.0.0.1:4111"},
-				ConnectionName:  "test-disconnection",
-				ConnectTimeout:  5 * time.Second,
-				QueueName:       "test",
-				MaxReconnect:    10,
-				ReconnectJitter: time.Second,
-				ReconnectWait:   time.Second,
+			NATSOptions: &multiconn.NATSConnectionOptions{
+				CommonOptions: multiconn.CommonOptions{
+					NumRetries: 10,
+					RetryDelay: time.Second,
+				},
+				Servers:           []string{"127.0.0.1:4111"},
+				ConnectionName:    "test-disconnection",
+				ConnectionTimeout: time.Second,
+				MaxReconnects:     10,
+				ReconnectWait:     time.Second,
+				ReconnectJitter:   time.Second,
 			},
+			NATSQueueName:         "test",
 			MaxParallelExecutions: 1,
 		}
 
@@ -503,15 +521,19 @@ func TestNATSFailureRestart(t *testing.T) {
 
 	e := Engine{
 		Name: "nats-test",
-		NATSOptions: &NATSOptions{
-			URLs:            []string{"127.0.0.1:4111"},
-			ConnectionName:  "test-disconnection",
-			ConnectTimeout:  time.Second,
-			QueueName:       "test",
-			MaxReconnect:    1,
-			ReconnectWait:   100 * time.Millisecond,
-			ReconnectJitter: 10 * time.Millisecond,
+		NATSOptions: &multiconn.NATSConnectionOptions{
+			CommonOptions: multiconn.CommonOptions{
+				NumRetries: 10,
+				RetryDelay: time.Second,
+			},
+			Servers:           []string{"127.0.0.1:4111"},
+			ConnectionName:    "test-disconnection",
+			ConnectionTimeout: time.Second,
+			MaxReconnects:     10,
+			ReconnectWait:     100 * time.Millisecond,
+			ReconnectJitter:   10 * time.Millisecond,
 		},
+		NATSQueueName:           "test",
 		MaxParallelExecutions:   1,
 		ConnectionWatchInterval: 1 * time.Second,
 	}
@@ -557,14 +579,18 @@ func TestNatsAuth(t *testing.T) {
 
 	e := Engine{
 		Name: "nats-test",
-		NATSOptions: &NATSOptions{
-			URLs:           NatsAuthTestURLs,
-			ConnectionName: "test-connection",
-			ConnectTimeout: time.Second,
-			MaxReconnect:   5,
-			QueueName:      "test",
-			TokenClient:    GetTestOAuthTokenClient(t),
+		NATSOptions: &multiconn.NATSConnectionOptions{
+			CommonOptions: multiconn.CommonOptions{
+				NumRetries: 5,
+				RetryDelay: time.Second,
+			},
+			Servers:           NatsTestURLs,
+			ConnectionName:    "test-connection",
+			ConnectionTimeout: time.Second,
+			MaxReconnects:     5,
+			TokenClient:       GetTestOAuthTokenClient(t),
 		},
+		NATSQueueName:         "test",
 		MaxParallelExecutions: 10,
 	}
 
@@ -649,4 +675,42 @@ func TestNatsAuth(t *testing.T) {
 		}
 	})
 
+}
+
+func GetTestOAuthTokenClient(t *testing.T) *multiconn.OAuthTokenClient {
+	var domain string
+	var clientID string
+	var clientSecret string
+	var exists bool
+
+	errorFormat := "environment variable %v not found. Set up your test environment first. See: https://github.com/overmindtech/auth0-test-data"
+
+	// Read secrets form the environment
+	if domain, exists = os.LookupEnv("OVERMIND_NTE_ALLPERMS_DOMAIN"); !exists || domain == "" {
+		t.Errorf(errorFormat, "OVERMIND_NTE_ALLPERMS_DOMAIN")
+		t.Skip("Skipping due to missing environment setup")
+	}
+
+	if clientID, exists = os.LookupEnv("OVERMIND_NTE_ALLPERMS_CLIENT_ID"); !exists || clientID == "" {
+		t.Errorf(errorFormat, "OVERMIND_NTE_ALLPERMS_CLIENT_ID")
+		t.Skip("Skipping due to missing environment setup")
+	}
+
+	if clientSecret, exists = os.LookupEnv("OVERMIND_NTE_ALLPERMS_CLIENT_SECRET"); !exists || clientSecret == "" {
+		t.Errorf(errorFormat, "OVERMIND_NTE_ALLPERMS_CLIENT_SECRET")
+		t.Skip("Skipping due to missing environment setup")
+	}
+
+	exchangeURL, err := GetWorkingTokenExchange()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return multiconn.NewOAuthTokenClient(
+		clientID,
+		clientSecret,
+		fmt.Sprintf("https://%v/oauth/token", domain),
+		exchangeURL,
+	)
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
+	"github.com/overmindtech/multiconn"
 	"github.com/overmindtech/sdp-go"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -219,8 +220,8 @@ func TestNATSTriggers(t *testing.T) {
 
 	engine := Engine{
 		Name: "trigger-testing",
-		NATSOptions: &NATSOptions{
-			URLs: NatsTestURLs,
+		NATSOptions: &multiconn.NATSConnectionOptions{
+			Servers: NatsTestURLs,
 		},
 		MaxParallelExecutions: 1,
 	}

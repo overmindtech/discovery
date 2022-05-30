@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"runtime"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/overmindtech/multiconn"
 	"github.com/overmindtech/sdp-go"
 	"github.com/overmindtech/sdpcache"
 
@@ -17,39 +17,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 )
-
-type NATSOptions struct {
-	// The list of URLs to use for connecting to NATS
-	URLs []string
-
-	// The name given to the connection, useful in logging
-	ConnectionName string
-
-	// How long to wait when trying to connect to each NATS server
-	ConnectTimeout time.Duration
-
-	// MaxReconnect sets the number of reconnect attempts that will be
-	// tried before giving up. If negative, then it will never give up
-	// trying to reconnect.
-	MaxReconnect int
-
-	// ReconnectWait sets the time to backoff after attempting a reconnect
-	// to a server that we were already connected to previously.
-	ReconnectWait time.Duration
-
-	// ReconnectJitter sets the upper bound for a random delay added to
-	// ReconnectWait during a reconnect when no TLS is used.
-	// Note that any jitter is capped with ReconnectJitterMax.
-	ReconnectJitter time.Duration
-
-	// TokenClient Is the client that should be used to get a token to connect
-	// to NATS. This could be for example a BasicTokenClient which uses a static
-	// token, or an OAuthTokenClient that gets one using OAuth credentials
-	TokenClient TokenClient
-
-	// The name of the queue to join when subscribing to subjects
-	QueueName string
-}
 
 // Engine is the main discovery engine. This is where all of the Sources and
 // sources are stored and is responsible for calling out to the right sources to
@@ -61,8 +28,8 @@ type Engine struct {
 	// Descriptive name of this engine. Used as responder name in SDP responses
 	Name string
 
-	// Options for connecting to NATS
-	NATSOptions *NATSOptions
+	NATSOptions   *multiconn.NATSConnectionOptions // Options for connecting to NATS
+	NATSQueueName string                           // The name of the queue to use when subscribing
 
 	// The maximum number of queries that can be executing in parallel. Defaults
 	// to the number of CPUs
@@ -266,84 +233,7 @@ func (e *Engine) NonHiddenSources() []Source {
 func (e *Engine) connect() error {
 	// Try to connect to NATS
 	if no := e.NATSOptions; no != nil {
-		var servers string
-
-		// Register our custom encoder
-		nats.RegisterEncoder("sdp", &sdp.ENCODER)
-
-		// Create server list as comme separated
-		servers = strings.Join(no.URLs, ",")
-
-		// Configure options
-		options := []nats.Option{
-			nats.Name(no.ConnectionName),
-			nats.Timeout(no.ConnectTimeout),
-			nats.RetryOnFailedConnect(true),
-			nats.MaxReconnects(no.MaxReconnect),
-			nats.DisconnectErrHandler(func(c *nats.Conn, e error) {
-				log.WithFields(log.Fields{
-					"error":   e,
-					"address": c.ConnectedAddr(),
-				}).Error("NATS disconnected")
-			}),
-			nats.ReconnectHandler(func(c *nats.Conn) {
-				log.WithFields(log.Fields{
-					"reconnects": c.Reconnects,
-					"ServerID":   c.ConnectedServerId(),
-					"URL:":       c.ConnectedUrl(),
-				}).Info("NATS reconnected")
-			}),
-			nats.ClosedHandler(func(c *nats.Conn) {
-				log.WithFields(log.Fields{
-					"error": c.LastError(),
-				}).Info("NATS connection closed")
-			}),
-			nats.LameDuckModeHandler(func(c *nats.Conn) {
-				log.WithFields(log.Fields{
-					"address": c.ConnectedAddr(),
-				}).Info("NATS server has entered lame duck mode")
-			}),
-			nats.ErrorHandler(func(c *nats.Conn, s *nats.Subscription, e error) {
-				log.WithFields(log.Fields{
-					"error":   e,
-					"address": c.ConnectedAddr(),
-					"subject": s.Subject,
-					"queue":   s.Queue,
-				}).Error("NATS error")
-			}),
-		}
-
-		if no.TokenClient != nil {
-			options = append(options, nats.UserJWT(no.TokenClient.GetJWT, no.TokenClient.Sign))
-		}
-
-		if no.ReconnectWait > 0 {
-			options = append(options, nats.ReconnectWait(no.ReconnectWait))
-		}
-
-		if no.ReconnectJitter > 0 {
-			options = append(options, nats.ReconnectJitter(no.ReconnectJitter, no.ReconnectJitter))
-		}
-
-		log.WithFields(log.Fields{
-			"servers": servers,
-		}).Info("NATS connecting")
-
-		e.natsConnectionMutex.Lock()
-		defer e.natsConnectionMutex.Unlock()
-
-		nc, err := nats.Connect(
-			servers,
-			options...,
-		)
-
-		if err != nil {
-			return err
-		}
-
-		var enc *nats.EncodedConn
-
-		enc, err = nats.NewEncodedConn(nc, "sdp")
+		enc, err := e.NATSOptions.Connect()
 
 		if err != nil {
 			return err
@@ -500,15 +390,15 @@ func (e *Engine) subscribe(subject string, handler nats.Handler) error {
 	}
 
 	log.WithFields(log.Fields{
-		"queueName":  e.NATSOptions.QueueName,
+		"queueName":  e.NATSQueueName,
 		"subject":    subject,
 		"engineName": e.Name,
 	}).Debug("creating NATS subscription")
 
-	if e.NATSOptions.QueueName == "" {
+	if e.NATSQueueName == "" {
 		subscription, err = e.natsConnection.Subscribe(subject, handler)
 	} else {
-		subscription, err = e.natsConnection.QueueSubscribe(subject, e.NATSOptions.QueueName, handler)
+		subscription, err = e.natsConnection.QueueSubscribe(subject, e.NATSQueueName, handler)
 	}
 
 	if err != nil {
