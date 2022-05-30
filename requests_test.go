@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/overmindtech/multiconn"
 	"github.com/overmindtech/sdp-go"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
@@ -275,13 +276,13 @@ func TestSendRequestSync(t *testing.T) {
 
 	e := Engine{
 		Name: "nats-test",
-		NATSOptions: &NATSOptions{
-			URLs:           NatsTestURLs,
-			ConnectionName: "test-connection",
-			ConnectTimeout: time.Second,
-			MaxReconnect:   5,
-			QueueName:      "test",
+		NATSOptions: &multiconn.NATSConnectionOptions{
+			Servers:           NatsTestURLs,
+			ConnectionName:    "test-connection",
+			ConnectionTimeout: time.Second,
+			MaxReconnects:     5,
 		},
+		NATSQueueName:         "test",
 		MaxParallelExecutions: 10,
 	}
 
