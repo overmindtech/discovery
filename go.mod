@@ -8,7 +8,7 @@ require (
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats-server/v2 v2.8.4
 	github.com/nats-io/nats.go v1.16.0
-	github.com/overmindtech/multiconn v0.3.1
+	github.com/overmindtech/multiconn v0.3.2
 	github.com/overmindtech/sdp-go v0.9.2
 	github.com/overmindtech/sdpcache v0.3.2
 	github.com/sirupsen/logrus v1.8.1
