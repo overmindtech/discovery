@@ -510,7 +510,7 @@ func TestNatsConnections(t *testing.T) {
 }
 
 func TestNATSFailureRestart(t *testing.T) {
-	test.DefaultTestOptions.Port = 4111
+	test.DefaultTestOptions.Port = 4112
 
 	// We are running a custom server here so that we can control its lifecycle
 	s := test.RunServer(&test.DefaultTestOptions)
@@ -526,7 +526,7 @@ func TestNATSFailureRestart(t *testing.T) {
 				NumRetries: 10,
 				RetryDelay: time.Second,
 			},
-			Servers:           []string{"127.0.0.1:4111"},
+			Servers:           []string{"127.0.0.1:4112"},
 			ConnectionName:    "test-disconnection",
 			ConnectionTimeout: time.Second,
 			MaxReconnects:     10,
@@ -675,6 +675,30 @@ func TestNatsAuth(t *testing.T) {
 		}
 	})
 
+}
+
+func TestSetupMaxRequestTimeout(t *testing.T) {
+	t.Run("with no value", func(t *testing.T) {
+		e := Engine{}
+
+		e.SetupMaxRequestTimeout()
+
+		if e.MaxRequestTimeout != DefaultMaxRequestTimeout {
+			t.Errorf("max request timeout did not default. Got %v expected %v", e.MaxRequestTimeout.String(), DefaultMaxRequestTimeout.String())
+		}
+	})
+
+	t.Run("with a value", func(t *testing.T) {
+		e := Engine{
+			MaxRequestTimeout: 1 * time.Second,
+		}
+
+		e.SetupMaxRequestTimeout()
+
+		if e.MaxRequestTimeout != 1*time.Second {
+			t.Errorf("max request timeout did not take provided value. Got %v expected %v", e.MaxRequestTimeout.String(), (1 * time.Second).String())
+		}
+	})
 }
 
 func GetTestOAuthTokenClient(t *testing.T) *multiconn.OAuthTokenClient {

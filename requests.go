@@ -12,6 +12,7 @@ import (
 	"github.com/overmindtech/sdp-go"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 // NewItemSubject Generates a random subject name for returning items e.g.
@@ -40,6 +41,14 @@ func (e *Engine) HandleItemRequest(itemRequest *sdp.ItemRequest) {
 		return
 	}
 
+	var timeoutOverride bool
+
+	// If the timeout is infinite OR greater than the max, set it to the max
+	if itemRequest.Timeout.AsDuration() == 0 || itemRequest.Timeout.AsDuration() > e.MaxRequestTimeout {
+		itemRequest.Timeout = durationpb.New(e.MaxRequestTimeout)
+		timeoutOverride = true
+	}
+
 	// Respond saying we've got it
 	responder := sdp.ResponseSender{
 		ResponseSubject: itemRequest.ResponseSubject,
@@ -58,15 +67,19 @@ func (e *Engine) HandleItemRequest(itemRequest *sdp.ItemRequest) {
 		e.Name,
 	)
 
+	// Extract and parse the UUID
+	reqUUID, uuidErr := uuid.FromBytes(itemRequest.UUID)
+
 	log.WithFields(log.Fields{
-		"type":        itemRequest.Type,
-		"method":      itemRequest.Method,
-		"query":       itemRequest.Query,
-		"linkDepth":   itemRequest.LinkDepth,
-		"context":     itemRequest.Context,
-		"timeout":     itemRequest.Timeout.AsDuration().String(),
-		"uuid":        itemRequest.UUID,
-		"ignoreCache": itemRequest.IgnoreCache,
+		"type":              itemRequest.Type,
+		"method":            itemRequest.Method,
+		"query":             itemRequest.Query,
+		"linkDepth":         itemRequest.LinkDepth,
+		"context":           itemRequest.Context,
+		"timeout":           itemRequest.Timeout.AsDuration().String(),
+		"timeoutOverridden": timeoutOverride,
+		"uuid":              reqUUID.String(),
+		"ignoreCache":       itemRequest.IgnoreCache,
 	}).Info("Received request")
 
 	requestTracker := RequestTracker{
@@ -74,8 +87,8 @@ func (e *Engine) HandleItemRequest(itemRequest *sdp.ItemRequest) {
 		Engine:  e,
 	}
 
-	if u, err := uuid.FromBytes(itemRequest.UUID); err == nil {
-		e.TrackRequest(u, &requestTracker)
+	if uuidErr == nil {
+		e.TrackRequest(reqUUID, &requestTracker)
 	}
 
 	_, err := requestTracker.Execute()
@@ -108,7 +121,7 @@ func (e *Engine) HandleItemRequest(itemRequest *sdp.ItemRequest) {
 			"requestLinkDepth":   itemRequest.LinkDepth,
 			"requestContext":     itemRequest.Context,
 			"requestTimeout":     itemRequest.Timeout.AsDuration().String(),
-			"requestUUID":        itemRequest.UUID,
+			"requestUUID":        reqUUID.String(),
 			"requestIgnoreCache": itemRequest.IgnoreCache,
 		})
 
@@ -127,7 +140,7 @@ func (e *Engine) HandleItemRequest(itemRequest *sdp.ItemRequest) {
 			"linkDepth":   itemRequest.LinkDepth,
 			"context":     itemRequest.Context,
 			"timeout":     itemRequest.Timeout.AsDuration().String(),
-			"uuid":        itemRequest.UUID,
+			"uuid":        reqUUID.String(),
 			"ignoreCache": itemRequest.IgnoreCache,
 		}).Info("Request complete")
 	}

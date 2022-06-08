@@ -18,6 +18,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const DefaultMaxRequestTimeout = 1 * time.Minute
+
 // Engine is the main discovery engine. This is where all of the Sources and
 // sources are stored and is responsible for calling out to the right sources to
 // discover everything
@@ -34,6 +36,12 @@ type Engine struct {
 	// The maximum number of queries that can be executing in parallel. Defaults
 	// to the number of CPUs
 	MaxParallelExecutions int
+
+	// The maximum request timeout. Defaults to `DefaultMaxRequestTimeout` if
+	// set to zero. If a client does not send a timeout, it will default to this
+	// value. Requests with timouts larger than this value will have their
+	// timeouts overridden
+	MaxRequestTimeout time.Duration
 
 	// How often to check for closed connections and try to recover
 	ConnectionWatchInterval time.Duration
@@ -120,6 +128,12 @@ func (e *Engine) SetupThrottle() {
 
 	e.throttle = Throttle{
 		NumParallel: e.MaxParallelExecutions,
+	}
+}
+
+func (e *Engine) SetupMaxRequestTimeout() {
+	if e.MaxRequestTimeout == 0 {
+		e.MaxRequestTimeout = DefaultMaxRequestTimeout
 	}
 }
 
@@ -384,6 +398,7 @@ func (e *Engine) disconnect() error {
 // any effect until the engine is restarted
 func (e *Engine) Start() error {
 	e.SetupThrottle()
+	e.SetupMaxRequestTimeout()
 
 	// Start purging cache
 	e.cache.StartPurger()
