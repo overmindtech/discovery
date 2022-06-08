@@ -324,42 +324,6 @@ func TestNatsCancel(t *testing.T) {
 		}
 	})
 
-	t.Run("Cancelling requests without a UUID", func(t *testing.T) {
-		conn := e.natsConnection
-
-		progress := sdp.NewRequestProgress(&sdp.ItemRequest{
-			Type:            "person",
-			Method:          sdp.RequestMethod_GET,
-			Query:           "bad-uuid",
-			LinkDepth:       4,
-			Context:         "*",
-			ResponseSubject: nats.NewInbox(),
-			ItemSubject:     "items.bin",
-		})
-
-		items := make(chan *sdp.Item)
-
-		err := progress.Start(conn, items)
-
-		if err != nil {
-			t.Error(err)
-		}
-
-		err = progress.Cancel(conn)
-
-		if err != nil {
-			t.Error(err)
-		}
-
-		for range items {
-		}
-
-		// You shouldn't be able to cancel requests that don't have a UUID
-		if progress.NumCancelled() != 0 {
-			t.Errorf("Expected query to not cancelled, got\n%v", progress.String())
-		}
-	})
-
 	t.Run("stopping", func(t *testing.T) {
 		err := e.Stop()
 
