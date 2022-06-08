@@ -59,11 +59,14 @@ func (e *Engine) HandleItemRequest(itemRequest *sdp.ItemRequest) {
 	)
 
 	log.WithFields(log.Fields{
-		"type":      itemRequest.Type,
-		"method":    itemRequest.Method,
-		"query":     itemRequest.Query,
-		"linkDepth": itemRequest.LinkDepth,
-		"context":   itemRequest.Context,
+		"type":        itemRequest.Type,
+		"method":      itemRequest.Method,
+		"query":       itemRequest.Query,
+		"linkDepth":   itemRequest.LinkDepth,
+		"context":     itemRequest.Context,
+		"timeout":     itemRequest.Timeout.AsDuration().String(),
+		"uuid":        itemRequest.UUID,
+		"ignoreCache": itemRequest.IgnoreCache,
 	}).Info("Received request")
 
 	requestTracker := RequestTracker{
@@ -97,13 +100,16 @@ func (e *Engine) HandleItemRequest(itemRequest *sdp.ItemRequest) {
 		}
 
 		logEntry := log.WithFields(log.Fields{
-			"errorType":        "OTHER",
-			"errorString":      err.Error(),
-			"requestType":      itemRequest.Type,
-			"requestMethod":    itemRequest.Method,
-			"requestQuery":     itemRequest.Query,
-			"requestLinkDepth": itemRequest.LinkDepth,
-			"requestContext":   itemRequest.Context,
+			"errorType":          "OTHER",
+			"errorString":        err.Error(),
+			"requestType":        itemRequest.Type,
+			"requestMethod":      itemRequest.Method,
+			"requestQuery":       itemRequest.Query,
+			"requestLinkDepth":   itemRequest.LinkDepth,
+			"requestContext":     itemRequest.Context,
+			"requestTimeout":     itemRequest.Timeout.AsDuration().String(),
+			"requestUUID":        itemRequest.UUID,
+			"requestIgnoreCache": itemRequest.IgnoreCache,
 		})
 
 		if ire, ok := err.(*sdp.ItemRequestError); ok && ire.ErrorType == sdp.ItemRequestError_OTHER {
@@ -115,11 +121,14 @@ func (e *Engine) HandleItemRequest(itemRequest *sdp.ItemRequest) {
 		responder.Done()
 
 		log.WithFields(log.Fields{
-			"type":      itemRequest.Type,
-			"method":    itemRequest.Method,
-			"query":     itemRequest.Query,
-			"linkDepth": itemRequest.LinkDepth,
-			"context":   itemRequest.Context,
+			"type":        itemRequest.Type,
+			"method":      itemRequest.Method,
+			"query":       itemRequest.Query,
+			"linkDepth":   itemRequest.LinkDepth,
+			"context":     itemRequest.Context,
+			"timeout":     itemRequest.Timeout.AsDuration().String(),
+			"uuid":        itemRequest.UUID,
+			"ignoreCache": itemRequest.IgnoreCache,
 		}).Info("Request complete")
 	}
 }
