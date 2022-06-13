@@ -18,7 +18,8 @@ jobs:
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
       with:
-        token: ${{ secrets.PUSH_PAT }}
+        # Fetch all history
+        fetch-depth: 0
 
     - name: Check for updates
       run: go get -t -u ./...
