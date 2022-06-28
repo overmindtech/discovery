@@ -221,9 +221,6 @@ func (r *RequestTracker) stopLinking() {
 }
 
 func (r *RequestTracker) Execute() ([]*sdp.Item, error) {
-	var errs []error
-	var errsMutex sync.Mutex
-
 	if r.unlinkedItems == nil {
 		r.unlinkedItems = make(chan *sdp.Item)
 	}
@@ -255,18 +252,13 @@ func (r *RequestTracker) Execute() ([]*sdp.Item, error) {
 			// goroutine, linked and published once done
 			r.queueUnlinkedItem(item)
 		}
-	} else {
-		errsMutex.Lock()
-		errs = append(errs, err)
-		errsMutex.Unlock()
 	}
 
 	// Wait for all of the initial requests to be done processing
 	r.stopLinking()
 
-	// If everything has failed then just stop here
-	if len(errs) > 0 {
-		return nil, errs[0]
+	if err != nil {
+		return r.LinkedItems(), err
 	}
 
 	return r.LinkedItems(), ctx.Err()
