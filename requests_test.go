@@ -320,10 +320,16 @@ func TestSendRequestSync(t *testing.T) {
 			ResponseSubject: NewResponseSubject(),
 		})
 
-		items, err := progress.Execute(e.natsConnection)
+		items, errs, err := progress.Execute(e.natsConnection)
 
 		if err != nil {
 			t.Fatal(err)
+		}
+
+		if len(errs) != 0 {
+			for _, err := range errs {
+				t.Error(err)
+			}
 		}
 
 		if len(items) != 1 {

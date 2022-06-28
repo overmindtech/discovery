@@ -95,21 +95,10 @@ func (e *Engine) HandleItemRequest(itemRequest *sdp.ItemRequest) {
 
 	// If all failed then return an error
 	if err != nil {
-		if ire, ok := err.(*sdp.ItemRequestError); ok {
-			responder.Error(ire)
+		if err == context.Canceled {
+			responder.Cancel()
 		} else {
-			switch err {
-			case context.Canceled:
-				responder.Cancel()
-			default:
-				ire = &sdp.ItemRequestError{
-					ErrorType:   sdp.ItemRequestError_OTHER,
-					ErrorString: err.Error(),
-					Context:     itemRequest.Context,
-				}
-
-				responder.Error(ire)
-			}
+			responder.Error()
 		}
 
 		logEntry := log.WithFields(log.Fields{
@@ -257,7 +246,7 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest) ([]*s
 }
 
 // WillRespond Performs a cursory check to see if it's likely that this engine
-// will respond to a given request based on the type and context of teh request.
+// will respond to a given request based on the type and context of the request.
 // Should be used an initial check before proceeding to detailed processing.
 func (e *Engine) WillRespond(req *sdp.ItemRequest) bool {
 	for _, src := range e.Sources() {
