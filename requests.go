@@ -36,7 +36,7 @@ func (e *Engine) ItemRequestHandler(itemRequest *sdp.ItemRequest) {
 // HandleItemRequest Handles a single request. This includes responses, linking
 // etc.
 func (e *Engine) HandleItemRequest(itemRequest *sdp.ItemRequest) {
-	if !e.WillRespond(itemRequest) {
+	if len(e.ExpandRequest(itemRequest)) == 0 {
 		// If we don't have any relevant sources, exit
 		return
 	}
@@ -243,25 +243,6 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest) ([]*s
 	}
 
 	return allItems, nil
-}
-
-// WillRespond Performs a cursory check to see if it's likely that this engine
-// will respond to a given request based on the type and context of the request.
-// Should be used an initial check before proceeding to detailed processing.
-func (e *Engine) WillRespond(req *sdp.ItemRequest) bool {
-	for _, src := range e.Sources() {
-		typeMatch := (req.Type == src.Type() || IsWildcard(req.Type))
-
-		for _, context := range src.Contexts() {
-			contextMatch := (req.Context == context || IsWildcard(req.Context) || IsWildcard(context))
-
-			if contextMatch && typeMatch {
-				return true
-			}
-		}
-	}
-
-	return false
 }
 
 // ExpandRequest Expands requests with wildcards to no longer contain wildcards.
