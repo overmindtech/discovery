@@ -114,10 +114,14 @@ func TestExecute(t *testing.T) {
 			},
 		}
 
-		items, err := rt.Execute()
+		items, errs, err := rt.Execute()
 
 		if err != nil {
 			t.Error(err)
+		}
+
+		for _, e := range errs {
+			t.Error(e)
 		}
 
 		if l := len(items); l != 1 {
@@ -139,10 +143,14 @@ func TestExecute(t *testing.T) {
 			},
 		}
 
-		items, err := rt.Execute()
+		items, errs, err := rt.Execute()
 
 		if err != nil {
 			t.Error(err)
+		}
+
+		for _, e := range errs {
+			t.Error(e)
 		}
 
 		if l := len(items); l != 11 {
@@ -164,7 +172,7 @@ func TestExecute(t *testing.T) {
 			},
 		}
 
-		_, err := rt.Execute()
+		_, _, err := rt.Execute()
 
 		if err == nil {
 			t.Error("expected error but got nil")
@@ -178,7 +186,7 @@ func TestExecute(t *testing.T) {
 			Engine: &engine,
 		}
 
-		_, err := rt.Execute()
+		_, _, err := rt.Execute()
 
 		if err != nil {
 			t.Error(err)
@@ -214,10 +222,14 @@ func TestTimeout(t *testing.T) {
 			},
 		}
 
-		items, err := rt.Execute()
+		items, errs, err := rt.Execute()
 
 		if err != nil {
 			t.Error(err)
+		}
+
+		for _, e := range errs {
+			t.Error(e)
 		}
 
 		if l := len(items); l != 1 {
@@ -240,7 +252,7 @@ func TestTimeout(t *testing.T) {
 			},
 		}
 
-		_, err := rt.Execute()
+		_, _, err := rt.Execute()
 
 		if err == nil {
 			t.Error("Expected timout but got no error")
@@ -260,10 +272,14 @@ func TestTimeout(t *testing.T) {
 			},
 		}
 
-		items, err := rt.Execute()
+		items, errs, err := rt.Execute()
 
 		if err == nil {
 			t.Error("Expected timeout but got no error")
+		}
+
+		for _, e := range errs {
+			t.Error(e)
 		}
 
 		if len(items) != 3 {
@@ -304,7 +320,7 @@ func TestCancel(t *testing.T) {
 
 	wg.Add(1)
 	go func() {
-		items, err = rt.Execute()
+		items, _, err = rt.Execute()
 		wg.Done()
 	}()
 

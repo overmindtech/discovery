@@ -176,33 +176,59 @@ func (r *RequestTracker) linkItem(ctx context.Context, parent *sdp.Item) {
 				return
 			}
 
-			linkedItems, err := r.Engine.ExecuteRequest(ctx, req)
+			items := make(chan *sdp.Item)
+			errs := make(chan *sdp.ItemRequestError)
+			requestErr := make(chan error)
+			var shouldRemove bool
 
-			if err == nil {
-				itemMutex.Lock()
+			go func(e chan error) {
+				e <- r.Engine.ExecuteRequest(ctx, req, items, errs)
+			}(requestErr)
 
-				for _, li := range linkedItems {
-					// Add the new items back into the queue to be linked
-					// further if required
-					r.queueUnlinkedItem(li)
+			for {
+				select {
+				case li, ok := <-items:
+					if ok {
+						itemMutex.Lock()
 
-					// Create a reference to the newly found item and attach to
-					// the parent item
-					ref := li.Reference()
-					p.LinkedItems = append(p.LinkedItems, &ref)
-				}
+						// Add the new items back into the queue to be linked
+						// further if required
+						r.queueUnlinkedItem(li)
 
-				p.LinkedItemRequests = deleteItemRequest(p.LinkedItemRequests, req)
+						// Create a reference to the newly found item and attach
+						// to the parent item
+						ref := li.Reference()
+						p.LinkedItems = append(p.LinkedItems, &ref)
 
-				itemMutex.Unlock()
-			} else {
-				if sdpErr, ok := err.(*sdp.ItemRequestError); ok {
-					if sdpErr.ErrorType == sdp.ItemRequestError_NOCONTEXT || sdpErr.ErrorType == sdp.ItemRequestError_TIMEOUT {
-						// If there was no context or it timed out, leave it for the remote linker
-						return
+						itemMutex.Unlock()
+					} else {
+						items = nil
+					}
+				case err, ok := <-errs:
+					if ok {
+						if err.ErrorType == sdp.ItemRequestError_NOTFOUND {
+							// If we looked and didn't find the item then
+							// there is no point keeping the request around.
+							// Mark as true so that it's removed from the
+							// item
+							shouldRemove = true
+						}
+					} else {
+						errs = nil
 					}
 				}
 
+				if items == nil && errs == nil {
+					break
+				}
+			}
+
+			err := <-requestErr
+
+			if err == nil || shouldRemove {
+				// Delete the item request if we were able to resolve it locally
+				// OR it failed to resolve but because we looked and we know it
+				// doesn't exist
 				itemMutex.Lock()
 				p.LinkedItemRequests = deleteItemRequest(p.LinkedItemRequests, req)
 				itemMutex.Unlock()
@@ -220,18 +246,27 @@ func (r *RequestTracker) stopLinking() {
 	close(r.unlinkedItems)
 }
 
-func (r *RequestTracker) Execute() ([]*sdp.Item, error) {
+// Execute Executes a given item request and publishes results and errors on the
+// relevant nats subjects. Returns the full list of items, errors, and a final
+// error. The final error will be populated if all sources failed, or some other
+// error was encountered while trying run the request
+func (r *RequestTracker) Execute() ([]*sdp.Item, []*sdp.ItemRequestError, error) {
 	if r.unlinkedItems == nil {
 		r.unlinkedItems = make(chan *sdp.Item)
 	}
 
 	if r.Request == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	if r.Engine == nil {
-		return nil, errors.New("no engine supplied, cannot execute")
+		return nil, nil, errors.New("no engine supplied, cannot execute")
 	}
+
+	items := make(chan *sdp.Item)
+	errs := make(chan *sdp.ItemRequestError)
+	errChan := make(chan error)
+	sdpErrs := make([]*sdp.ItemRequestError, 0)
 
 	// Create context to enforce timeouts
 	ctx, cancel := r.Request.TimeoutContext()
@@ -243,25 +278,59 @@ func (r *RequestTracker) Execute() ([]*sdp.Item, error) {
 	r.startLinking(ctx)
 
 	// Run the request
-	items, err := r.Engine.ExecuteRequest(ctx, r.Request)
+	go func() {
+		errChan <- r.Engine.ExecuteRequest(ctx, r.Request, items, errs)
+	}()
 
-	// If it worked, put the items in the unlinked queue for linking
-	if err == nil {
-		for _, item := range items {
-			// Add to the queue. This will be picked up by other
-			// goroutine, linked and published once done
-			r.queueUnlinkedItem(item)
+	// Process the items and errors as they come in
+	for {
+		select {
+		case item, ok := <-items:
+			if ok {
+				// Add to the queue. This will be picked up by other goroutine,
+				// linked and published to NATS once done
+				r.queueUnlinkedItem(item)
+			} else {
+				items = nil
+			}
+		case err, ok := <-errs:
+			if ok {
+				sdpErrs = append(sdpErrs, err)
+
+				if r.Request.ErrorSubject != "" && r.Engine.natsConnection != nil {
+					pubErr := r.Engine.natsConnection.Publish(r.Request.ErrorSubject, err)
+
+					if pubErr != nil {
+						// TODO: I probably shouldn't be logging directly here but I
+						// don't want the error to be lost
+						log.WithFields(log.Fields{
+							"error": err,
+						}).Error("Error publishing item request error")
+					}
+				}
+			} else {
+				errs = nil
+			}
+		}
+
+		if items == nil && errs == nil {
+			// If both channels have been closed and set to nil, we're done so
+			// break
+			break
 		}
 	}
 
 	// Wait for all of the initial requests to be done processing
 	r.stopLinking()
 
+	// Get the result of the execution
+	err := <-errChan
+
 	if err != nil {
-		return r.LinkedItems(), err
+		return r.LinkedItems(), sdpErrs, err
 	}
 
-	return r.LinkedItems(), ctx.Err()
+	return r.LinkedItems(), sdpErrs, ctx.Err()
 }
 
 // Cancel Cancells the currently running request

@@ -119,7 +119,7 @@ type TimedResults struct {
 	MaxTime       time.Duration
 	TimeTaken     time.Duration
 	Results       []*sdp.Item
-	Errors        []error
+	Errors        []*sdp.ItemRequestError
 }
 
 func TimeRequests(numRequests int, linkDepth int, numParallel int) TimedResults {
@@ -146,7 +146,7 @@ func TimeRequests(numRequests int, linkDepth int, numParallel int) TimedResults 
 	}
 
 	results := make([]*sdp.Item, 0)
-	errors := make([]error, 0)
+	errors := make([]*sdp.ItemRequestError, 0)
 	resultsMutex := sync.Mutex{}
 	wg := sync.WaitGroup{}
 
@@ -169,13 +169,11 @@ func TimeRequests(numRequests int, linkDepth int, numParallel int) TimedResults 
 		go func(rt *RequestTracker) {
 			defer wg.Done()
 
-			items, err := rt.Execute()
+			items, errs, _ := rt.Execute()
 
 			resultsMutex.Lock()
 			results = append(results, items...)
-			if err != nil {
-				errors = append(errors, err)
-			}
+			errors = append(errors, errs...)
 			resultsMutex.Unlock()
 		}(&rt)
 	}
