@@ -167,8 +167,12 @@ func (e *Engine) ExecuteRequestSync(ctx context.Context, req *sdp.ItemRequest) (
 // requered the channels can be nil
 func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items chan<- *sdp.Item, errs chan<- *sdp.ItemRequestError) error {
 	// Make sure we close channels once we're done
-	defer close(items)
-	defer close(errs)
+	if items != nil {
+		defer close(items)
+	}
+	if errs != nil {
+		defer close(errs)
+	}
 
 	if ctx.Err() != nil {
 		return ctx.Err()

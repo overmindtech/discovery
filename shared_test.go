@@ -134,7 +134,11 @@ func (s *TestSource) Find(ctx context.Context, itemContext string) ([]*sdp.Item,
 
 	switch itemContext {
 	case "empty":
-		return nil, nil
+		return nil, &sdp.ItemRequestError{
+			ErrorType:   sdp.ItemRequestError_NOTFOUND,
+			ErrorString: "no items found",
+			Context:     itemContext,
+		}
 	case "error":
 		return nil, &sdp.ItemRequestError{
 			ErrorType:   sdp.ItemRequestError_OTHER,
@@ -154,7 +158,11 @@ func (s *TestSource) Search(ctx context.Context, itemContext string, query strin
 
 	switch itemContext {
 	case "empty":
-		return nil, nil
+		return nil, &sdp.ItemRequestError{
+			ErrorType:   sdp.ItemRequestError_NOTFOUND,
+			ErrorString: "no items found",
+			Context:     itemContext,
+		}
 	case "error":
 		return nil, &sdp.ItemRequestError{
 			ErrorType:   sdp.ItemRequestError_OTHER,

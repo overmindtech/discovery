@@ -507,16 +507,16 @@ func TestFindSearchCaching(t *testing.T) {
 
 		_, _, err = e.ExecuteRequestSync(context.Background(), &req)
 
-		if err != nil {
-			t.Error(err)
+		if err == nil {
+			t.Error("expected error but got nil")
 		}
 
 		time.Sleep(10 * time.Millisecond)
 
 		_, _, err = e.ExecuteRequestSync(context.Background(), &req)
 
-		if err != nil {
-			t.Error(err)
+		if err == nil {
+			t.Error("expected error but got nil")
 		}
 
 		if l := len(src.FindCalls); l != 1 {
@@ -527,8 +527,8 @@ func TestFindSearchCaching(t *testing.T) {
 
 		_, _, err = e.ExecuteRequestSync(context.Background(), &req)
 
-		if err != nil {
-			t.Error(err)
+		if err == nil {
+			t.Error("expected error but got nil")
 		}
 
 		if l := len(src.FindCalls); l != 2 {
@@ -598,16 +598,16 @@ func TestFindSearchCaching(t *testing.T) {
 
 		_, _, err = e.ExecuteRequestSync(context.Background(), &req)
 
-		if err != nil {
-			t.Error(err)
+		if err == nil {
+			t.Error("expected error but got nil")
 		}
 
 		time.Sleep(10 * time.Millisecond)
 
 		_, _, err = e.ExecuteRequestSync(context.Background(), &req)
 
-		if err != nil {
-			t.Error(err)
+		if err == nil {
+			t.Error("expected error but got nil")
 		}
 
 		if l := len(src.SearchCalls); l != 1 {
@@ -618,8 +618,8 @@ func TestFindSearchCaching(t *testing.T) {
 
 		_, _, err = e.ExecuteRequestSync(context.Background(), &req)
 
-		if err != nil {
-			t.Error(err)
+		if err == nil {
+			t.Error("expected error but got nil")
 		}
 
 		if l := len(src.SearchCalls); l != 2 {
