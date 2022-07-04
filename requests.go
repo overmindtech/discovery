@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -36,7 +37,7 @@ func (e *Engine) ItemRequestHandler(itemRequest *sdp.ItemRequest) {
 // HandleItemRequest Handles a single request. This includes responses, linking
 // etc.
 func (e *Engine) HandleItemRequest(itemRequest *sdp.ItemRequest) {
-	if !e.WillRespond(itemRequest) {
+	if len(e.ExpandRequest(itemRequest)) == 0 {
 		// If we don't have any relevant sources, exit
 		return
 	}
@@ -91,25 +92,14 @@ func (e *Engine) HandleItemRequest(itemRequest *sdp.ItemRequest) {
 		e.TrackRequest(reqUUID, &requestTracker)
 	}
 
-	_, err := requestTracker.Execute()
+	_, _, err := requestTracker.Execute()
 
 	// If all failed then return an error
 	if err != nil {
-		if ire, ok := err.(*sdp.ItemRequestError); ok {
-			responder.Error(ire)
+		if err == context.Canceled {
+			responder.Cancel()
 		} else {
-			switch err {
-			case context.Canceled:
-				responder.Cancel()
-			default:
-				ire = &sdp.ItemRequestError{
-					ErrorType:   sdp.ItemRequestError_OTHER,
-					ErrorString: err.Error(),
-					Context:     itemRequest.Context,
-				}
-
-				responder.Error(ire)
-			}
+			responder.Error()
 		}
 
 		logEntry := log.WithFields(log.Fields{
@@ -146,44 +136,65 @@ func (e *Engine) HandleItemRequest(itemRequest *sdp.ItemRequest) {
 	}
 }
 
-// ExecuteRequest Executes a single request and returns the results without any
-// linking
-func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest) ([]*sdp.Item, error) {
-	if ctx.Err() != nil {
-		return nil, ctx.Err()
+// ExecuteRequestSync Executes a request, waiting for all results, then returns
+// them along with the error, rather than paiing the results back along channels
+func (e *Engine) ExecuteRequestSync(ctx context.Context, req *sdp.ItemRequest) ([]*sdp.Item, []*sdp.ItemRequestError, error) {
+	itemsChan := make(chan *sdp.Item, 100_000)
+	errsChan := make(chan *sdp.ItemRequestError, 100_000)
+	items := make([]*sdp.Item, 0)
+	errs := make([]*sdp.ItemRequestError, 0)
+
+	err := e.ExecuteRequest(ctx, req, itemsChan, errsChan)
+
+	for i := range itemsChan {
+		items = append(items, i)
 	}
 
-	items := make(chan *sdp.Item)
-	errors := make(chan error)
-	done := make(chan bool)
+	for e := range errsChan {
+		errs = append(errs, e)
+	}
+
+	return items, errs, err
+}
+
+// ExecuteRequest Executes a single request and returns the results without any
+// linking. Will return an error if all sources fail, or the request couldn't be
+// run.
+//
+// Items and errors will be sent to the supplied channels as they are found.
+// Note that if these channels are not buffered, something will need to be
+// receiving the results or this method will never finish. If results are not
+// requered the channels can be nil
+func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items chan<- *sdp.Item, errs chan<- *sdp.ItemRequestError) error {
+	// Make sure we close channels once we're done
+	if items != nil {
+		defer close(items)
+	}
+	if errs != nil {
+		defer close(errs)
+	}
+
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
 	wg := sync.WaitGroup{}
 
 	expanded := e.ExpandRequest(req)
 
 	if len(expanded) == 0 {
-		return []*sdp.Item{}, &sdp.ItemRequestError{
+		errs <- &sdp.ItemRequestError{
 			ErrorType:   sdp.ItemRequestError_NOCONTEXT,
-			ErrorString: "No matching sources found",
+			ErrorString: "no matching sources found",
 			Context:     req.Context,
 		}
+
+		return errors.New("no matching sources found")
 	}
 
-	allItems := make([]*sdp.Item, 0)
-	allErrors := make([]error, 0)
-
-	go func() {
-		for item := range items {
-			allItems = append(allItems, item)
-		}
-		done <- true
-	}()
-
-	go func() {
-		for err := range errors {
-			allErrors = append(allErrors, err)
-		}
-		done <- true
-	}()
+	// These are used to calcualte whether all sourcces have failed or not
+	var numSources int
+	var numErrs int
 
 	for request, sources := range expanded {
 		wg.Add(1)
@@ -194,19 +205,17 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest) ([]*s
 			defer wg.Done()
 			defer e.throttle.Unlock()
 			var requestItems []*sdp.Item
-			var requestError error
+			var requestErrors []*sdp.ItemRequestError
+			numSources++
 
 			// Make the request of all sources
 			switch req.GetMethod() {
 			case sdp.RequestMethod_GET:
-				var requestItem *sdp.Item
-
-				requestItem, requestError = e.Get(ctx, r, sources)
-				requestItems = append(requestItems, requestItem)
+				requestItems, requestErrors = e.Get(ctx, r, sources)
 			case sdp.RequestMethod_FIND:
-				requestItems, requestError = e.Find(ctx, r, sources)
+				requestItems, requestErrors = e.Find(ctx, r, sources)
 			case sdp.RequestMethod_SEARCH:
-				requestItems, requestError = e.Search(ctx, r, sources)
+				requestItems, requestErrors = e.Search(ctx, r, sources)
 			}
 
 			for _, i := range requestItems {
@@ -231,48 +240,32 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest) ([]*s
 					i.Metadata.SourceRequest = req
 				}
 
-				items <- i
+				if items != nil {
+					items <- i
+				}
 			}
-			errors <- requestError
+
+			for _, e := range requestErrors {
+				if r != nil {
+					numErrs++
+
+					if errs != nil {
+						errs <- e
+					}
+				}
+			}
 		}(request, sources)
 	}
 
 	// Wait for all requests to complete
 	wg.Wait()
 
-	// Close channels as no more messages are coming
-	close(items)
-	close(errors)
-
-	// Wait for all channels to empty and be added to slices
-	<-done
-	<-done
-
 	// If all failed then return first error
-	if len(allErrors) == len(expanded) && len(allErrors) > 0 {
-		return allItems, allErrors[0]
+	if numErrs == numSources {
+		return errors.New("all sources failed")
 	}
 
-	return allItems, nil
-}
-
-// WillRespond Performs a cursory check to see if it's likely that this engine
-// will respond to a given request based on the type and context of teh request.
-// Should be used an initial check before proceeding to detailed processing.
-func (e *Engine) WillRespond(req *sdp.ItemRequest) bool {
-	for _, src := range e.Sources() {
-		typeMatch := (req.Type == src.Type() || IsWildcard(req.Type))
-
-		for _, context := range src.Contexts() {
-			contextMatch := (req.Context == context || IsWildcard(req.Context) || IsWildcard(context))
-
-			if contextMatch && typeMatch {
-				return true
-			}
-		}
-	}
-
-	return false
+	return nil
 }
 
 // ExpandRequest Expands requests with wildcards to no longer contain wildcards.

@@ -285,10 +285,14 @@ func TestNATSTriggers(t *testing.T) {
 			}
 
 			items := make(chan *sdp.Item, 1000)
+			errs := make(chan *sdp.ItemRequestError, 1000)
 
-			progress.Start(engine.natsConnection, items)
+			progress.Start(engine.natsConnection, items, errs)
 
 			for range items {
+				// Do nothing
+			}
+			for range errs {
 				// Do nothing
 			}
 

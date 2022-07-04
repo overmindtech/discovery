@@ -34,10 +34,14 @@ func TestExecuteRequest(t *testing.T) {
 			ResponseSubject: "responses",
 		}
 
-		items, err := e.ExecuteRequest(context.Background(), request)
+		items, errs, err := e.ExecuteRequestSync(context.Background(), request)
 
 		if err != nil {
 			t.Error(err)
+		}
+
+		for _, e := range errs {
+			t.Error(e)
 		}
 
 		if x := len(src.GetCalls); x != 1 {
@@ -78,15 +82,20 @@ func TestExecuteRequest(t *testing.T) {
 			LinkDepth: 0,
 		}
 
-		_, err := e.ExecuteRequest(context.Background(), request)
+		_, errs, err := e.ExecuteRequestSync(context.Background(), request)
 
-		if ire, ok := err.(*sdp.ItemRequestError); ok {
-			if ire.ErrorType != sdp.ItemRequestError_NOCONTEXT {
-				t.Errorf("expected error type to be NOCONTEXT, got %v", ire.ErrorType)
+		if err == nil {
+			t.Error("expected erro but got nil")
+		}
+
+		if len(errs) == 1 {
+			if errs[0].ErrorType != sdp.ItemRequestError_NOCONTEXT {
+				t.Errorf("expected error type to be NOCONTEXT, got %v", errs[0].ErrorType)
 			}
 		} else {
-			t.Errorf("expected error to be ItemRequestError, got %T", err)
+			t.Errorf("expected 1 error, got %v", len(errs))
 		}
+
 	})
 
 	t.Run("Wrong type Get request", func(t *testing.T) {
@@ -98,14 +107,18 @@ func TestExecuteRequest(t *testing.T) {
 			LinkDepth: 0,
 		}
 
-		_, err := e.ExecuteRequest(context.Background(), request)
+		_, errs, err := e.ExecuteRequestSync(context.Background(), request)
 
-		if ire, ok := err.(*sdp.ItemRequestError); ok {
-			if ire.ErrorType != sdp.ItemRequestError_NOCONTEXT {
-				t.Errorf("expected error type to be NOCONTEXT, got %v", ire.ErrorType)
+		if err == nil {
+			t.Error("expected erro but got nil")
+		}
+
+		if len(errs) == 1 {
+			if errs[0].ErrorType != sdp.ItemRequestError_NOCONTEXT {
+				t.Errorf("expected error type to be NOCONTEXT, got %v", errs[0].ErrorType)
 			}
 		} else {
-			t.Errorf("expected error to be ItemRequestError, got %T", err)
+			t.Errorf("expected 1 error, got %v", len(errs))
 		}
 	})
 
@@ -117,10 +130,14 @@ func TestExecuteRequest(t *testing.T) {
 			LinkDepth: 5,
 		}
 
-		items, err := e.ExecuteRequest(context.Background(), request)
+		items, errs, err := e.ExecuteRequestSync(context.Background(), request)
 
 		if err != nil {
 			t.Error(err)
+		}
+
+		for _, e := range errs {
+			t.Error(e)
 		}
 
 		if len(items) < 1 {
@@ -137,10 +154,14 @@ func TestExecuteRequest(t *testing.T) {
 			LinkDepth: 5,
 		}
 
-		items, err := e.ExecuteRequest(context.Background(), request)
+		items, errs, err := e.ExecuteRequestSync(context.Background(), request)
 
 		if err != nil {
 			t.Error(err)
+		}
+
+		for _, e := range errs {
+			t.Error(e)
 		}
 
 		if len(items) < 1 {
@@ -320,10 +341,16 @@ func TestSendRequestSync(t *testing.T) {
 			ResponseSubject: NewResponseSubject(),
 		})
 
-		items, err := progress.Execute(e.natsConnection)
+		items, errs, err := progress.Execute(e.natsConnection)
 
 		if err != nil {
 			t.Fatal(err)
+		}
+
+		if len(errs) != 0 {
+			for _, err := range errs {
+				t.Error(err)
+			}
 		}
 
 		if len(items) != 1 {

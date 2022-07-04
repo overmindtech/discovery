@@ -205,7 +205,7 @@ func TestNats(t *testing.T) {
 			ItemSubject:     NewItemSubject(),
 		})
 
-		_, err := req.Execute(e.natsConnection)
+		_, _, err := req.Execute(e.natsConnection)
 
 		if err != nil {
 			t.Error(err)
@@ -232,7 +232,7 @@ func TestNats(t *testing.T) {
 			ItemSubject:     NewItemSubject(),
 		})
 
-		_, err := req.Execute(e.natsConnection)
+		_, _, err := req.Execute(e.natsConnection)
 
 		if err != nil {
 			t.Error(err)
@@ -302,9 +302,10 @@ func TestNatsCancel(t *testing.T) {
 			UUID:            u[:],
 		})
 
-		items := make(chan *sdp.Item)
+		items := make(chan *sdp.Item, 1000)
+		errs := make(chan *sdp.ItemRequestError, 1000)
 
-		err := progress.Start(conn, items)
+		err := progress.Start(conn, items, errs)
 
 		if err != nil {
 			t.Error(err)
@@ -316,7 +317,10 @@ func TestNatsCancel(t *testing.T) {
 			UUID: u[:],
 		})
 
+		// Read and discard all items and errors until they are closed
 		for range items {
+		}
+		for range errs {
 		}
 
 		if progress.NumCancelled() != 1 {
@@ -587,7 +591,7 @@ func TestNatsAuth(t *testing.T) {
 			e.ClearCache()
 		})
 
-		_, err := sdp.NewRequestProgress(&sdp.ItemRequest{
+		_, _, err := sdp.NewRequestProgress(&sdp.ItemRequest{
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
 			Query:           "basic",
@@ -612,7 +616,7 @@ func TestNatsAuth(t *testing.T) {
 			e.ClearCache()
 		})
 
-		_, err := sdp.NewRequestProgress(&sdp.ItemRequest{
+		_, _, err := sdp.NewRequestProgress(&sdp.ItemRequest{
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
 			Query:           "deeplink",

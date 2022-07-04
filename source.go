@@ -2,7 +2,6 @@ package discovery
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/overmindtech/sdp-go"
@@ -98,275 +97,24 @@ func GetCacheDuration(s Source) time.Duration {
 }
 
 // Get Runs a get query against known sources in priority order. If nothing was
-// found, returns the first error
-func (e *Engine) Get(ctx context.Context, r *sdp.ItemRequest, relevantSources []Source) (*sdp.Item, error) {
-	if len(relevantSources) == 0 {
-		return nil, &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_NOCONTEXT,
-			ErrorString: fmt.Sprintf("no sources found for type %v and context %v", r.Type, r.Context),
-			Context:     r.Context,
-		}
-	}
-
-	e.gfm.GetLock(r.Context, r.Type)
-
-	var err error
-
-	for _, src := range relevantSources {
-		tags := sdpcache.Tags{
-			"sourceName":           src.Name(),
-			"uniqueAttributeValue": r.Query,
-			"type":                 r.Type,
-			"context":              r.Context,
-		}
-
-		logFields := log.Fields{
-			"sourceName":   src.Name(),
-			"sourceWeight": src.Weight(),
-			"type":         r.Type,
-			"context":      r.Context,
-			"query":        r.Query,
-		}
-
-		if !r.IgnoreCache {
-			cached, cacheErr := e.cache.Search(tags)
-
-			switch err := cacheErr.(type) {
-			case sdpcache.CacheNotFoundError:
-				// If the item/error wasn't found in the cache then just continue on
-			case *sdp.ItemRequestError:
-				if err.ErrorType == sdp.ItemRequestError_NOTFOUND {
-					// If the item wasn't found, but we've already looked then don't look
-					// again and just return a blank result
-					log.WithFields(logFields).Debug("Was not found previously, skipping")
-
-					continue
-				}
-			case nil:
-				if len(cached) == 1 {
-					// If the cache found something then just return that
-					log.WithFields(logFields).Debug("Found item from cache")
-
-					e.gfm.GetUnlock(r.Context, r.Type)
-
-					return cached[0], nil
-				}
-
-				// If we got a weird number of stuff from the cache then
-				// something is wrong
-				log.WithFields(logFields).Error("Cache returned >1 value, purging and continuing")
-
-				e.cache.Delete(tags)
-			}
-		}
-
-		log.WithFields(logFields).Debug("Executing get for backend")
-
-		var getDuration time.Duration
-		var item *sdp.Item
-		err = nil
-
-		getDuration = timeOperation(func() {
-			item, err = src.Get(ctx, r.Context, r.Query)
-		})
-
-		logFields["itemFound"] = (err == nil)
-		logFields["error"] = err
-
-		// A good backend should be careful to raise ItemNotFoundError if the
-		// query was able to execute successfully, but the item wasn't found. If
-		// however there was some failure in checking and therefore we aren't
-		// sure if the item is actually there is not another type of error
-		// should be raised and this will be logged
-		if ire, sdpErr := err.(*sdp.ItemRequestError); (sdpErr && ire.ErrorType == sdp.ItemRequestError_NOTFOUND) || err == nil {
-			log.WithFields(logFields).Debug("Get complete")
-
-			if ire != nil {
-				// Cache the error since the types was ItemRequestError_NOTFOUND
-				// and therefore the item doesn't exist
-				e.cache.StoreError(err, GetCacheDuration(src), tags)
-			}
-		} else {
-			log.WithFields(logFields).Error("Get Failed")
-		}
-
-		if err == nil {
-			// Handle the case where we are given a nil pointer
-			if item == nil {
-				return &sdp.Item{}, &sdp.ItemRequestError{
-					ErrorType:   sdp.ItemRequestError_OTHER,
-					ErrorString: "Backend returned a nil pointer as an item",
-				}
-			}
-
-			// Set the metadata
-			item.Metadata = &sdp.Metadata{
-				Timestamp:             timestamppb.New(time.Now()),
-				SourceDuration:        durationpb.New(getDuration),
-				SourceDurationPerItem: durationpb.New(getDuration),
-				SourceName:            src.Name(),
-			}
-
-			// Mark the item as hidden if the source is a hidden source
-			if hs, ok := src.(HiddenSource); ok {
-				item.Metadata.Hidden = hs.Hidden()
-			}
-
-			// Store the new item in the cache
-			e.cache.StoreItem(item, GetCacheDuration(src), tags)
-
-			e.gfm.GetUnlock(r.Context, r.Type)
-
-			return item, nil
-		}
-
-		e.gfm.GetUnlock(r.Context, r.Type)
-	}
-
-	// If we don't find anything then we should raise an error
-	return &sdp.Item{}, err
+// found, returns the first error. This returns a slice if items for
+// convenience, but this should always be of length 1 or 0
+func (e *Engine) Get(ctx context.Context, r *sdp.ItemRequest, relevantSources []Source) ([]*sdp.Item, []*sdp.ItemRequestError) {
+	return e.callSources(ctx, r, relevantSources, Get)
 }
 
 // Find executes Find() on all sources for a given type, returning the merged
 // results. Only returns an error if all sources fail, in which case returns the
 // first error
-func (e *Engine) Find(ctx context.Context, r *sdp.ItemRequest, relevantSources []Source) ([]*sdp.Item, error) {
-	if len(relevantSources) == 0 {
-		return nil, &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_NOCONTEXT,
-			ErrorString: fmt.Sprintf("no sources found for type %v and context %v", r.Type, r.Context),
-			Context:     r.Context,
-		}
-	}
-
-	e.gfm.FindLock(r.Context, r.Type)
-	defer e.gfm.FindUnlock(r.Context, r.Type)
-
-	items := make([]*sdp.Item, 0)
-	errors := make([]error, 0)
-
-	for _, src := range relevantSources {
-		tags := sdpcache.Tags{
-			"method":     "find",
-			"sourceName": src.Name(),
-			"context":    r.Context,
-		}
-
-		logFields := log.Fields{
-			"sourceName": src.Name(),
-			"type":       r.Type,
-			"context":    r.Context,
-		}
-
-		if !r.IgnoreCache {
-			cachedItems, err := e.cache.Search(tags)
-
-			switch err := err.(type) {
-			case sdpcache.CacheNotFoundError:
-				// If the item/error wasn't found in the cache then just
-				// continue on
-			case *sdp.ItemRequestError:
-				if err.ErrorType == sdp.ItemRequestError_NOTFOUND {
-					log.WithFields(logFields).Debug("Found cached empty FIND, not executing")
-
-					continue
-				}
-			default:
-				// If we get a result from the cache then return that
-				if len(cachedItems) > 0 {
-					logFields["items"] = len(cachedItems)
-
-					log.WithFields(logFields).Debug("Found items from cache")
-
-					items = append(items, cachedItems...)
-					errors = append(errors, err)
-
-					continue
-				}
-			}
-		}
-
-		log.WithFields(logFields).Debug("Executing find")
-
-		finds := make([]*sdp.Item, 0)
-		var err error
-
-		findDuration := timeOperation(func() {
-			finds, err = src.Find(ctx, r.Context)
-		})
-
-		logFields["items"] = len(finds)
-		logFields["error"] = err
-
-		if err == nil {
-			log.WithFields(logFields).Debug("Find complete")
-
-			// Check too see if nothing was found, make sure we cache the
-			// nothing
-			if len(finds) == 0 {
-				e.cache.StoreError(&sdp.ItemRequestError{
-					ErrorType: sdp.ItemRequestError_NOTFOUND,
-				}, GetCacheDuration(src), tags)
-			}
-		} else {
-			log.WithFields(logFields).Error("Error during find")
-
-			e.cache.StoreError(err, GetCacheDuration(src), tags)
-		}
-
-		// For each found item, add more details
-		//
-		// Use the index here to ensure that we're actually editing the
-		// right thing
-		for i := range finds {
-			// Get a pointer to the item we're dealing with
-			item := finds[i]
-
-			// Handle the case where we are given a nil pointer
-			if item == nil {
-				continue
-			}
-
-			// Store metadata
-			item.Metadata = &sdp.Metadata{
-				Timestamp:             timestamppb.New(time.Now()),
-				SourceDuration:        durationpb.New(findDuration),
-				SourceDurationPerItem: durationpb.New(time.Duration(findDuration.Nanoseconds() / int64(len(finds)))),
-				SourceName:            src.Name(),
-			}
-
-			// Mark the item as hidden if the source is a hidden source
-			if hs, ok := src.(HiddenSource); ok {
-				item.Metadata.Hidden = hs.Hidden()
-			}
-
-			// Cache the item
-			e.cache.StoreItem(item, GetCacheDuration(src), tags)
-		}
-
-		items = append(items, finds...)
-		errors = append(errors, err)
-	}
-
-	// Check if there were any successful runs and if so return the items
-	for _, e := range errors {
-		if e == nil {
-			return items, nil
-		}
-	}
-
-	if len(errors) > 0 {
-		return items, errors[0]
-	}
-
-	return items, nil
+func (e *Engine) Find(ctx context.Context, r *sdp.ItemRequest, relevantSources []Source) ([]*sdp.Item, []*sdp.ItemRequestError) {
+	return e.callSources(ctx, r, relevantSources, Find)
 }
 
 // Search executes Search() on all sources for a given type, returning the merged
 // results. Only returns an error if all sources fail, in which case returns the
 // first error
-func (e *Engine) Search(ctx context.Context, r *sdp.ItemRequest, relevantSources []Source) ([]*sdp.Item, error) {
-	searchableSources := make([]SearchableSource, 0)
+func (e *Engine) Search(ctx context.Context, r *sdp.ItemRequest, relevantSources []Source) ([]*sdp.Item, []*sdp.ItemRequestError) {
+	searchableSources := make([]Source, 0)
 
 	// Filter further by searchability
 	for _, source := range relevantSources {
@@ -375,26 +123,71 @@ func (e *Engine) Search(ctx context.Context, r *sdp.ItemRequest, relevantSources
 		}
 	}
 
-	if len(searchableSources) == 0 {
-		return nil, &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_NOCONTEXT,
-			ErrorString: fmt.Sprintf("no sources found for type %v and context %v that support searching", r.Type, r.Context),
-			Context:     r.Context,
-		}
+	return e.callSources(ctx, r, searchableSources, Search)
+}
+
+type SourceMethod int64
+
+const (
+	Get SourceMethod = iota
+	Find
+	Search
+)
+
+func (s SourceMethod) String() string {
+	switch s {
+	case Get:
+		return "Get"
+	case Find:
+		return "Find"
+	case Search:
+		return "Search"
+	default:
+		return "Unknown"
+	}
+}
+
+func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSources []Source, method SourceMethod) ([]*sdp.Item, []*sdp.ItemRequestError) {
+	errs := make([]*sdp.ItemRequestError, 0)
+	items := make([]*sdp.Item, 0)
+
+	// We want to avid having a Get and a Find running at the same time, we'd
+	// rather run the Find first, populate the cache, then have the Get just
+	// grab the value from the cache. To this end we use a GetFindMutex to allow
+	// a Find to block all subsequent Get requests until it is done
+	switch method {
+	case Get:
+		e.gfm.GetLock(r.Context, r.Type)
+		defer e.gfm.GetUnlock(r.Context, r.Type)
+	case Find:
+		e.gfm.FindLock(r.Context, r.Type)
+		defer e.gfm.FindUnlock(r.Context, r.Type)
+	case Search:
+		// We don't need to lock for a search since they are independant and
+		// will only ever have a cache hit if the request is identical
 	}
 
-	e.gfm.GetLock(r.Context, r.Type)
-	defer e.gfm.GetUnlock(r.Context, r.Type)
-
-	items := make([]*sdp.Item, 0)
-	errors := make([]error, 0)
-
-	for _, src := range searchableSources {
+	for _, src := range relevantSources {
 		tags := sdpcache.Tags{
-			"method":     "find",
 			"sourceName": src.Name(),
-			"query":      r.Query,
 			"context":    r.Context,
+			"type":       r.Type,
+		}
+
+		switch method {
+		case Get:
+			// With a Get request we need just the one specific item, so also
+			// filter on uniqueAttributeValue
+			tags["uniqueAttributeValue"] = r.Query
+		case Find:
+			// In the case of a find, we just want everything that was found in
+			// the last find, so we only care about the method
+			tags["method"] = method.String()
+		case Search:
+			// For a search, we only want to get from the cache items that were
+			// found using search, and with the exact same query
+			tags["method"] = method.String()
+			tags["query"] = r.Query
 		}
 
 		logFields := log.Fields{
@@ -404,68 +197,143 @@ func (e *Engine) Search(ctx context.Context, r *sdp.ItemRequest, relevantSources
 		}
 
 		if !r.IgnoreCache {
+			// TODO: This is where I'm up to. Rethink the way this works. Does
+			// the logic make sense here?
 			cachedItems, err := e.cache.Search(tags)
 
-			switch err := err.(type) {
-			case sdpcache.CacheNotFoundError:
-				// If the item/error wasn't found in the cache then just
-				// continue on
-			case *sdp.ItemRequestError:
-				if err.ErrorType == sdp.ItemRequestError_NOTFOUND {
-					log.WithFields(logFields).Debug("Found cached empty result, not executing")
+			if err != nil {
+				switch err := err.(type) {
+				case sdpcache.CacheNotFoundError:
+					// If nothing was found then continue with execution
+				case *sdp.ItemRequestError:
+					// Add relevant info
+					err.Context = r.Context
+					err.ItemRequestUUID = r.UUID
+					err.SourceName = src.Name()
+					err.ItemType = r.Type
+
+					errs = append(errs, err)
+
+					logFields["error"] = err.Error()
+
+					if err.ErrorType == sdp.ItemRequestError_NOTFOUND {
+						log.WithFields(logFields).Debug("Found cached empty result, not executing")
+					} else {
+						log.WithFields(logFields).Debug("Found cached error")
+					}
+
+					continue
+				default:
+					// If it's an unknown error, conver it to SDP and skip this source
+					errs = append(errs, &sdp.ItemRequestError{
+						ItemRequestUUID: r.UUID,
+						ErrorType:       sdp.ItemRequestError_OTHER,
+						ErrorString:     err.Error(),
+						Context:         r.Context,
+						SourceName:      src.Name(),
+						ItemType:        r.Type,
+					})
+
+					logFields["error"] = err.Error()
+					log.WithFields(logFields).Debug("Found cached error")
 
 					continue
 				}
-			default:
-				// If we get a result from the cache then return that
-				if len(cachedItems) > 0 {
-					logFields["items"] = len(cachedItems)
+			} else {
+				logFields["numItems"] = len(cachedItems)
+				log.WithFields(logFields).Debug("Found items from cache")
 
-					log.WithFields(logFields).Debug("Found items from cache")
+				if method == Get {
+					// If the method was Get we should validate that we have
+					// only pulled one thing from the cache
 
+					if len(cachedItems) < 2 {
+						items = append(items, cachedItems...)
+						continue
+					} else {
+						// If we got a weird number of stuff from the cache then
+						// something is wrong
+						log.WithFields(logFields).Error("Cache returned >1 value, purging and continuing")
+
+						e.cache.Delete(tags)
+					}
+				} else {
 					items = append(items, cachedItems...)
-					errors = append(errors, err)
-
 					continue
 				}
 			}
 		}
 
-		log.WithFields(logFields).Debug("Executing search")
+		log.WithFields(logFields).Debugf("Executing %v", method.String())
 
-		var searchItems []*sdp.Item
+		var resultItems []*sdp.Item
 		var err error
 
 		searchDuration := timeOperation(func() {
-			searchItems, err = src.Search(ctx, r.Context, r.Query)
+			switch method {
+			case Get:
+				var newItem *sdp.Item
+
+				newItem, err = src.Get(ctx, r.Context, r.Query)
+
+				if err == nil {
+					resultItems = []*sdp.Item{newItem}
+				}
+			case Find:
+				resultItems, err = src.Find(ctx, r.Context)
+			case Search:
+				if searchableSrc, ok := src.(SearchableSource); ok {
+					resultItems, err = searchableSrc.Search(ctx, r.Context, r.Query)
+				} else {
+					err = &sdp.ItemRequestError{
+						ItemRequestUUID: r.UUID,
+						ErrorType:       sdp.ItemRequestError_NOTFOUND,
+						ErrorString:     "source is not searchable",
+						Context:         r.Context,
+						SourceName:      src.Name(),
+						ItemType:        r.Type,
+					}
+				}
+			}
 		})
 
-		logFields["items"] = len(searchItems)
+		logFields["items"] = len(resultItems)
 		logFields["error"] = err
 
-		if err == nil {
-			log.WithFields(logFields).Debug("Search completed")
-
-			// Check too see if nothing was found, make sure we cache the
-			// nothing
-			if len(searchItems) == 0 {
-				e.cache.StoreError(&sdp.ItemRequestError{
-					ErrorType: sdp.ItemRequestError_NOTFOUND,
-				}, GetCacheDuration(src), tags)
-			}
-		} else {
+		if considerFailed(err) {
 			log.WithFields(logFields).Error("Error during search")
+		} else {
+			log.WithFields(logFields).Debugf("%v completed", method.String())
 
-			e.cache.StoreError(err, GetCacheDuration(src), tags)
+			if err != nil {
+				// In this case the error must be a NOTFOUND error, which we
+				// want to cache
+				e.cache.StoreError(err, GetCacheDuration(src), tags)
+			}
+		}
+
+		if err != nil {
+			if sdpErr, ok := err.(*sdp.ItemRequestError); ok {
+				errs = append(errs, sdpErr)
+			} else {
+				errs = append(errs, &sdp.ItemRequestError{
+					ItemRequestUUID: r.UUID,
+					ErrorType:       sdp.ItemRequestError_OTHER,
+					ErrorString:     err.Error(),
+					Context:         r.Context,
+					SourceName:      src.Name(),
+					ItemType:        r.Type,
+				})
+			}
 		}
 
 		// For each found item, add more details
 		//
 		// Use the index here to ensure that we're actually editing the
 		// right thing
-		for i := range searchItems {
+		for i := range resultItems {
 			// Get a pointer to the item we're dealing with
-			item := searchItems[i]
+			item := resultItems[i]
 
 			// Handle the case where we are given a nil pointer
 			if item == nil {
@@ -476,7 +344,7 @@ func (e *Engine) Search(ctx context.Context, r *sdp.ItemRequest, relevantSources
 			item.Metadata = &sdp.Metadata{
 				Timestamp:             timestamppb.New(time.Now()),
 				SourceDuration:        durationpb.New(searchDuration),
-				SourceDurationPerItem: durationpb.New(time.Duration(searchDuration.Nanoseconds() / int64(len(searchItems)))),
+				SourceDurationPerItem: durationpb.New(time.Duration(searchDuration.Nanoseconds() / int64(len(resultItems)))),
 				SourceName:            src.Name(),
 			}
 
@@ -489,22 +357,37 @@ func (e *Engine) Search(ctx context.Context, r *sdp.ItemRequest, relevantSources
 			e.cache.StoreItem(item, GetCacheDuration(src), tags)
 		}
 
-		items = append(items, searchItems...)
-		errors = append(errors, err)
-	}
+		items = append(items, resultItems...)
 
-	// Check if there were any successful runs and if so return the items
-	for _, e := range errors {
-		if e == nil {
-			return items, nil
+		if method == Get {
+			// If it's a get, we just return the first thing that works
+			if len(resultItems) > 0 {
+				break
+			}
 		}
 	}
 
-	if len(errors) > 0 {
-		return items, errors[0]
-	}
+	return items, errs
+}
 
-	return items, nil
+// considerFailed Returns whether or not a given error should be considered as a
+// failure or not. The only error that isn't consider a failure is a
+// *sdp.ItemRequestError with a Type of NOTFOUND, this means that it was queried
+// successfully but it simply doesn't exist
+func considerFailed(err error) bool {
+	if err == nil {
+		return false
+	} else {
+		if sdperr, ok := err.(*sdp.ItemRequestError); ok {
+			if sdperr.ErrorType == sdp.ItemRequestError_NOTFOUND {
+				return false
+			} else {
+				return true
+			}
+		} else {
+			return true
+		}
+	}
 }
 
 // timeOperation Times how lon an operation takes and stores it in the first
