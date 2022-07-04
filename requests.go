@@ -16,6 +16,15 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
+// AllSourcesFailedError Will be returned when all sources have failed
+type AllSourcesFailedError struct {
+	NumSources int
+}
+
+func (e AllSourcesFailedError) Error() string {
+	return fmt.Sprintf("all sources (%v) failed", e.NumSources)
+}
+
 // NewItemSubject Generates a random subject name for returning items e.g.
 // return.item._INBOX.712ab421
 func NewItemSubject() string {
@@ -262,7 +271,9 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items
 
 	// If all failed then return first error
 	if numErrs == numSources {
-		return errors.New("all sources failed")
+		return AllSourcesFailedError{
+			NumSources: numSources,
+		}
 	}
 
 	return nil

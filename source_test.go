@@ -217,6 +217,7 @@ func TestGet(t *testing.T) {
 	}
 
 	src := TestSource{
+		ReturnName: "orange",
 		ReturnContexts: []string{
 			"test",
 			"empty",
@@ -245,6 +246,50 @@ func TestGet(t *testing.T) {
 
 		if firstCall[0] != "test" || firstCall[1] != "three" {
 			t.Fatalf("First get call parameters unexpected: %v", firstCall)
+		}
+	})
+
+	t.Run("not found error", func(t *testing.T) {
+		t.Cleanup(func() {
+			src.ClearCalls()
+		})
+
+		items, errs, err := e.ExecuteRequestSync(context.Background(), &sdp.ItemRequest{
+			Type:    "person",
+			Context: "empty",
+			Query:   "three",
+			Method:  sdp.RequestMethod_GET,
+		})
+
+		if err == nil {
+			t.Error("execpected all sources failed")
+		}
+
+		if len(errs) == 1 {
+			if errs[0].ErrorType != sdp.ItemRequestError_NOTFOUND {
+				t.Errorf("expected ErrorType to be %v, got %v", sdp.ItemRequestError_NOTFOUND, errs[0].ErrorType)
+			}
+			if errs[0].ErrorString != "not found (test)" {
+				t.Errorf("expected ErrorString to be %v, got %v", "", errs[0].ErrorString)
+			}
+			if errs[0].Context != "empty" {
+				t.Errorf("expected Context to be %v, got %v", "empty", errs[0].Context)
+			}
+			if errs[0].SourceName != "testSource-orange" {
+				t.Errorf("expected SourceName to be %v, got %v", "testSource-orange", errs[0].SourceName)
+			}
+			if errs[0].ItemType != "person" {
+				t.Errorf("expected ItemType to be %v, got %v", "person", errs[0].ItemType)
+			}
+			if errs[0].ResponderName != "testEngine" {
+				t.Errorf("expected ResponderName to be %v, got %v", "testEngine", errs[0].ResponderName)
+			}
+		} else {
+			t.Errorf("expected 1 error, got %v", len(errs))
+		}
+
+		if len(items) != 0 {
+			t.Errorf("expected 0 items, got %v", len(items))
 		}
 	})
 

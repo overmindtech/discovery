@@ -286,12 +286,8 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 					resultItems, err = searchableSrc.Search(ctx, r.Context, r.Query)
 				} else {
 					err = &sdp.ItemRequestError{
-						ItemRequestUUID: r.UUID,
-						ErrorType:       sdp.ItemRequestError_NOTFOUND,
-						ErrorString:     "source is not searchable",
-						Context:         r.Context,
-						SourceName:      src.Name(),
-						ItemType:        r.Type,
+						ErrorType:   sdp.ItemRequestError_NOTFOUND,
+						ErrorString: "source is not searchable",
 					}
 				}
 			}
@@ -301,7 +297,7 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 		logFields["error"] = err
 
 		if considerFailed(err) {
-			log.WithFields(logFields).Error("Error during search")
+			log.WithFields(logFields).Errorf("Error during %v", method.String())
 		} else {
 			log.WithFields(logFields).Debugf("%v completed", method.String())
 
@@ -314,6 +310,15 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 
 		if err != nil {
 			if sdpErr, ok := err.(*sdp.ItemRequestError); ok {
+				// Add details if they aren't populated
+				if sdpErr.Context == "" {
+					sdpErr.Context = r.Context
+				}
+				sdpErr.ItemRequestUUID = r.UUID
+				sdpErr.ItemType = src.Type()
+				sdpErr.ResponderName = e.Name
+				sdpErr.SourceName = src.Name()
+
 				errs = append(errs, sdpErr)
 			} else {
 				errs = append(errs, &sdp.ItemRequestError{
