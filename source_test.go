@@ -731,3 +731,83 @@ func TestFindSearchCaching(t *testing.T) {
 	})
 
 }
+
+func TestSearchGetCaching(t *testing.T) {
+	// We want to be sure that if an item has been found via a search and
+	// cached, the cache will be hit if a Get is run for that particular item
+	e := Engine{
+		Name: "testEngine",
+	}
+
+	src := TestSource{
+		ReturnContexts: []string{
+			"test",
+		},
+	}
+
+	e.AddSources(&src)
+	e.cache.MinWaitTime = (10 * time.Millisecond)
+	e.cache.StartPurger()
+
+	t.Run("caching with successful search", func(t *testing.T) {
+		t.Cleanup(func() {
+			src.ClearCalls()
+		})
+
+		var searchResult []*sdp.Item
+		var searchErrors []*sdp.ItemRequestError
+		var getResult []*sdp.Item
+		var getErrors []*sdp.ItemRequestError
+		var err error
+		req := sdp.ItemRequest{
+			Type:    "person",
+			Context: "test",
+			Query:   "Dylan",
+			Method:  sdp.RequestMethod_SEARCH,
+		}
+
+		searchResult, searchErrors, err = e.ExecuteRequestSync(context.Background(), &req)
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if len(searchErrors) != 0 {
+			for _, err := range searchErrors {
+				t.Error(err)
+			}
+		}
+
+		if len(searchResult) == 0 {
+			t.Fatal("Got no results")
+		}
+
+		time.Sleep(10 * time.Millisecond)
+
+		// Do a get request for that same item
+		req.Method = sdp.RequestMethod_GET
+		req.Query = searchResult[0].UniqueAttributeValue()
+
+		getResult, getErrors, err = e.ExecuteRequestSync(context.Background(), &req)
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if len(getErrors) != 0 {
+			for _, err := range getErrors {
+				t.Error(err)
+			}
+		}
+
+		if len(getResult) == 0 {
+			t.Error("No result from GET")
+		}
+
+		if searchResult[0].Metadata.Timestamp.String() != getResult[0].Metadata.Timestamp.String() {
+			t.Error("Item timestamps do not match, caching has not worked")
+		}
+
+	})
+
+}
