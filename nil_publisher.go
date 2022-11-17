@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/nats-io/nats.go"
@@ -30,4 +31,13 @@ func (n NilConnection) Subscribe(subject string, cb nats.Handler) (*nats.Subscri
 	}).Error("Could not subscribe to NAT subject due to no connection")
 
 	return nil, nil
+}
+
+func (n NilConnection) RequestWithContext(ctx context.Context, subject string, v interface{}, vPtr interface{}) error {
+	log.WithFields(log.Fields{
+		"subject": subject,
+		"message": fmt.Sprint(v),
+	}).Error("Could not publish NATS request due to no connection")
+
+	return nil
 }
