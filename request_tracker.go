@@ -197,8 +197,7 @@ func (r *RequestTracker) linkItem(ctx context.Context, parent *sdp.Item) {
 
 						// Create a reference to the newly found item and attach
 						// to the parent item
-						ref := li.Reference()
-						p.LinkedItems = append(p.LinkedItems, &ref)
+						p.LinkedItems = append(p.LinkedItems, li.Reference())
 
 						itemMutex.Unlock()
 					} else {
