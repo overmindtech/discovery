@@ -27,7 +27,7 @@ jobs:
           # creates all service containers on the same network, and with a nice
           # network alias so we can use docker-provided DNS to have them talk to
           # one another
-          NATS_SERVER: nats://nats-auth:4222
+          NATS_URL: nats://nats-auth:4222
         credentials:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
