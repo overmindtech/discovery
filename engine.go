@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/overmindtech/multiconn"
+	"github.com/overmindtech/connect"
 	"github.com/overmindtech/sdp-go"
 	"github.com/overmindtech/sdpcache"
 
@@ -30,8 +30,8 @@ type Engine struct {
 	// Descriptive name of this engine. Used as responder name in SDP responses
 	Name string
 
-	NATSOptions   *multiconn.NATSConnectionOptions // Options for connecting to NATS
-	NATSQueueName string                           // The name of the queue to use when subscribing
+	NATSOptions   *connect.NATSOptions // Options for connecting to NATS
+	NATSQueueName string               // The name of the queue to use when subscribing
 
 	// The maximum number of queries that can be executing in parallel. Defaults
 	// to the number of CPUs

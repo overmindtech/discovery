@@ -20,14 +20,14 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
         ports:
           - 4223:4222
-      nats-token-exchange:
-        image: ghcr.io/overmindtech/test-populated-nats-token-exchange:main
+      api-server:
+        image: ghcr.io/overmindtech/test-populated-api-server:main
         env:
           # This is the URL of the nats-auth container above. Thankfully github
           # creates all service containers on the same network, and with a nice
           # network alias so we can use docker-provided DNS to have them talk to
           # one another
-          NATS_SERVER: nats://nats-auth:4222
+          NATS_URL: nats://nats-auth:4222
         credentials:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
