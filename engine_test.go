@@ -12,7 +12,7 @@ import (
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"
-	"github.com/overmindtech/multiconn"
+	"github.com/overmindtech/connect"
 	"github.com/overmindtech/sdp-go"
 )
 
@@ -152,11 +152,9 @@ func TestNats(t *testing.T) {
 
 	e := Engine{
 		Name: "nats-test",
-		NATSOptions: &multiconn.NATSConnectionOptions{
-			CommonOptions: multiconn.CommonOptions{
-				NumRetries: 5,
-				RetryDelay: time.Second,
-			},
+		NATSOptions: &connect.NATSOptions{
+			NumRetries:        5,
+			RetryDelay:        time.Second,
 			Servers:           NatsTestURLs,
 			ConnectionName:    "test-connection",
 			ConnectionTimeout: time.Second,
@@ -257,11 +255,9 @@ func TestNatsCancel(t *testing.T) {
 
 	e := Engine{
 		Name: "nats-test",
-		NATSOptions: &multiconn.NATSConnectionOptions{
-			CommonOptions: multiconn.CommonOptions{
-				NumRetries: 5,
-				RetryDelay: time.Second,
-			},
+		NATSOptions: &connect.NATSOptions{
+			NumRetries:        5,
+			RetryDelay:        time.Second,
 			Servers:           NatsTestURLs,
 			ConnectionName:    "test-connection",
 			ConnectionTimeout: time.Second,
@@ -344,7 +340,7 @@ func TestNatsConnections(t *testing.T) {
 	t.Run("with a bad hostname", func(t *testing.T) {
 		e := Engine{
 			Name: "nats-test",
-			NATSOptions: &multiconn.NATSConnectionOptions{
+			NATSOptions: &connect.NATSOptions{
 				Servers:           []string{"nats://bad.server"},
 				ConnectionName:    "test-disconnection",
 				ConnectionTimeout: time.Second,
@@ -377,11 +373,9 @@ func TestNatsConnections(t *testing.T) {
 
 		e := Engine{
 			Name: "nats-test",
-			NATSOptions: &multiconn.NATSConnectionOptions{
-				CommonOptions: multiconn.CommonOptions{
-					NumRetries: 5,
-					RetryDelay: time.Second,
-				},
+			NATSOptions: &connect.NATSOptions{
+				NumRetries:        5,
+				RetryDelay:        time.Second,
 				Servers:           []string{"127.0.0.1:4111"},
 				ConnectionName:    "test-disconnection",
 				ConnectionTimeout: time.Second,
@@ -437,11 +431,9 @@ func TestNatsConnections(t *testing.T) {
 	t.Run("with a server that takes a while to start", func(t *testing.T) {
 		e := Engine{
 			Name: "nats-test",
-			NATSOptions: &multiconn.NATSConnectionOptions{
-				CommonOptions: multiconn.CommonOptions{
-					NumRetries: 10,
-					RetryDelay: time.Second,
-				},
+			NATSOptions: &connect.NATSOptions{
+				NumRetries:        10,
+				RetryDelay:        time.Second,
 				Servers:           []string{"127.0.0.1:4111"},
 				ConnectionName:    "test-disconnection",
 				ConnectionTimeout: time.Second,
@@ -489,11 +481,9 @@ func TestNATSFailureRestart(t *testing.T) {
 
 	e := Engine{
 		Name: "nats-test",
-		NATSOptions: &multiconn.NATSConnectionOptions{
-			CommonOptions: multiconn.CommonOptions{
-				NumRetries: 10,
-				RetryDelay: time.Second,
-			},
+		NATSOptions: &connect.NATSOptions{
+			NumRetries:        10,
+			RetryDelay:        time.Second,
 			Servers:           []string{"127.0.0.1:4112"},
 			ConnectionName:    "test-disconnection",
 			ConnectionTimeout: time.Second,
@@ -547,11 +537,9 @@ func TestNatsAuth(t *testing.T) {
 
 	e := Engine{
 		Name: "nats-test",
-		NATSOptions: &multiconn.NATSConnectionOptions{
-			CommonOptions: multiconn.CommonOptions{
-				NumRetries: 5,
-				RetryDelay: time.Second,
-			},
+		NATSOptions: &connect.NATSOptions{
+			NumRetries:        5,
+			RetryDelay:        time.Second,
 			Servers:           NatsTestURLs,
 			ConnectionName:    "test-connection",
 			ConnectionTimeout: time.Second,
@@ -669,7 +657,7 @@ func TestSetupMaxRequestTimeout(t *testing.T) {
 	})
 }
 
-func GetTestOAuthTokenClient(t *testing.T) *multiconn.OAuthTokenClient {
+func GetTestOAuthTokenClient(t *testing.T) *connect.OAuthTokenClient {
 	var domain string
 	var clientID string
 	var clientSecret string
@@ -699,10 +687,15 @@ func GetTestOAuthTokenClient(t *testing.T) *multiconn.OAuthTokenClient {
 		t.Fatal(err)
 	}
 
-	return multiconn.NewOAuthTokenClient(
-		clientID,
-		clientSecret,
+	ccc := connect.ClientCredentialsConfig{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		Org:          "org_hdeUXbB55sMMvJLa",
+	}
+
+	return connect.NewOAuthTokenClient(
 		fmt.Sprintf("https://%v/oauth/token", domain),
 		exchangeURL,
+		ccc,
 	)
 }

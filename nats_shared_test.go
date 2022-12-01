@@ -19,8 +19,8 @@ var NatsAuthTestURLs = []string{
 }
 
 var tokenExchangeURLs = []string{
-	"http://nats-token-exchange:8080/api/nats",
-	"http://localhost:8080/api/nats",
+	"http://api-server:8080",
+	"http://localhost:8080",
 }
 
 // SkipWithoutNats Skips a test if NATS is not available

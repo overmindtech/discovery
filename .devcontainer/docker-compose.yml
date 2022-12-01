@@ -12,10 +12,9 @@ services:
     networks:
       - nats
 
-  # Runs the token exchange
-  nats-token-exchange:
-    image: ghcr.io/overmindtech/test-populated-nats-token-exchange:main
-    command: --nats-server nats://nats-auth:4222
+  api-server:
+    image: ghcr.io/overmindtech/test-populated-api-server:main
+    command: --nats-url nats://nats-auth:4222 --disable-kube
     networks:
       - nats
 
