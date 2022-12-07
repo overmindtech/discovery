@@ -15,7 +15,7 @@ func TestSourcesSource(t *testing.T) {
 	})
 }
 
-func TestMetaSourceSearch(t *testing.T) {
+func TestMetaSourceSearchType(t *testing.T) {
 	s, err := NewMetaSource(newTestEngine())
 
 	if err != nil {
@@ -79,6 +79,63 @@ func TestMetaSourceSearch(t *testing.T) {
 
 		if types[0] != "aws-elasticloadbalancer" {
 			t.Errorf("expected first resault to be aws-elasticloadbalancer, got %v", types[0])
+		}
+	})
+}
+
+func TestMetaSourceSearchContext(t *testing.T) {
+	s, err := NewMetaSource(newTestEngine())
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("searching using prefixes", func(t *testing.T) {
+		prefixes := []string{
+			"prod",
+			"prodAccount",
+			"prodAccountInternet",
+			"prodAccountInternetBanking",
+		}
+
+		for _, prefix := range prefixes {
+			t.Run(prefix, func(t *testing.T) {
+				results, err := s.SearchContext(prefix)
+
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if len(results) != 1 {
+					t.Fatalf("expected 1 results got %v", len(results))
+				}
+
+				if results[0] != "prodAccountInternetBanking" {
+					t.Errorf("expected first resault to be prodAccountInternetBanking, got %v", results[0])
+				}
+			})
+		}
+	})
+
+	t.Run("searching using full words", func(t *testing.T) {
+		words := []string{
+			"Account",
+			"Internet",
+			"InternetBanking",
+		}
+
+		for _, word := range words {
+			t.Run(word, func(t *testing.T) {
+				results, err := s.SearchContext(word)
+
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if len(results) == 0 {
+					t.Fatal("no results found")
+				}
+			})
 		}
 	})
 

@@ -57,7 +57,6 @@ func searchRequest(query string) *bleve.SearchRequest {
 
 	q := bleve.NewDisjunctionQuery(fuzzy, prefix)
 	search := bleve.NewSearchRequest(q)
-	search.IncludeLocations = true
 
 	return search
 }
@@ -65,23 +64,33 @@ func searchRequest(query string) *bleve.SearchRequest {
 // SearchType Searches for available types based on the sources that the engine
 // has, returns a list of results
 func (m *MetaSource) SearchType(query string) ([]string, error) {
+	return m.searchIndex(m.typeIndex, query)
+}
+
+// SearchContext Searches for available contexts based on the sources that the
+// engine has, returns a list of results
+func (m *MetaSource) SearchContext(query string) ([]string, error) {
+	return m.searchIndex(m.contextIndex, query)
+}
+
+func (m *MetaSource) searchIndex(index bleve.Index, query string) ([]string, error) {
 	if m.indexOutdated() {
 		m.rebuildIndex()
 	}
 
-	searchResults, err := m.typeIndex.Search(searchRequest(query))
+	searchResults, err := index.Search(searchRequest(query))
 
 	if err != nil {
 		return nil, err
 	}
 
-	types := make([]string, 0)
+	results := make([]string, 0)
 
 	for _, hit := range searchResults.Hits {
-		types = append(types, hit.ID)
+		results = append(results, hit.ID)
 	}
 
-	return types, nil
+	return results, nil
 }
 
 // indexOutdated Returns whether or not the index is outdated and needs to be rebuilt
