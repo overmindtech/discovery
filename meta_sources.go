@@ -5,7 +5,10 @@ import (
 	"errors"
 
 	"github.com/blevesearch/bleve/v2"
-	"github.com/blevesearch/bleve/v2/analysis/analyzer/simple"
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/custom"
+	"github.com/blevesearch/bleve/v2/analysis/token/camelcase"
+	"github.com/blevesearch/bleve/v2/analysis/token/lowercase"
+	"github.com/blevesearch/bleve/v2/analysis/tokenizer/letter"
 	"github.com/overmindtech/sdp-go"
 )
 
@@ -14,10 +17,26 @@ const DefaultSearchResultsLimit = 5
 
 // NewMetaSource Creates a new meta source, including creation of the index
 func NewMetaSource(engine *Engine) (MetaSource, error) {
-	mapping := bleve.NewIndexMapping()
-	mapping.DefaultAnalyzer = simple.Name
-
 	var err error
+
+	mapping := bleve.NewIndexMapping()
+
+	err = mapping.AddCustomAnalyzer("custom", map[string]interface{}{
+		"type":         custom.Name,
+		"char_filters": []string{},
+		"tokenizer":    letter.Name,
+		"token_filters": []string{
+			camelcase.Name,
+			lowercase.Name,
+		},
+	})
+
+	if err != nil {
+		return MetaSource{}, err
+	}
+
+	mapping.DefaultAnalyzer = "custom"
+
 	var ms MetaSource
 
 	ms.Engine = engine
@@ -53,9 +72,10 @@ func searchRequest(query string) *bleve.SearchRequest {
 	// Fuzzy query, will only match longer strings but should be smarter than
 	// "starts with"
 	fuzzy := bleve.NewFuzzyQuery(query)
-	fuzzy.Fuzziness = 2
 
-	q := bleve.NewDisjunctionQuery(fuzzy, prefix)
+	match := bleve.NewMatchQuery(query)
+
+	q := bleve.NewDisjunctionQuery(fuzzy, prefix, match)
 	search := bleve.NewSearchRequest(q)
 
 	return search

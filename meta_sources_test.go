@@ -66,8 +66,8 @@ func TestMetaSourceSearchType(t *testing.T) {
 		}
 	})
 
-	t.Run("searching for 'loadbalancer' type", func(t *testing.T) {
-		types, err := s.SearchType("loadbalancer")
+	t.Run("searching for 'ip' type", func(t *testing.T) {
+		types, err := s.SearchType("ip")
 
 		if err != nil {
 			t.Fatal(err)
@@ -76,9 +76,17 @@ func TestMetaSourceSearchType(t *testing.T) {
 		if len(types) != 1 {
 			t.Fatalf("expected 1 types got %v", len(types))
 		}
+	})
 
-		if types[0] != "aws-elasticloadbalancer" {
-			t.Errorf("expected first resault to be aws-elasticloadbalancer, got %v", types[0])
+	t.Run("searching for 'elas' type", func(t *testing.T) {
+		types, err := s.SearchType("elas")
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if len(types) != 1 {
+			t.Fatalf("expected 1 types got %v", len(types))
 		}
 	})
 }
@@ -106,8 +114,8 @@ func TestMetaSourceSearchContext(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				if len(results) != 1 {
-					t.Fatalf("expected 1 results got %v", len(results))
+				if len(results) == 0 {
+					t.Fatalf("empty results")
 				}
 
 				if results[0] != "prodAccountInternetBanking" {
@@ -138,7 +146,6 @@ func TestMetaSourceSearchContext(t *testing.T) {
 			})
 		}
 	})
-
 }
 
 func newTestEngine() *Engine {
