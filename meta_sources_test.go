@@ -23,7 +23,7 @@ func TestMetaSourceSearchType(t *testing.T) {
 	}
 
 	t.Run("searching for 'instance' type", func(t *testing.T) {
-		types, err := s.SearchType("instance")
+		types, err := s.SearchField(Type, "instance")
 
 		if err != nil {
 			t.Fatal(err)
@@ -33,13 +33,13 @@ func TestMetaSourceSearchType(t *testing.T) {
 			t.Fatalf("expected 1 types got %v", len(types))
 		}
 
-		if types[0] != "aws-ec2instance" {
+		if types[0].Value != "aws-ec2instance" {
 			t.Errorf("expected first resault to be aws-ec2instance, got %v", types[0])
 		}
 	})
 
 	t.Run("searching for 'ec2' type", func(t *testing.T) {
-		types, err := s.SearchType("ec2")
+		types, err := s.SearchField(Type, "ec2")
 
 		if err != nil {
 			t.Fatal(err)
@@ -49,13 +49,13 @@ func TestMetaSourceSearchType(t *testing.T) {
 			t.Fatalf("expected 1 types got %v", len(types))
 		}
 
-		if types[0] != "aws-ec2instance" {
+		if types[0].Value != "aws-ec2instance" {
 			t.Errorf("expected first resault to be aws-ec2instance, got %v", types[0])
 		}
 	})
 
 	t.Run("searching for 'aws' type", func(t *testing.T) {
-		types, err := s.SearchType("aws")
+		types, err := s.SearchField(Type, "aws")
 
 		if err != nil {
 			t.Fatal(err)
@@ -67,7 +67,7 @@ func TestMetaSourceSearchType(t *testing.T) {
 	})
 
 	t.Run("searching for 'ip' type", func(t *testing.T) {
-		types, err := s.SearchType("ip")
+		types, err := s.SearchField(Type, "ip")
 
 		if err != nil {
 			t.Fatal(err)
@@ -79,7 +79,7 @@ func TestMetaSourceSearchType(t *testing.T) {
 	})
 
 	t.Run("searching for 'elas' type", func(t *testing.T) {
-		types, err := s.SearchType("elas")
+		types, err := s.SearchField(Type, "elas")
 
 		if err != nil {
 			t.Fatal(err)
@@ -108,7 +108,7 @@ func TestMetaSourceSearchContext(t *testing.T) {
 
 		for _, prefix := range prefixes {
 			t.Run(prefix, func(t *testing.T) {
-				results, err := s.SearchContext(prefix)
+				results, err := s.SearchField(Contexts, prefix)
 
 				if err != nil {
 					t.Fatal(err)
@@ -118,7 +118,7 @@ func TestMetaSourceSearchContext(t *testing.T) {
 					t.Fatalf("empty results")
 				}
 
-				if results[0] != "prodAccountInternetBanking" {
+				if results[0].Value != "prodAccountInternetBanking" {
 					t.Errorf("expected first resault to be prodAccountInternetBanking, got %v", results[0])
 				}
 			})
@@ -134,7 +134,7 @@ func TestMetaSourceSearchContext(t *testing.T) {
 
 		for _, word := range words {
 			t.Run(word, func(t *testing.T) {
-				results, err := s.SearchContext(word)
+				results, err := s.SearchField(Contexts, word)
 
 				if err != nil {
 					t.Fatal(err)

@@ -40,13 +40,8 @@ func NewMetaSource(engine *Engine) (MetaSource, error) {
 	var ms MetaSource
 
 	ms.Engine = engine
-	ms.contextIndex, err = bleve.NewMemOnly(mapping)
-
-	if err != nil {
-		return MetaSource{}, err
-	}
-
-	ms.typeIndex, err = bleve.NewMemOnly(mapping)
+	ms.indexedSources = make(map[string]Source)
+	ms.index, err = bleve.NewMemOnly(mapping)
 
 	if err != nil {
 		return MetaSource{}, err
@@ -59,13 +54,16 @@ type MetaSource struct {
 	// The engine to query sources from
 	Engine *Engine
 
-	typeIndex    bleve.Index
-	contextIndex bleve.Index
+	// The actual Bleve index
+	index bleve.Index
+
+	// A map of all sources that have been indexed by their index ID
+	indexedSources map[string]Source
 
 	numSourcesIndexed int // Number of sources that have been indexed
 }
 
-func searchRequest(query string) *bleve.SearchRequest {
+func searchRequest(query string, field Field) *bleve.SearchRequest {
 	// Simple "starts with"
 	prefix := bleve.NewPrefixQuery(query)
 
@@ -78,40 +76,114 @@ func searchRequest(query string) *bleve.SearchRequest {
 
 	q := bleve.NewDisjunctionQuery(fuzzy, prefix, match)
 	search := bleve.NewSearchRequest(q)
+	search.IncludeLocations = true
+	search.Fields = []string{string(field)}
 
 	return search
 }
 
-// SearchType Searches for available types based on the sources that the engine
-// has, returns a list of results
-func (m *MetaSource) SearchType(query string) ([]string, error) {
-	return m.searchIndex(m.typeIndex, query)
+type Field string
+
+const (
+	Type     Field = "Type"
+	Contexts Field = "Contexts"
+)
+
+type SearchResult struct {
+	Value          string
+	RelatedSources []Source
 }
 
-// SearchContext Searches for available contexts based on the sources that the
-// engine has, returns a list of results
-func (m *MetaSource) SearchContext(query string) ([]string, error) {
-	return m.searchIndex(m.contextIndex, query)
-}
-
-func (m *MetaSource) searchIndex(index bleve.Index, query string) ([]string, error) {
+// SearchField Searaches the sources index by a particlar field (Type or
+// Context) and returns a list of results. Each result contains the value and a
+// list of sources that this is related to
+func (m *MetaSource) SearchField(field Field, query string) ([]SearchResult, error) {
 	if m.indexOutdated() {
 		m.rebuildIndex()
 	}
 
-	searchResults, err := index.Search(searchRequest(query))
+	searchResults, err := m.index.Search(searchRequest(query, field))
 
 	if err != nil {
 		return nil, err
 	}
 
-	results := make([]string, 0)
-
-	for _, hit := range searchResults.Hits {
-		results = append(results, hit.ID)
+	type interimResult struct {
+		Value          string
+		RelatedSources map[string]Source // Map to ensure uniqueness
 	}
 
-	return results, nil
+	// Map of the actual found value to the full result
+	results := make(map[string]interimResult)
+
+	// I'm not proud of this. But the data format that is returned from Bleve is
+	// pretty complex and this is the best way I could think of to get the data
+	// out. Stepping through this with a debuggers is recommended
+	for _, hit := range searchResults.Hits {
+		// Extract which thing (type or context) that the result is relevant to
+		for fieldName, locationMap := range hit.Locations {
+			if fieldName != string(field) {
+				// Ignore fields other than the one we care about
+				continue
+			}
+
+			for _, locations := range locationMap {
+				for _, location := range locations {
+					if len(location.ArrayPositions) == 0 {
+						// This means it wasn't an array
+						value := hit.Fields[fieldName].(string)
+						relatedSource := m.indexedSources[hit.ID]
+
+						if result, ok := results[value]; ok {
+							result.RelatedSources[relatedSource.Name()] = relatedSource
+						} else {
+							results[value] = interimResult{
+								Value: value,
+								RelatedSources: map[string]Source{
+									relatedSource.Name(): relatedSource,
+								},
+							}
+						}
+					} else {
+						for _, position := range location.ArrayPositions {
+							if relevantSlice, ok := hit.Fields[fieldName].([]interface{}); ok {
+								value := relevantSlice[position].(string)
+								relatedSource := m.indexedSources[hit.ID]
+
+								if result, ok := results[value]; ok {
+									result.RelatedSources[relatedSource.Name()] = relatedSource
+								} else {
+									results[value] = interimResult{
+										Value: value,
+										RelatedSources: map[string]Source{
+											relatedSource.Name(): relatedSource,
+										},
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	finalResults := make([]SearchResult, 0)
+
+	for _, res := range results {
+		sources := make([]Source, 0)
+
+		for _, source := range res.RelatedSources {
+			sources = append(sources, source)
+		}
+
+		finalResults = append(finalResults, SearchResult{
+			Value:          res.Value,
+			RelatedSources: sources,
+		})
+	}
+
+	return finalResults, nil
 }
 
 // indexOutdated Returns whether or not the index is outdated and needs to be rebuilt
@@ -123,6 +195,12 @@ func (m *MetaSource) indexOutdated() bool {
 	}
 
 	return l != m.numSourcesIndexed
+}
+
+type SourceDetails struct {
+	Type     string
+	Contexts []string
+	Name     string
 }
 
 // rebuildIndex Reindexes all sources. Since sources can't be deleted we aren't
@@ -137,19 +215,17 @@ func (m *MetaSource) rebuildIndex() error {
 	sources := m.Engine.Sources()
 
 	for _, src := range sources {
-		err = m.typeIndex.Index(src.Type(), src.Type())
+		err = m.index.Index(src.Name(), SourceDetails{
+			Type:     src.Type(),
+			Name:     src.Name(),
+			Contexts: src.Contexts(),
+		})
 
 		if err != nil {
 			return err
 		}
 
-		for _, c := range src.Contexts() {
-			err = m.contextIndex.Index(c, c)
-
-			if err != nil {
-				return err
-			}
-		}
+		m.indexedSources[src.Name()] = src
 	}
 
 	m.numSourcesIndexed = len(sources)
