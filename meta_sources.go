@@ -73,6 +73,7 @@ func searchRequest(query string) *bleve.SearchRequest {
 	// "starts with"
 	fuzzy := bleve.NewFuzzyQuery(query)
 
+	// Tokenize the input and search for those too
 	match := bleve.NewMatchQuery(query)
 
 	q := bleve.NewDisjunctionQuery(fuzzy, prefix, match)
@@ -154,12 +155,6 @@ func (m *MetaSource) rebuildIndex() error {
 	m.numSourcesIndexed = len(sources)
 
 	return nil
-}
-
-// SearchableData A stract that represents a source that is indexed for search
-type SearchableData struct {
-	Type    string `json:"type"`
-	Context string `json:"context"`
 }
 
 // SourcesSource A source which returns the details of all running sources as
