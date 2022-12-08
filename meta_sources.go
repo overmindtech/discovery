@@ -20,7 +20,7 @@ import (
 const DefaultSearchResultsLimit = 5
 
 // NewMetaSource Creates a new meta source, including creation of the index
-func NewMetaSource(engine *Engine) (*MetaSource, error) {
+func NewMetaSource(engine *Engine, mode Field) (*MetaSource, error) {
 	var err error
 
 	mapping := bleve.NewIndexMapping()
@@ -41,9 +41,20 @@ func NewMetaSource(engine *Engine) (*MetaSource, error) {
 
 	mapping.DefaultAnalyzer = "custom"
 
+	var itemType string
+
+	switch mode {
+	case Type:
+		itemType = "overmind-type"
+	case Contexts:
+		itemType = "overmind-context"
+	}
+
 	var ms MetaSource
 
 	ms.engine = engine
+	ms.itemType = itemType
+	ms.field = mode
 	ms.indexedSources = make(map[string]Source)
 	ms.index, err = bleve.NewMemOnly(mapping)
 
@@ -132,8 +143,8 @@ func (i interimResults) ToResults() []SearchResult {
 }
 
 type MetaSource struct {
-	Field    Field  // The field that we should search
-	ItemType string // The name of the types of items to returns
+	field    Field  // The field that we should search
+	itemType string // The name of the types of items to returns
 
 	// The engine to query sources from
 	engine *Engine
@@ -148,11 +159,11 @@ type MetaSource struct {
 }
 
 func (t *MetaSource) Type() string {
-	return t.ItemType
+	return t.itemType
 }
 
 func (t *MetaSource) Name() string {
-	return fmt.Sprintf("%v-metasource", t.ItemType)
+	return fmt.Sprintf("%v-metasource", t.itemType)
 }
 
 func (t *MetaSource) Get(ctx context.Context, itemContext string, query string) (*sdp.Item, error) {
@@ -163,7 +174,7 @@ func (t *MetaSource) Get(ctx context.Context, itemContext string, query string) 
 		}
 	}
 
-	results, err := t.SearchField(t.Field, query)
+	results, err := t.SearchField(t.field, query)
 
 	if err != nil {
 		return nil, sdp.NewItemRequestError(err)
@@ -187,7 +198,7 @@ func (t *MetaSource) Find(ctx context.Context, itemContext string) ([]*sdp.Item,
 		}
 	}
 
-	results := t.All(t.Field)
+	results := t.All(t.field)
 	items := make([]*sdp.Item, len(results))
 	var i int
 
@@ -210,7 +221,7 @@ func (t *MetaSource) Search(ctx context.Context, itemContext string, query strin
 		}
 	}
 
-	results, err := t.SearchField(t.Field, query)
+	results, err := t.SearchField(t.field, query)
 
 	if err != nil {
 		return nil, sdp.NewItemRequestError(err)
@@ -412,8 +423,6 @@ func resultToItem(result SearchResult, itemType string) *sdp.Item {
 	return &item
 }
 
-// TODO: Redo everything below this
-
 // SourcesSource A source which returns the details of all running sources as
 // items
 type SourcesSource struct {
@@ -423,17 +432,11 @@ type SourcesSource struct {
 }
 
 func (s *SourcesSource) Type() string {
-	return "overmind_source"
+	return "overmind-source"
 }
 
 func (s *SourcesSource) Name() string {
-	return "overmind-meta-source"
-}
-
-func (s *SourcesSource) Contexts() []string {
-	return []string{
-		"global",
-	}
+	return "overmind-source-metasource"
 }
 
 func (s *SourcesSource) Get(ctx context.Context, itemContext string, query string) (*sdp.Item, error) {

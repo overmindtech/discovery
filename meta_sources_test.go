@@ -17,7 +17,7 @@ func TestSourcesSource(t *testing.T) {
 }
 
 func TestMetaSourceSearchType(t *testing.T) {
-	s, err := NewMetaSource(newTestEngine())
+	s, err := NewMetaSource(newTestEngine(), Type)
 
 	if err != nil {
 		t.Fatal(err)
@@ -93,7 +93,7 @@ func TestMetaSourceSearchType(t *testing.T) {
 }
 
 func TestMetaSourceSearchContext(t *testing.T) {
-	s, err := NewMetaSource(newTestEngine())
+	s, err := NewMetaSource(newTestEngine(), Type)
 
 	if err != nil {
 		t.Fatal(err)
@@ -150,14 +150,11 @@ func TestMetaSourceSearchContext(t *testing.T) {
 }
 
 func TestTypeSource(t *testing.T) {
-	s, err := NewMetaSource(newTestEngine())
+	s, err := NewMetaSource(newTestEngine(), Type)
 
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	s.Field = Type
-	s.ItemType = "overmind-type"
 
 	//lint:ignore S1021 Using to check that it satisfies the interface at
 	//compile time
@@ -241,14 +238,11 @@ func TestTypeSource(t *testing.T) {
 }
 
 func TestContextSource(t *testing.T) {
-	s, err := NewMetaSource(newTestEngine())
+	s, err := NewMetaSource(newTestEngine(), Contexts)
 
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	s.Field = Contexts
-	s.ItemType = "overmind-context"
 
 	//lint:ignore S1021 Using to check that it satisfies the interface at
 	//compile time

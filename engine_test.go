@@ -565,7 +565,7 @@ func TestNatsAuth(t *testing.T) {
 		err := e.Start()
 
 		if err != nil {
-			t.Error(err)
+			t.Fatal(err)
 		}
 
 		if len(e.subscriptions) != 4 {

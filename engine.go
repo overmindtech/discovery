@@ -408,6 +408,38 @@ func (e *Engine) Start() error {
 	e.SetupThrottle()
 	e.SetupMaxRequestTimeout()
 
+	var typeSource Source
+	var contextSource Source
+	var sourceSource Source
+	var ms *MetaSource
+	var err error
+
+	// Add meta-sources so that we can respond to requests for `overmind-type`,
+	// `overmind-context` and `overmind-source` resources
+	typeSource, err = NewMetaSource(e, Type)
+
+	if err != nil {
+		return err
+	}
+
+	contextSource, err = NewMetaSource(e, Contexts)
+
+	if err != nil {
+		return err
+	}
+
+	ms, err = NewMetaSource(e, Type)
+
+	if err != nil {
+		return err
+	}
+
+	sourceSource = &SourcesSource{
+		MetaSource: *ms,
+	}
+
+	e.AddSources(typeSource, contextSource, sourceSource)
+
 	// Start purging cache
 	e.cache.StartPurger()
 
