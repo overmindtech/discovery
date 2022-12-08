@@ -39,7 +39,7 @@ func NewMetaSource(engine *Engine) (MetaSource, error) {
 
 	var ms MetaSource
 
-	ms.Engine = engine
+	ms.engine = engine
 	ms.indexedSources = make(map[string]Source)
 	ms.index, err = bleve.NewMemOnly(mapping)
 
@@ -52,7 +52,7 @@ func NewMetaSource(engine *Engine) (MetaSource, error) {
 
 type MetaSource struct {
 	// The engine to query sources from
-	Engine *Engine
+	engine *Engine
 
 	// The actual Bleve index
 	index bleve.Index
@@ -94,6 +94,13 @@ type SearchResult struct {
 	RelatedSources []Source
 }
 
+// interimResult Uses a mapt to ensure uniqueness, is eventually translated to
+// SearchResult
+type interimResult struct {
+	Value          string
+	RelatedSources map[string]Source // Map to ensure uniqueness
+}
+
 // SearchField Searaches the sources index by a particlar field (Type or
 // Context) and returns a list of results. Each result contains the value and a
 // list of sources that this is related to
@@ -106,11 +113,6 @@ func (m *MetaSource) SearchField(field Field, query string) ([]SearchResult, err
 
 	if err != nil {
 		return nil, err
-	}
-
-	type interimResult struct {
-		Value          string
-		RelatedSources map[string]Source // Map to ensure uniqueness
 	}
 
 	// Map of the actual found value to the full result
@@ -134,32 +136,14 @@ func (m *MetaSource) SearchField(field Field, query string) ([]SearchResult, err
 						value := hit.Fields[fieldName].(string)
 						relatedSource := m.indexedSources[hit.ID]
 
-						if result, ok := results[value]; ok {
-							result.RelatedSources[relatedSource.Name()] = relatedSource
-						} else {
-							results[value] = interimResult{
-								Value: value,
-								RelatedSources: map[string]Source{
-									relatedSource.Name(): relatedSource,
-								},
-							}
-						}
+						mergeInterminResult(results, value, relatedSource)
 					} else {
 						for _, position := range location.ArrayPositions {
 							if relevantSlice, ok := hit.Fields[fieldName].([]interface{}); ok {
 								value := relevantSlice[position].(string)
 								relatedSource := m.indexedSources[hit.ID]
 
-								if result, ok := results[value]; ok {
-									result.RelatedSources[relatedSource.Name()] = relatedSource
-								} else {
-									results[value] = interimResult{
-										Value: value,
-										RelatedSources: map[string]Source{
-											relatedSource.Name(): relatedSource,
-										},
-									}
-								}
+								mergeInterminResult(results, value, relatedSource)
 							}
 						}
 					}
@@ -186,12 +170,28 @@ func (m *MetaSource) SearchField(field Field, query string) ([]SearchResult, err
 	return finalResults, nil
 }
 
+// mergeInterminResult Merges a result into an existng map, avoiding duplication
+func mergeInterminResult(results map[string]interimResult, value string, relatedSource Source) {
+	if result, ok := results[value]; ok {
+		// Merge source into existing
+		result.RelatedSources[relatedSource.Name()] = relatedSource
+	} else {
+		// Create new
+		results[value] = interimResult{
+			Value: value,
+			RelatedSources: map[string]Source{
+				relatedSource.Name(): relatedSource,
+			},
+		}
+	}
+}
+
 // indexOutdated Returns whether or not the index is outdated and needs to be rebuilt
 func (m *MetaSource) indexOutdated() bool {
 	var l int
 
-	if m.Engine != nil {
-		l = len(m.Engine.Sources())
+	if m.engine != nil {
+		l = len(m.engine.Sources())
 	}
 
 	return l != m.numSourcesIndexed
@@ -206,13 +206,13 @@ type SourceDetails struct {
 // rebuildIndex Reindexes all sources. Since sources can't be deleted we aren't
 // handling that use case
 func (m *MetaSource) rebuildIndex() error {
-	if m.Engine == nil {
+	if m.engine == nil {
 		return errors.New("no engine specified, cannot index sources")
 	}
 
 	var err error
 
-	sources := m.Engine.Sources()
+	sources := m.engine.Sources()
 
 	for _, src := range sources {
 		err = m.index.Index(src.Name(), SourceDetails{
@@ -256,14 +256,14 @@ func (s *SourcesSource) Contexts() []string {
 }
 
 func (s *SourcesSource) Get(ctx context.Context, itemContext string, query string) (*sdp.Item, error) {
-	if s.Engine == nil {
+	if s.engine == nil {
 		return nil, &sdp.ItemRequestError{
 			ErrorType:   sdp.ItemRequestError_OTHER,
 			ErrorString: "engine not set",
 		}
 	}
 
-	for _, src := range s.Engine.Sources() {
+	for _, src := range s.engine.Sources() {
 		if src.Name() == query {
 			return s.sourceToItem(src)
 		}
@@ -275,14 +275,14 @@ func (s *SourcesSource) Get(ctx context.Context, itemContext string, query strin
 }
 
 func (s *SourcesSource) Find(ctx context.Context, itemContext string) ([]*sdp.Item, error) {
-	if s.Engine == nil {
+	if s.engine == nil {
 		return nil, &sdp.ItemRequestError{
 			ErrorType:   sdp.ItemRequestError_OTHER,
 			ErrorString: "engine not set",
 		}
 	}
 
-	sources := s.Engine.Sources()
+	sources := s.engine.Sources()
 	items := make([]*sdp.Item, len(sources))
 
 	var item *sdp.Item
