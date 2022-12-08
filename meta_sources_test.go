@@ -240,6 +240,97 @@ func TestTypeSource(t *testing.T) {
 	})
 }
 
+func TestContextSource(t *testing.T) {
+	s, err := NewMetaSource(newTestEngine())
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s.Field = Contexts
+	s.ItemType = "overmind-context"
+
+	//lint:ignore S1021 Using to check that it satisfies the interface at
+	//compile time
+	var source Source
+
+	source = s
+
+	if source.Type() == "" {
+		t.Error("empty name")
+	}
+
+	t.Run("Get", func(t *testing.T) {
+		t.Run("good context", func(t *testing.T) {
+			item, err := s.Get(context.Background(), "global", "some-other-context")
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if item.UniqueAttributeValue() != "some-other-context" {
+				t.Errorf("expected item to be some-other-context, got %v", item.UniqueAttributeValue())
+			}
+		})
+
+		t.Run("bad context", func(t *testing.T) {
+			_, err := s.Get(context.Background(), "global", "aws-ec2")
+
+			if err == nil {
+				t.Error("expected error")
+			}
+		})
+	})
+
+	t.Run("Find", func(t *testing.T) {
+		t.Run("good context", func(t *testing.T) {
+			items, err := s.Find(context.Background(), "global")
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if len(items) == 0 {
+				t.Error("no contexts")
+			}
+		})
+
+		t.Run("bad context", func(t *testing.T) {
+			_, err := s.Find(context.Background(), "bad")
+
+			if err == nil {
+				t.Error("expected error")
+			}
+		})
+	})
+
+	t.Run("Search", func(t *testing.T) {
+		t.Run("good context", func(t *testing.T) {
+			items, err := s.Search(context.Background(), "global", "AccountInternetBanking")
+
+			if err != nil {
+				t.Error(err)
+			}
+
+			if len(items) != 2 {
+				t.Errorf("expected 2 items, got %v", len(items))
+			}
+		})
+
+		t.Run("bad context", func(t *testing.T) {
+			items, err := s.Search(context.Background(), "global", "somethingElse")
+
+			if err != nil {
+				t.Error(err)
+			}
+
+			if len(items) != 0 {
+				t.Errorf("expected no items, got %v", len(items))
+			}
+		})
+	})
+}
+
 func newTestEngine() *Engine {
 	e := Engine{
 		Name: "test",
