@@ -150,14 +150,23 @@ func TestMetaSourceSearchContext(t *testing.T) {
 }
 
 func TestTypeSource(t *testing.T) {
-	s, err := NewTypeSource(newTestEngine())
+	s, err := NewMetaSource(newTestEngine())
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, ok := interface{}(s).(Source); !ok {
-		t.Error("TypeSource does not satisfy Source interface")
+	s.Field = Type
+	s.ItemType = "overmind-type"
+
+	//lint:ignore S1021 Using to check that it satisfies the interface at
+	//compile time
+	var source Source
+
+	source = s
+
+	if source.Type() == "" {
+		t.Error("empty name")
 	}
 
 	t.Run("Get", func(t *testing.T) {
