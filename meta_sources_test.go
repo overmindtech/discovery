@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"context"
 	"testing"
 )
 
@@ -145,6 +146,88 @@ func TestMetaSourceSearchContext(t *testing.T) {
 				}
 			})
 		}
+	})
+}
+
+func TestTypeSource(t *testing.T) {
+	s, err := NewTypeSource(newTestEngine())
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok := interface{}(s).(Source); !ok {
+		t.Error("TypeSource does not satisfy Source interface")
+	}
+
+	t.Run("Get", func(t *testing.T) {
+		t.Run("good type", func(t *testing.T) {
+			item, err := s.Get(context.Background(), "global", "aws-ec2instance")
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if item.UniqueAttributeValue() != "aws-ec2instance" {
+				t.Errorf("expected item to be aws-ec2instance, got %v", item.UniqueAttributeValue())
+			}
+		})
+
+		t.Run("bad type", func(t *testing.T) {
+			_, err := s.Get(context.Background(), "global", "aws-ec2")
+
+			if err == nil {
+				t.Error("expected error")
+			}
+		})
+	})
+
+	t.Run("Find", func(t *testing.T) {
+		t.Run("good context", func(t *testing.T) {
+			items, err := s.Find(context.Background(), "global")
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if len(s.engine.Sources()) != len(items) {
+				t.Errorf("expected %v sources, got %v", len(s.engine.Sources()), len(items))
+			}
+		})
+
+		t.Run("bad context", func(t *testing.T) {
+			_, err := s.Find(context.Background(), "bad")
+
+			if err == nil {
+				t.Error("expected error")
+			}
+		})
+	})
+
+	t.Run("Search", func(t *testing.T) {
+		t.Run("good type", func(t *testing.T) {
+			items, err := s.Search(context.Background(), "global", "aws")
+
+			if err != nil {
+				t.Error(err)
+			}
+
+			if len(items) == 0 {
+				t.Error("no items found")
+			}
+		})
+
+		t.Run("bad type", func(t *testing.T) {
+			items, err := s.Search(context.Background(), "global", "somethingElse")
+
+			if err != nil {
+				t.Error(err)
+			}
+
+			if len(items) != 0 {
+				t.Errorf("expected no items, got %v", len(items))
+			}
+		})
 	})
 }
 
