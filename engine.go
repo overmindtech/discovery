@@ -422,7 +422,7 @@ func (e *Engine) Start() error {
 		return err
 	}
 
-	contextSource, err = NewMetaSource(e, Contexts)
+	contextSource, err = NewMetaSource(e, Context)
 
 	if err != nil {
 		return err

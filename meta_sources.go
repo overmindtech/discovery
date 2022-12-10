@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/blevesearch/bleve/v2"
@@ -16,7 +15,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-// Default number of results to retuns for a search
+// Default number of results to returns for a search
 const DefaultSearchResultsLimit = 5
 
 // NewMetaSource Creates a new meta source, including creation of the index
@@ -46,7 +45,7 @@ func NewMetaSource(engine *Engine, mode Field) (*MetaSource, error) {
 	switch mode {
 	case Type:
 		itemType = "overmind-type"
-	case Contexts:
+	case Context:
 		itemType = "overmind-context"
 	}
 
@@ -55,8 +54,15 @@ func NewMetaSource(engine *Engine, mode Field) (*MetaSource, error) {
 	ms.engine = engine
 	ms.itemType = itemType
 	ms.field = mode
-	ms.indexedSources = make(map[string]Source)
-	ms.index, err = bleve.NewMemOnly(mapping)
+	ms.contextMap = make(map[string][]Source)
+	ms.typeMap = make(map[string][]Source)
+	ms.contextIndex, err = bleve.NewMemOnly(mapping)
+
+	if err != nil {
+		return nil, err
+	}
+
+	ms.typeIndex, err = bleve.NewMemOnly(mapping)
 
 	if err != nil {
 		return nil, err
@@ -78,8 +84,6 @@ func searchRequest(query string, field Field) *bleve.SearchRequest {
 
 	q := bleve.NewDisjunctionQuery(fuzzy, prefix, match)
 	search := bleve.NewSearchRequest(q)
-	search.IncludeLocations = true
-	search.Fields = []string{string(field)}
 
 	return search
 }
@@ -87,59 +91,14 @@ func searchRequest(query string, field Field) *bleve.SearchRequest {
 type Field string
 
 const (
-	Type     Field = "Type"
-	Contexts Field = "Contexts"
+	// TODO: remember the itoa thing
+	Type    Field = "Type"
+	Context Field = "Context"
 )
 
 type SearchResult struct {
 	Value          string
 	RelatedSources []Source
-}
-
-// interimResult Uses a mapt to ensure uniqueness, is eventually translated to
-// SearchResult
-type interimResult struct {
-	Value          string
-	RelatedSources map[string]Source // Map to ensure uniqueness
-	Score          float64
-}
-
-type interimResults map[string]interimResult
-
-// ToResults Converts interim results to final search results by removing maps
-// and sorting
-func (i interimResults) ToResults() []SearchResult {
-	finalResults := make([]SearchResult, 0)
-
-	// Convert to a slice for sorting
-	interimSlice := make([]interimResult, len(i))
-	var index int
-
-	for _, result := range i {
-		interimSlice[index] = result
-		index++
-	}
-
-	// Sort
-	sort.Slice(interimSlice, func(i, j int) bool {
-		// Sort in reverse, highest score first
-		return interimSlice[i].Score > interimSlice[j].Score
-	})
-
-	for _, res := range interimSlice {
-		sources := make([]Source, 0)
-
-		for _, source := range res.RelatedSources {
-			sources = append(sources, source)
-		}
-
-		finalResults = append(finalResults, SearchResult{
-			Value:          res.Value,
-			RelatedSources: sources,
-		})
-	}
-
-	return finalResults
 }
 
 type MetaSource struct {
@@ -149,11 +108,13 @@ type MetaSource struct {
 	// The engine to query sources from
 	engine *Engine
 
-	// The actual Bleve index
-	index bleve.Index
+	// The actual Bleve indexes
+	contextIndex bleve.Index
+	typeIndex    bleve.Index
 
-	// A map of all sources that have been indexed by their index ID
-	indexedSources map[string]Source
+	// Maps used for remembering which source a type or context was related to
+	contextMap map[string][]Source
+	typeMap    map[string][]Source
 
 	numSourcesIndexed int // Number of sources that have been indexed
 }
@@ -212,7 +173,7 @@ func (t *MetaSource) Find(ctx context.Context, itemContext string) ([]*sdp.Item,
 
 // Search Searches for a type by name, this accepts any search string and is
 // intended to be used as an autocomplete service, where a user starts typing
-// and we exectute a search with what they have typed so far.
+// and we execute a search with what they have typed so far.
 func (t *MetaSource) Search(ctx context.Context, itemContext string, query string) ([]*sdp.Item, error) {
 	if itemContext != "global" {
 		return nil, &sdp.ItemRequestError{
@@ -243,7 +204,7 @@ func (m *MetaSource) Contexts() []string {
 	return []string{"global"}
 }
 
-// Weight Default weight to satidy `Source` interface
+// Weight Default weight to satisfy `Source` interface
 func (m *MetaSource) Weight() int {
 	return 100
 }
@@ -254,33 +215,38 @@ func (m *MetaSource) DefaultCacheDuration() time.Duration {
 	return time.Second
 }
 
-// Hidden These resources shsould be hidden
+// Hidden These resources should be hidden
 func (m *MetaSource) Hidden() bool {
 	return true
 }
 
+// All Returns all results for that field
 func (m *MetaSource) All(field Field) []SearchResult {
 	if m.indexOutdated() {
 		m.rebuildIndex()
 	}
 
-	interim := make(interimResults)
+	results := make([]SearchResult, 0)
+	var relevantMap map[string][]Source
 
-	for _, src := range m.indexedSources {
-		switch field {
-		case Type:
-			mergeInterminResult(interim, src.Type(), src, 0)
-		case Contexts:
-			for _, context := range src.Contexts() {
-				mergeInterminResult(interim, context, src, 0)
-			}
-		}
+	switch field {
+	case Type:
+		relevantMap = m.typeMap
+	case Context:
+		relevantMap = m.contextMap
 	}
 
-	return interim.ToResults()
+	for name, sources := range relevantMap {
+		results = append(results, SearchResult{
+			Value:          name,
+			RelatedSources: sources,
+		})
+	}
+
+	return results
 }
 
-// SearchField Searaches the sources index by a particlar field (Type or
+// SearchField Searches the sources index by a particular field (Type or
 // Context) and returns a list of results. Each result contains the value and a
 // list of sources that this is related to
 func (m *MetaSource) SearchField(field Field, query string) ([]SearchResult, error) {
@@ -288,50 +254,46 @@ func (m *MetaSource) SearchField(field Field, query string) ([]SearchResult, err
 		m.rebuildIndex()
 	}
 
-	searchResults, err := m.index.Search(searchRequest(query, field))
+	var index bleve.Index
+
+	switch field {
+	case Type:
+		index = m.typeIndex
+	case Context:
+		index = m.contextIndex
+	default:
+		return nil, errors.New("unsupported field")
+	}
+
+	searchResults, err := index.Search(searchRequest(query, field))
 
 	if err != nil {
 		return nil, err
 	}
 
 	// Map of the actual found value to the full result
-	results := make(interimResults)
+	results := make([]SearchResult, 0)
+
+	var sourceMap map[string][]Source
 
 	// I'm not proud of this. But the data format that is returned from Bleve is
 	// pretty complex and this is the best way I could think of to get the data
 	// out. Stepping through this with a debuggers is recommended
 	for _, hit := range searchResults.Hits {
-		// Extract which thing (type or context) that the result is relevant to
-		for fieldName, locationMap := range hit.Locations {
-			if fieldName != string(field) {
-				// Ignore fields other than the one we care about
-				continue
-			}
-
-			for _, locations := range locationMap {
-				for _, location := range locations {
-					if len(location.ArrayPositions) == 0 {
-						// This means it wasn't an array
-						value := hit.Fields[fieldName].(string)
-						relatedSource := m.indexedSources[hit.ID]
-
-						mergeInterminResult(results, value, relatedSource, hit.Score)
-					} else {
-						for _, position := range location.ArrayPositions {
-							if relevantSlice, ok := hit.Fields[fieldName].([]interface{}); ok {
-								value := relevantSlice[position].(string)
-								relatedSource := m.indexedSources[hit.ID]
-
-								mergeInterminResult(results, value, relatedSource, hit.Score)
-							}
-						}
-					}
-				}
-			}
+		switch field {
+		case Type:
+			sourceMap = m.typeMap
+		case Context:
+			sourceMap = m.contextMap
 		}
+
+		results = append(results, SearchResult{
+			Value:          hit.ID,
+			RelatedSources: sourceMap[hit.ID],
+		})
 	}
 
-	return results.ToResults(), nil
+	return results, nil
 }
 
 // rebuildIndex Reindexes all sources. Since sources can't be deleted we aren't
@@ -346,17 +308,19 @@ func (m *MetaSource) rebuildIndex() error {
 	sources := m.engine.Sources()
 
 	for _, src := range sources {
-		err = m.index.Index(src.Name(), SourceDetails{
-			Type:     src.Type(),
-			Name:     src.Name(),
-			Contexts: src.Contexts(),
-		})
+		err = m.indexField(Type, src.Type(), src)
 
 		if err != nil {
 			return err
 		}
 
-		m.indexedSources[src.Name()] = src
+		for _, contextName := range src.Contexts() {
+			err = m.indexField(Context, contextName, src)
+
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	m.numSourcesIndexed = len(sources)
@@ -364,21 +328,37 @@ func (m *MetaSource) rebuildIndex() error {
 	return nil
 }
 
-// mergeInterminResult Merges a result into an existng map, avoiding duplication
-func mergeInterminResult(results interimResults, value string, relatedSource Source, score float64) {
-	if result, ok := results[value]; ok {
-		// Merge source into existing
-		result.RelatedSources[relatedSource.Name()] = relatedSource
-	} else {
-		// Create new
-		results[value] = interimResult{
-			Value: value,
-			Score: score,
-			RelatedSources: map[string]Source{
-				relatedSource.Name(): relatedSource,
-			},
-		}
+// indexField Indexes a given field. The user should pass the field you want ot
+// index, its value, and the source that it is related to
+func (m *MetaSource) indexField(field Field, value string, src Source) error {
+	var index bleve.Index
+	var srcMap map[string][]Source
+	var err error
+
+	switch field {
+	case Type:
+		index = m.typeIndex
+		srcMap = m.typeMap
+	case Context:
+		index = m.contextIndex
+		srcMap = m.contextMap
+	default:
+		return fmt.Errorf("type %v cannot be indexed", field)
 	}
+
+	err = index.Index(value, value)
+
+	if err != nil {
+		return err
+	}
+
+	if _, exists := srcMap[value]; !exists {
+		srcMap[value] = make([]Source, 0)
+	}
+
+	srcMap[value] = append(srcMap[value], src)
+
+	return nil
 }
 
 // indexOutdated Returns whether or not the index is outdated and needs to be rebuilt
@@ -390,12 +370,6 @@ func (m *MetaSource) indexOutdated() bool {
 	}
 
 	return l != m.numSourcesIndexed
-}
-
-type SourceDetails struct {
-	Type     string
-	Contexts []string
-	Name     string
 }
 
 func resultToItem(result SearchResult, itemType string) *sdp.Item {

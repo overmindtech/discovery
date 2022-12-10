@@ -35,7 +35,7 @@ func TestMetaSourceSearchType(t *testing.T) {
 		}
 
 		if types[0].Value != "aws-ec2instance" {
-			t.Errorf("expected first resault to be aws-ec2instance, got %v", types[0])
+			t.Errorf("expected first result to be aws-ec2instance, got %v", types[0])
 		}
 	})
 
@@ -51,7 +51,7 @@ func TestMetaSourceSearchType(t *testing.T) {
 		}
 
 		if types[0].Value != "aws-ec2instance" {
-			t.Errorf("expected first resault to be aws-ec2instance, got %v", types[0])
+			t.Errorf("expected first result to be aws-ec2instance, got %v", types[0])
 		}
 	})
 
@@ -109,7 +109,7 @@ func TestMetaSourceSearchContext(t *testing.T) {
 
 		for _, prefix := range prefixes {
 			t.Run(prefix, func(t *testing.T) {
-				results, err := s.SearchField(Contexts, prefix)
+				results, err := s.SearchField(Context, prefix)
 
 				if err != nil {
 					t.Fatal(err)
@@ -120,7 +120,7 @@ func TestMetaSourceSearchContext(t *testing.T) {
 				}
 
 				if results[0].Value != "prodAccountInternetBanking" {
-					t.Errorf("expected first resault to be prodAccountInternetBanking, got %v", results[0])
+					t.Errorf("expected first result to be prodAccountInternetBanking, got %v", results[0])
 				}
 			})
 		}
@@ -135,7 +135,7 @@ func TestMetaSourceSearchContext(t *testing.T) {
 
 		for _, word := range words {
 			t.Run(word, func(t *testing.T) {
-				results, err := s.SearchField(Contexts, word)
+				results, err := s.SearchField(Context, word)
 
 				if err != nil {
 					t.Fatal(err)
@@ -238,7 +238,7 @@ func TestTypeSource(t *testing.T) {
 }
 
 func TestContextSource(t *testing.T) {
-	s, err := NewMetaSource(newTestEngine(), Contexts)
+	s, err := NewMetaSource(newTestEngine(), Context)
 
 	if err != nil {
 		t.Fatal(err)
