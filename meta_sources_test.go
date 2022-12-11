@@ -37,6 +37,10 @@ func TestMetaSourceSearchType(t *testing.T) {
 		if types[0].Value != "aws-ec2instance" {
 			t.Errorf("expected first result to be aws-ec2instance, got %v", types[0])
 		}
+
+		if types[0].Score == 0 {
+			t.Error("expected non-zero score")
+		}
 	})
 
 	t.Run("searching for 'ec2' type", func(t *testing.T) {

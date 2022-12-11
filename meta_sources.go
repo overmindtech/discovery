@@ -97,8 +97,9 @@ const (
 )
 
 type SearchResult struct {
-	Value          string
-	RelatedSources []Source
+	Value          string   // The search result
+	RelatedSources []Source // Sources related to this result
+	Score          float64  // How confident the searcher is,higher score means higher confidence
 }
 
 type MetaSource struct {
@@ -240,6 +241,7 @@ func (m *MetaSource) All(field Field) []SearchResult {
 		results = append(results, SearchResult{
 			Value:          name,
 			RelatedSources: sources,
+			Score:          100,
 		})
 	}
 
@@ -290,6 +292,7 @@ func (m *MetaSource) SearchField(field Field, query string) ([]SearchResult, err
 		results = append(results, SearchResult{
 			Value:          hit.ID,
 			RelatedSources: sourceMap[hit.ID],
+			Score:          hit.Score,
 		})
 	}
 
@@ -380,7 +383,8 @@ func resultToItem(result SearchResult, itemType string) *sdp.Item {
 		Attributes: &sdp.ItemAttributes{
 			AttrStruct: &structpb.Struct{
 				Fields: map[string]*structpb.Value{
-					"name": structpb.NewStringValue(result.Value),
+					"name":  structpb.NewStringValue(result.Value),
+					"score": structpb.NewNumberValue(result.Score),
 				},
 			},
 		},
