@@ -54,6 +54,39 @@ var trigger = Trigger{
 
 When the above trigger fires it will result in the engine that it is assigned to processing a SEARCH request as defined above. Note that while only the `Type`, `Method` and `Query` attributes have been specified, the rest will be filled in automatically with data from the `Metadata.SourceRequest` of the originating item to ensure that the responses are sent to the user that originated the request.
 
+## Default Sources
+
+### `overmind-source`
+
+This source returns information about other sources as SDP items. Can be used to inventory what sources are available.
+
+Methods:
+
+* [x] `Get()`: Returns sources by their descriptive name
+* [x] `Find()`
+* [ ] `Search()`
+
+### `overmind-context`
+
+Returns available contexts as SDP items. This is intended to be used to improve UX in the GUI since users will be able to see what contexts are available.
+
+Methods:
+
+* [x] `Get()`: Returns contexts by their name
+* [x] `Find()`
+* [x] `Search()`: Search by any string. Intended to be used by autocomplete in the GUI and therefore places extra weight on prefixes however will also perform free-text and fuzzy matching too
+
+### `overmind-type`
+
+Returns available types as SDP items. This is intended to be used to improve UX in the GUI since users will be able to see what types are available.
+
+Methods:
+
+* [x] `Get()`: Returns contexts by their name
+* [x] `Find()`
+* [x] `Search()`: Search by any string. Intended to be used by autocomplete in the GUI and therefore places extra weight on prefixes however will also perform free-text and fuzzy matching too
+
+
 ## Developing
 
 This repository is configured to us [VSCode devcontainers](https://code.visualstudio.com/docs/remote/containers). This means that if you don't want to install Go locally, you can do all of your development inside a container. You can also use Github codespaces to host these containers meaning that the only requirement is having VSCode installed. Use of this is optional but does have some benefits:

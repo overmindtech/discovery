@@ -63,8 +63,8 @@ type TestSource struct {
 	FindCalls      [][]string
 	SearchCalls    [][]string
 	IsHidden       bool
-	ReturnWeight   int
-	ReturnName     string
+	ReturnWeight   int    // Weight to be returned
+	ReturnName     string // The name of the source
 	mutex          sync.Mutex
 }
 

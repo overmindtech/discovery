@@ -61,7 +61,8 @@ type Engine struct {
 	subscriptions []*nats.Subscription
 
 	// Map of types to all sources for that type
-	sourceMap map[string][]Source
+	sourceMap      map[string][]Source
+	sourceMapMutex sync.RWMutex
 
 	// Storage for triggers
 	triggers      []*Trigger
@@ -75,6 +76,7 @@ type Engine struct {
 	trackedRequests      map[uuid.UUID]*RequestTracker
 	trackedRequestsMutex sync.RWMutex
 
+	// Prevents the engine being restarted many times in parallel
 	restartMutex sync.Mutex
 }
 
@@ -139,6 +141,9 @@ func (e *Engine) SetupMaxRequestTimeout() {
 
 // AddSources Adds a source to this engine
 func (e *Engine) AddSources(sources ...Source) {
+	e.sourceMapMutex.Lock()
+	defer e.sourceMapMutex.Unlock()
+
 	if e.sourceMap == nil {
 		e.sourceMap = make(map[string][]Source)
 	}
@@ -223,6 +228,9 @@ func (e *Engine) ManagedConnection() *nats.EncodedConn {
 
 // Sources Returns a slice of all known sources
 func (e *Engine) Sources() []Source {
+	e.sourceMapMutex.RLock()
+	defer e.sourceMapMutex.RUnlock()
+
 	sources := make([]Source, 0)
 
 	for _, typeSources := range e.sourceMap {
@@ -399,6 +407,38 @@ func (e *Engine) disconnect() error {
 func (e *Engine) Start() error {
 	e.SetupThrottle()
 	e.SetupMaxRequestTimeout()
+
+	var typeSource Source
+	var contextSource Source
+	var sourceSource Source
+	var ms *MetaSource
+	var err error
+
+	// Add meta-sources so that we can respond to requests for `overmind-type`,
+	// `overmind-context` and `overmind-source` resources
+	typeSource, err = NewMetaSource(e, Type)
+
+	if err != nil {
+		return err
+	}
+
+	contextSource, err = NewMetaSource(e, Context)
+
+	if err != nil {
+		return err
+	}
+
+	ms, err = NewMetaSource(e, Type)
+
+	if err != nil {
+		return err
+	}
+
+	sourceSource = &SourcesSource{
+		MetaSource: *ms,
+	}
+
+	e.AddSources(typeSource, contextSource, sourceSource)
 
 	// Start purging cache
 	e.cache.StartPurger()
