@@ -18,14 +18,14 @@ import (
 
 func TestDeleteItemRequest(t *testing.T) {
 	one := &sdp.ItemRequest{
-		Context: "one",
-		Method:  sdp.RequestMethod_FIND,
-		Query:   "",
+		Scope:  "one",
+		Method: sdp.RequestMethod_LIST,
+		Query:  "",
 	}
 	two := &sdp.ItemRequest{
-		Context: "two",
-		Method:  sdp.RequestMethod_SEARCH,
-		Query:   "2",
+		Scope:  "two",
+		Method: sdp.RequestMethod_SEARCH,
+		Query:  "2",
 	}
 	irs := []*sdp.ItemRequest{
 		one,
@@ -53,7 +53,7 @@ func TestTrackRequest(t *testing.T) {
 			Engine: &e,
 			Request: &sdp.ItemRequest{
 				Type:      "person",
-				Method:    sdp.RequestMethod_FIND,
+				Method:    sdp.RequestMethod_LIST,
 				LinkDepth: 10,
 				UUID:      u[:],
 			},
@@ -169,7 +169,7 @@ func TestNats(t *testing.T) {
 	e.AddSources(
 		&src,
 		&TestSource{
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				sdp.WILDCARD,
 			},
 		},
@@ -198,7 +198,7 @@ func TestNats(t *testing.T) {
 			Method:          sdp.RequestMethod_GET,
 			Query:           "basic",
 			LinkDepth:       0,
-			Context:         "test",
+			Scope:           "test",
 			ResponseSubject: NewResponseSubject(),
 			ItemSubject:     NewItemSubject(),
 		})
@@ -225,7 +225,7 @@ func TestNats(t *testing.T) {
 			Method:          sdp.RequestMethod_GET,
 			Query:           "deeplink",
 			LinkDepth:       10,
-			Context:         "test",
+			Scope:           "test",
 			ResponseSubject: NewResponseSubject(),
 			ItemSubject:     NewItemSubject(),
 		})
@@ -268,9 +268,9 @@ func TestNatsCancel(t *testing.T) {
 	}
 
 	src := SpeedTestSource{
-		QueryDelay:     250 * time.Millisecond,
-		ReturnType:     "person",
-		ReturnContexts: []string{"test"},
+		QueryDelay:   250 * time.Millisecond,
+		ReturnType:   "person",
+		ReturnScopes: []string{"test"},
 	}
 
 	e.AddSources(&src)
@@ -292,7 +292,7 @@ func TestNatsCancel(t *testing.T) {
 			Method:          sdp.RequestMethod_GET,
 			Query:           "foo",
 			LinkDepth:       100,
-			Context:         "*",
+			Scope:           "*",
 			ResponseSubject: nats.NewInbox(),
 			ItemSubject:     "items.bin",
 			UUID:            u[:],
@@ -555,7 +555,7 @@ func TestNatsAuth(t *testing.T) {
 	e.AddSources(
 		&src,
 		&TestSource{
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				sdp.WILDCARD,
 			},
 		},
@@ -584,7 +584,7 @@ func TestNatsAuth(t *testing.T) {
 			Method:          sdp.RequestMethod_GET,
 			Query:           "basic",
 			LinkDepth:       0,
-			Context:         "test",
+			Scope:           "test",
 			ResponseSubject: NewResponseSubject(),
 			ItemSubject:     NewItemSubject(),
 		}).Execute(e.natsConnection)
@@ -609,7 +609,7 @@ func TestNatsAuth(t *testing.T) {
 			Method:          sdp.RequestMethod_GET,
 			Query:           "deeplink",
 			LinkDepth:       10,
-			Context:         "test",
+			Scope:           "test",
 			ResponseSubject: NewResponseSubject(),
 			ItemSubject:     NewItemSubject(),
 		}).Execute(e.natsConnection)

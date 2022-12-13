@@ -45,8 +45,8 @@ func NewMetaSource(engine *Engine, mode Field) (*MetaSource, error) {
 	switch mode {
 	case Type:
 		itemType = "overmind-type"
-	case Context:
-		itemType = "overmind-context"
+	case Scope:
+		itemType = "overmind-scope"
 	}
 
 	var ms MetaSource
@@ -54,9 +54,9 @@ func NewMetaSource(engine *Engine, mode Field) (*MetaSource, error) {
 	ms.engine = engine
 	ms.itemType = itemType
 	ms.field = mode
-	ms.contextMap = make(map[string][]Source)
+	ms.scopeMap = make(map[string][]Source)
 	ms.typeMap = make(map[string][]Source)
-	ms.contextIndex, err = bleve.NewMemOnly(mapping)
+	ms.scopeIndex, err = bleve.NewMemOnly(mapping)
 
 	if err != nil {
 		return nil, err
@@ -92,8 +92,8 @@ type Field string
 
 const (
 	// TODO: remember the itoa thing
-	Type    Field = "Type"
-	Context Field = "Context"
+	Type  Field = "Type"
+	Scope Field = "Scope"
 )
 
 type SearchResult struct {
@@ -110,12 +110,12 @@ type MetaSource struct {
 	engine *Engine
 
 	// The actual Bleve indexes
-	contextIndex bleve.Index
-	typeIndex    bleve.Index
+	scopeIndex bleve.Index
+	typeIndex  bleve.Index
 
-	// Maps used for remembering which source a type or context was related to
-	contextMap map[string][]Source
-	typeMap    map[string][]Source
+	// Maps used for remembering which source a type or scope was related to
+	scopeMap map[string][]Source
+	typeMap  map[string][]Source
 
 	numSourcesIndexed int // Number of sources that have been indexed
 }
@@ -128,11 +128,11 @@ func (t *MetaSource) Name() string {
 	return fmt.Sprintf("%v-metasource", t.itemType)
 }
 
-func (t *MetaSource) Get(ctx context.Context, itemContext string, query string) (*sdp.Item, error) {
-	if itemContext != "global" {
+func (t *MetaSource) Get(ctx context.Context, scope string, query string) (*sdp.Item, error) {
+	if scope != "global" {
 		return nil, &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_NOCONTEXT,
-			ErrorString: fmt.Sprintf("%v only available in global context", t.Type()),
+			ErrorType:   sdp.ItemRequestError_NOSCOPE,
+			ErrorString: fmt.Sprintf("%v only available in global scope", t.Type()),
 		}
 	}
 
@@ -145,18 +145,18 @@ func (t *MetaSource) Get(ctx context.Context, itemContext string, query string) 
 	if len(results) == 0 || results[0].Value != query {
 		return nil, &sdp.ItemRequestError{
 			ErrorType:   sdp.ItemRequestError_NOTFOUND,
-			ErrorString: fmt.Sprintf("context %v not found", query),
+			ErrorString: fmt.Sprintf("scope %v not found", query),
 		}
 	}
 
 	return resultToItem(results[0], t.Type()), nil
 }
 
-func (t *MetaSource) Find(ctx context.Context, itemContext string) ([]*sdp.Item, error) {
-	if itemContext != "global" {
+func (t *MetaSource) List(ctx context.Context, scope string) ([]*sdp.Item, error) {
+	if scope != "global" {
 		return nil, &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_NOCONTEXT,
-			ErrorString: fmt.Sprintf("%v only available in global context", t.Type()),
+			ErrorType:   sdp.ItemRequestError_NOSCOPE,
+			ErrorString: fmt.Sprintf("%v only available in global scope", t.Type()),
 		}
 	}
 
@@ -175,11 +175,11 @@ func (t *MetaSource) Find(ctx context.Context, itemContext string) ([]*sdp.Item,
 // Search Searches for a type by name, this accepts any search string and is
 // intended to be used as an autocomplete service, where a user starts typing
 // and we execute a search with what they have typed so far.
-func (t *MetaSource) Search(ctx context.Context, itemContext string, query string) ([]*sdp.Item, error) {
-	if itemContext != "global" {
+func (t *MetaSource) Search(ctx context.Context, scope string, query string) ([]*sdp.Item, error) {
+	if scope != "global" {
 		return nil, &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_NOCONTEXT,
-			ErrorString: fmt.Sprintf("%v only available in global context", t.Type()),
+			ErrorType:   sdp.ItemRequestError_NOSCOPE,
+			ErrorString: fmt.Sprintf("%v only available in global scope", t.Type()),
 		}
 	}
 
@@ -200,8 +200,8 @@ func (t *MetaSource) Search(ctx context.Context, itemContext string, query strin
 	return items, nil
 }
 
-// Contexts Returns just global since all the Overmind types are global
-func (m *MetaSource) Contexts() []string {
+// Scopes Returns just global since all the Overmind types are global
+func (m *MetaSource) Scopes() []string {
 	return []string{"global"}
 }
 
@@ -233,8 +233,8 @@ func (m *MetaSource) All(field Field) []SearchResult {
 	switch field {
 	case Type:
 		relevantMap = m.typeMap
-	case Context:
-		relevantMap = m.contextMap
+	case Scope:
+		relevantMap = m.scopeMap
 	}
 
 	for name, sources := range relevantMap {
@@ -249,7 +249,7 @@ func (m *MetaSource) All(field Field) []SearchResult {
 }
 
 // SearchField Searches the sources index by a particular field (Type or
-// Context) and returns a list of results. Each result contains the value and a
+// Scope) and returns a list of results. Each result contains the value and a
 // list of sources that this is related to
 func (m *MetaSource) SearchField(field Field, query string) ([]SearchResult, error) {
 	if m.indexOutdated() {
@@ -261,8 +261,8 @@ func (m *MetaSource) SearchField(field Field, query string) ([]SearchResult, err
 	switch field {
 	case Type:
 		index = m.typeIndex
-	case Context:
-		index = m.contextIndex
+	case Scope:
+		index = m.scopeIndex
 	default:
 		return nil, errors.New("unsupported field")
 	}
@@ -285,8 +285,8 @@ func (m *MetaSource) SearchField(field Field, query string) ([]SearchResult, err
 		switch field {
 		case Type:
 			sourceMap = m.typeMap
-		case Context:
-			sourceMap = m.contextMap
+		case Scope:
+			sourceMap = m.scopeMap
 		}
 
 		results = append(results, SearchResult{
@@ -317,8 +317,8 @@ func (m *MetaSource) rebuildIndex() error {
 			return err
 		}
 
-		for _, contextName := range src.Contexts() {
-			err = m.indexField(Context, contextName, src)
+		for _, scopeName := range src.Scopes() {
+			err = m.indexField(Scope, scopeName, src)
 
 			if err != nil {
 				return err
@@ -342,9 +342,9 @@ func (m *MetaSource) indexField(field Field, value string, src Source) error {
 	case Type:
 		index = m.typeIndex
 		srcMap = m.typeMap
-	case Context:
-		index = m.contextIndex
-		srcMap = m.contextMap
+	case Scope:
+		index = m.scopeIndex
+		srcMap = m.scopeMap
 	default:
 		return fmt.Errorf("type %v cannot be indexed", field)
 	}
@@ -379,7 +379,7 @@ func resultToItem(result SearchResult, itemType string) *sdp.Item {
 	item := sdp.Item{
 		Type:            itemType,
 		UniqueAttribute: "name",
-		Context:         "global",
+		Scope:           "global",
 		Attributes: &sdp.ItemAttributes{
 			AttrStruct: &structpb.Struct{
 				Fields: map[string]*structpb.Value{
@@ -417,7 +417,7 @@ func (s *SourcesSource) Name() string {
 	return "overmind-source-metasource"
 }
 
-func (s *SourcesSource) Get(ctx context.Context, itemContext string, query string) (*sdp.Item, error) {
+func (s *SourcesSource) Get(ctx context.Context, scope string, query string) (*sdp.Item, error) {
 	if s.engine == nil {
 		return nil, &sdp.ItemRequestError{
 			ErrorType:   sdp.ItemRequestError_OTHER,
@@ -436,7 +436,7 @@ func (s *SourcesSource) Get(ctx context.Context, itemContext string, query strin
 	}
 }
 
-func (s *SourcesSource) Find(ctx context.Context, itemContext string) ([]*sdp.Item, error) {
+func (s *SourcesSource) List(ctx context.Context, scope string) ([]*sdp.Item, error) {
 	if s.engine == nil {
 		return nil, &sdp.ItemRequestError{
 			ErrorType:   sdp.ItemRequestError_OTHER,
@@ -475,7 +475,7 @@ func (s *SourcesSource) sourceToItem(src Source) (*sdp.Item, error) {
 	attrMap := make(map[string]interface{})
 
 	attrMap["name"] = src.Name()
-	attrMap["contexts"] = src.Contexts()
+	attrMap["scopes"] = src.Scopes()
 	attrMap["weight"] = src.Weight()
 
 	_, searchable := src.(SearchableSource)
@@ -507,7 +507,7 @@ func (s *SourcesSource) sourceToItem(src Source) (*sdp.Item, error) {
 	item := sdp.Item{
 		Type:            s.Type(),
 		UniqueAttribute: "name",
-		Context:         "global",
+		Scope:           "global",
 		Attributes:      attributes,
 	}
 

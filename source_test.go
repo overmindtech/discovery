@@ -15,35 +15,35 @@ func TestFilterSources(t *testing.T) {
 
 	e.AddSources(
 		&TestSource{
-			ReturnContexts: []string{"test"},
-			ReturnType:     "person",
+			ReturnScopes: []string{"test"},
+			ReturnType:   "person",
 		},
 		&TestSource{
-			ReturnContexts: []string{"test"},
-			ReturnType:     "fish",
+			ReturnScopes: []string{"test"},
+			ReturnType:   "fish",
 		},
 		&TestSource{
-			ReturnContexts: []string{sdp.WILDCARD},
-			ReturnType:     "person",
+			ReturnScopes: []string{sdp.WILDCARD},
+			ReturnType:   "person",
 		},
 		&TestSource{
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				"testA",
 				"testB",
 			},
 			ReturnType: "chair",
 		},
 		&TestSource{
-			ReturnContexts: []string{"test"},
-			ReturnType:     "hidden_person",
-			IsHidden:       true,
+			ReturnScopes: []string{"test"},
+			ReturnType:   "hidden_person",
+			IsHidden:     true,
 		},
 	)
 
-	t.Run("Right type wrong context", func(t *testing.T) {
+	t.Run("Right type wrong scope", func(t *testing.T) {
 		req := sdp.ItemRequest{
-			Type:    "person",
-			Context: "wrong",
+			Type:  "person",
+			Scope: "wrong",
 		}
 
 		ee := ExpectExpand{
@@ -54,10 +54,10 @@ func TestFilterSources(t *testing.T) {
 		ee.Validate(t, e.ExpandRequest(&req))
 	})
 
-	t.Run("Right context wrong type", func(t *testing.T) {
+	t.Run("Right scope wrong type", func(t *testing.T) {
 		req := sdp.ItemRequest{
-			Type:    "wrong",
-			Context: "test",
+			Type:  "wrong",
+			Scope: "test",
 		}
 
 		ee := ExpectExpand{
@@ -70,8 +70,8 @@ func TestFilterSources(t *testing.T) {
 
 	t.Run("Right both", func(t *testing.T) {
 		req := sdp.ItemRequest{
-			Type:    "person",
-			Context: "test",
+			Type:  "person",
+			Scope: "test",
 		}
 
 		ee := ExpectExpand{
@@ -82,10 +82,10 @@ func TestFilterSources(t *testing.T) {
 		ee.Validate(t, e.ExpandRequest(&req))
 	})
 
-	t.Run("Multi-context", func(t *testing.T) {
+	t.Run("Multi-scope", func(t *testing.T) {
 		req := sdp.ItemRequest{
-			Type:    "chair",
-			Context: "testB",
+			Type:  "chair",
+			Scope: "testB",
 		}
 
 		ee := ExpectExpand{
@@ -96,10 +96,10 @@ func TestFilterSources(t *testing.T) {
 		ee.Validate(t, e.ExpandRequest(&req))
 	})
 
-	t.Run("Wildcard context", func(t *testing.T) {
+	t.Run("Wildcard scope", func(t *testing.T) {
 		req := sdp.ItemRequest{
-			Type:    "person",
-			Context: sdp.WILDCARD,
+			Type:  "person",
+			Scope: sdp.WILDCARD,
 		}
 
 		ee := ExpectExpand{
@@ -110,8 +110,8 @@ func TestFilterSources(t *testing.T) {
 		ee.Validate(t, e.ExpandRequest(&req))
 
 		req = sdp.ItemRequest{
-			Type:    "chair",
-			Context: sdp.WILDCARD,
+			Type:  "chair",
+			Scope: sdp.WILDCARD,
 		}
 
 		ee = ExpectExpand{
@@ -124,8 +124,8 @@ func TestFilterSources(t *testing.T) {
 
 	t.Run("Wildcard type", func(t *testing.T) {
 		req := sdp.ItemRequest{
-			Type:    sdp.WILDCARD,
-			Context: "test",
+			Type:  sdp.WILDCARD,
+			Scope: "test",
 		}
 
 		ee := ExpectExpand{
@@ -138,8 +138,8 @@ func TestFilterSources(t *testing.T) {
 
 	t.Run("Wildcard both", func(t *testing.T) {
 		req := sdp.ItemRequest{
-			Type:    sdp.WILDCARD,
-			Context: sdp.WILDCARD,
+			Type:  sdp.WILDCARD,
+			Scope: sdp.WILDCARD,
 		}
 
 		ee := ExpectExpand{
@@ -150,18 +150,18 @@ func TestFilterSources(t *testing.T) {
 		ee.Validate(t, e.ExpandRequest(&req))
 	})
 
-	t.Run("Finding hidden source with wildcard context", func(t *testing.T) {
+	t.Run("Listing hidden source with wildcard scope", func(t *testing.T) {
 		req := sdp.ItemRequest{
-			Type:    "hidden_person",
-			Context: sdp.WILDCARD,
+			Type:  "hidden_person",
+			Scope: sdp.WILDCARD,
 		}
 		if x := len(e.ExpandRequest(&req)); x != 0 {
 			t.Errorf("expected to find 0 sources, found %v", x)
 		}
 
 		req = sdp.ItemRequest{
-			Type:    "hidden_person",
-			Context: "test",
+			Type:  "hidden_person",
+			Scope: "test",
 		}
 		if x := len(e.ExpandRequest(&req)); x != 1 {
 			t.Errorf("expected to find 1 sources, found %v", x)
@@ -218,7 +218,7 @@ func TestGet(t *testing.T) {
 
 	src := TestSource{
 		ReturnName: "orange",
-		ReturnContexts: []string{
+		ReturnScopes: []string{
 			"test",
 			"empty",
 		},
@@ -232,10 +232,10 @@ func TestGet(t *testing.T) {
 		})
 
 		e.ExecuteRequest(context.Background(), &sdp.ItemRequest{
-			Type:    "person",
-			Context: "test",
-			Query:   "three",
-			Method:  sdp.RequestMethod_GET,
+			Type:   "person",
+			Scope:  "test",
+			Query:  "three",
+			Method: sdp.RequestMethod_GET,
 		}, nil, nil)
 
 		if x := len(src.GetCalls); x != 1 {
@@ -255,10 +255,10 @@ func TestGet(t *testing.T) {
 		})
 
 		items, errs, err := e.ExecuteRequestSync(context.Background(), &sdp.ItemRequest{
-			Type:    "person",
-			Context: "empty",
-			Query:   "three",
-			Method:  sdp.RequestMethod_GET,
+			Type:   "person",
+			Scope:  "empty",
+			Query:  "three",
+			Method: sdp.RequestMethod_GET,
 		})
 
 		if err == nil {
@@ -272,8 +272,8 @@ func TestGet(t *testing.T) {
 			if errs[0].ErrorString != "not found (test)" {
 				t.Errorf("expected ErrorString to be %v, got %v", "", errs[0].ErrorString)
 			}
-			if errs[0].Context != "empty" {
-				t.Errorf("expected Context to be %v, got %v", "empty", errs[0].Context)
+			if errs[0].Scope != "empty" {
+				t.Errorf("expected Scope to be %v, got %v", "empty", errs[0].Scope)
 			}
 			if errs[0].SourceName != "testSource-orange" {
 				t.Errorf("expected SourceName to be %v, got %v", "testSource-orange", errs[0].SourceName)
@@ -306,10 +306,10 @@ func TestGet(t *testing.T) {
 		e.cache.MinWaitTime = (10 * time.Millisecond)
 		e.cache.StartPurger()
 		req := sdp.ItemRequest{
-			Type:    "person",
-			Context: "test",
-			Query:   "Dylan",
-			Method:  sdp.RequestMethod_GET,
+			Type:   "person",
+			Scope:  "test",
+			Query:  "Dylan",
+			Method: sdp.RequestMethod_GET,
 		}
 
 		finds1, _, err = e.ExecuteRequestSync(context.Background(), &req)
@@ -349,10 +349,10 @@ func TestGet(t *testing.T) {
 		})
 
 		req := sdp.ItemRequest{
-			Type:    "person",
-			Context: "empty",
-			Query:   "query",
-			Method:  sdp.RequestMethod_GET,
+			Type:   "person",
+			Scope:  "empty",
+			Query:  "query",
+			Method: sdp.RequestMethod_GET,
 		}
 
 		e.ExecuteRequestSync(context.Background(), &req)
@@ -372,10 +372,10 @@ func TestGet(t *testing.T) {
 
 		t.Run("Get", func(t *testing.T) {
 			item, _, err := e.ExecuteRequestSync(context.Background(), &sdp.ItemRequest{
-				Type:    "person",
-				Context: "test",
-				Query:   "three",
-				Method:  sdp.RequestMethod_GET,
+				Type:   "person",
+				Scope:  "test",
+				Query:  "three",
+				Method: sdp.RequestMethod_GET,
 			})
 
 			if err != nil {
@@ -387,11 +387,11 @@ func TestGet(t *testing.T) {
 			}
 		})
 
-		t.Run("Find", func(t *testing.T) {
+		t.Run("List", func(t *testing.T) {
 			items, _, err := e.ExecuteRequestSync(context.Background(), &sdp.ItemRequest{
-				Type:    "person",
-				Context: "test",
-				Method:  sdp.RequestMethod_FIND,
+				Type:   "person",
+				Scope:  "test",
+				Method: sdp.RequestMethod_LIST,
 			})
 
 			if err != nil {
@@ -405,10 +405,10 @@ func TestGet(t *testing.T) {
 
 		t.Run("Search", func(t *testing.T) {
 			items, _, err := e.ExecuteRequestSync(context.Background(), &sdp.ItemRequest{
-				Type:    "person",
-				Context: "test",
-				Query:   "three",
-				Method:  sdp.RequestMethod_SEARCH,
+				Type:   "person",
+				Scope:  "test",
+				Query:  "three",
+				Method: sdp.RequestMethod_SEARCH,
 			})
 
 			if err != nil {
@@ -422,7 +422,7 @@ func TestGet(t *testing.T) {
 	})
 }
 
-func TestFind(t *testing.T) {
+func TestList(t *testing.T) {
 	e := Engine{
 		Name: "testEngine",
 	}
@@ -432,16 +432,16 @@ func TestFind(t *testing.T) {
 	e.AddSources(&src)
 
 	e.ExecuteRequestSync(context.Background(), &sdp.ItemRequest{
-		Type:    "person",
-		Context: "test",
-		Method:  sdp.RequestMethod_FIND,
+		Type:   "person",
+		Scope:  "test",
+		Method: sdp.RequestMethod_LIST,
 	})
 
-	if x := len(src.FindCalls); x != 1 {
+	if x := len(src.ListCalls); x != 1 {
 		t.Fatalf("Expected 1 find call, got %v", x)
 	}
 
-	firstCall := src.FindCalls[0]
+	firstCall := src.ListCalls[0]
 
 	if firstCall[0] != "test" {
 		t.Fatalf("First find call parameters unexpected: %v", firstCall)
@@ -458,10 +458,10 @@ func TestSearch(t *testing.T) {
 	e.AddSources(&src)
 
 	e.ExecuteRequestSync(context.Background(), &sdp.ItemRequest{
-		Type:    "person",
-		Context: "test",
-		Query:   "query",
-		Method:  sdp.RequestMethod_SEARCH,
+		Type:   "person",
+		Scope:  "test",
+		Query:  "query",
+		Method: sdp.RequestMethod_SEARCH,
 	})
 
 	if x := len(src.SearchCalls); x != 1 {
@@ -475,13 +475,13 @@ func TestSearch(t *testing.T) {
 	}
 }
 
-func TestFindSearchCaching(t *testing.T) {
+func TestListSearchCaching(t *testing.T) {
 	e := Engine{
 		Name: "testEngine",
 	}
 
 	src := TestSource{
-		ReturnContexts: []string{
+		ReturnScopes: []string{
 			"test",
 			"empty",
 			"error",
@@ -502,9 +502,9 @@ func TestFindSearchCaching(t *testing.T) {
 		var finds3 []*sdp.Item
 		var err error
 		req := sdp.ItemRequest{
-			Type:    "person",
-			Context: "test",
-			Method:  sdp.RequestMethod_FIND,
+			Type:   "person",
+			Scope:  "test",
+			Method: sdp.RequestMethod_LIST,
 		}
 
 		finds1, _, err = e.ExecuteRequestSync(context.Background(), &req)
@@ -522,7 +522,7 @@ func TestFindSearchCaching(t *testing.T) {
 		}
 
 		if finds1[0].Metadata.Timestamp.String() != finds2[0].Metadata.Timestamp.String() {
-			t.Error("Find requests 10ms apart had different timestamps, caching not working")
+			t.Error("List requests 10ms apart had different timestamps, caching not working")
 		}
 
 		time.Sleep(200 * time.Millisecond)
@@ -534,7 +534,7 @@ func TestFindSearchCaching(t *testing.T) {
 		}
 
 		if finds2[0].Metadata.Timestamp.String() == finds3[0].Metadata.Timestamp.String() {
-			t.Error("Find requests 200ms apart had the same timestamps, cache not expiring")
+			t.Error("List requests 200ms apart had the same timestamps, cache not expiring")
 		}
 	})
 
@@ -545,9 +545,9 @@ func TestFindSearchCaching(t *testing.T) {
 
 		var err error
 		req := sdp.ItemRequest{
-			Type:    "person",
-			Context: "empty",
-			Method:  sdp.RequestMethod_FIND,
+			Type:   "person",
+			Scope:  "empty",
+			Method: sdp.RequestMethod_LIST,
 		}
 
 		_, _, err = e.ExecuteRequestSync(context.Background(), &req)
@@ -564,7 +564,7 @@ func TestFindSearchCaching(t *testing.T) {
 			t.Error("expected error but got nil")
 		}
 
-		if l := len(src.FindCalls); l != 1 {
+		if l := len(src.ListCalls); l != 1 {
 			t.Errorf("Exected only 1 find call, got %v, cache not working", l)
 		}
 
@@ -576,7 +576,7 @@ func TestFindSearchCaching(t *testing.T) {
 			t.Error("expected error but got nil")
 		}
 
-		if l := len(src.FindCalls); l != 2 {
+		if l := len(src.ListCalls); l != 2 {
 			t.Errorf("Exected 2 find calls, got %v, cache not clearing", l)
 		}
 	})
@@ -591,10 +591,10 @@ func TestFindSearchCaching(t *testing.T) {
 		var finds3 []*sdp.Item
 		var err error
 		req := sdp.ItemRequest{
-			Type:    "person",
-			Context: "test",
-			Query:   "query",
-			Method:  sdp.RequestMethod_SEARCH,
+			Type:   "person",
+			Scope:  "test",
+			Query:  "query",
+			Method: sdp.RequestMethod_SEARCH,
 		}
 
 		finds1, _, err = e.ExecuteRequestSync(context.Background(), &req)
@@ -612,7 +612,7 @@ func TestFindSearchCaching(t *testing.T) {
 		}
 
 		if finds1[0].Metadata.Timestamp.String() != finds2[0].Metadata.Timestamp.String() {
-			t.Error("Find requests 10ms apart had different timestamps, caching not working")
+			t.Error("List requests 10ms apart had different timestamps, caching not working")
 		}
 
 		time.Sleep(200 * time.Millisecond)
@@ -624,7 +624,7 @@ func TestFindSearchCaching(t *testing.T) {
 		}
 
 		if finds2[0].Metadata.Timestamp.String() == finds3[0].Metadata.Timestamp.String() {
-			t.Error("Find requests 200ms apart had the same timestamps, cache not expiring")
+			t.Error("List requests 200ms apart had the same timestamps, cache not expiring")
 		}
 	})
 
@@ -635,10 +635,10 @@ func TestFindSearchCaching(t *testing.T) {
 
 		var err error
 		req := sdp.ItemRequest{
-			Type:    "person",
-			Context: "empty",
-			Query:   "query",
-			Method:  sdp.RequestMethod_SEARCH,
+			Type:   "person",
+			Scope:  "empty",
+			Query:  "query",
+			Method: sdp.RequestMethod_SEARCH,
 		}
 
 		_, _, err = e.ExecuteRequestSync(context.Background(), &req)
@@ -678,10 +678,10 @@ func TestFindSearchCaching(t *testing.T) {
 		})
 
 		req := sdp.ItemRequest{
-			Type:    "person",
-			Context: "error",
-			Query:   "query",
-			Method:  sdp.RequestMethod_GET,
+			Type:   "person",
+			Scope:  "error",
+			Query:  "query",
+			Method: sdp.RequestMethod_GET,
 		}
 
 		e.ExecuteRequestSync(context.Background(), &req)
@@ -698,16 +698,16 @@ func TestFindSearchCaching(t *testing.T) {
 		})
 
 		req := sdp.ItemRequest{
-			Type:    "person",
-			Context: "error",
-			Query:   "query",
-			Method:  sdp.RequestMethod_GET,
+			Type:   "person",
+			Scope:  "error",
+			Query:  "query",
+			Method: sdp.RequestMethod_GET,
 		}
 
 		e.ExecuteRequestSync(context.Background(), &req)
 		e.ExecuteRequestSync(context.Background(), &req)
 
-		req.Method = sdp.RequestMethod_FIND
+		req.Method = sdp.RequestMethod_LIST
 
 		e.ExecuteRequestSync(context.Background(), &req)
 		e.ExecuteRequestSync(context.Background(), &req)
@@ -721,8 +721,8 @@ func TestFindSearchCaching(t *testing.T) {
 			t.Errorf("Exected 2 get calls, got %v", l)
 		}
 
-		if l := len(src.FindCalls); l != 2 {
-			t.Errorf("Exected 2 Find calls, got %v", l)
+		if l := len(src.ListCalls); l != 2 {
+			t.Errorf("Exected 2 List calls, got %v", l)
 		}
 
 		if l := len(src.SearchCalls); l != 2 {
@@ -740,7 +740,7 @@ func TestSearchGetCaching(t *testing.T) {
 	}
 
 	src := TestSource{
-		ReturnContexts: []string{
+		ReturnScopes: []string{
 			"test",
 		},
 	}
@@ -760,10 +760,10 @@ func TestSearchGetCaching(t *testing.T) {
 		var getErrors []*sdp.ItemRequestError
 		var err error
 		req := sdp.ItemRequest{
-			Type:    "person",
-			Context: "test",
-			Query:   "Dylan",
-			Method:  sdp.RequestMethod_SEARCH,
+			Type:   "person",
+			Scope:  "test",
+			Query:  "Dylan",
+			Method: sdp.RequestMethod_SEARCH,
 		}
 
 		searchResult, searchErrors, err = e.ExecuteRequestSync(context.Background(), &req)

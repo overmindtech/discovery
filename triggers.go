@@ -72,8 +72,8 @@ func (t *Trigger) ProcessItem(i *sdp.Item) (*sdp.ItemRequest, error) {
 		}
 	}
 
-	if req.Context == "" {
-		req.Context = i.Context
+	if req.Scope == "" {
+		req.Scope = i.Scope
 	}
 
 	if req.UUID == nil {

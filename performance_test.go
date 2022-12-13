@@ -27,7 +27,7 @@ func (s *SlowSource) DefaultCacheDuration() time.Duration {
 	return 10 * time.Minute
 }
 
-func (s *SlowSource) Contexts() []string {
+func (s *SlowSource) Scopes() []string {
 	return []string{"test"}
 }
 
@@ -35,7 +35,7 @@ func (s *SlowSource) Hidden() bool {
 	return false
 }
 
-func (s *SlowSource) Get(ctx context.Context, itemContext string, query string) (*sdp.Item, error) {
+func (s *SlowSource) Get(ctx context.Context, scope string, query string) (*sdp.Item, error) {
 	end := time.Now().Add(s.RequestDuration)
 	attributes, _ := sdp.ToAttributes(map[string]interface{}{
 		"name": query,
@@ -45,16 +45,16 @@ func (s *SlowSource) Get(ctx context.Context, itemContext string, query string) 
 		Type:               "person",
 		UniqueAttribute:    "name",
 		Attributes:         attributes,
-		Context:            "test",
+		Scope:              "test",
 		LinkedItemRequests: []*sdp.ItemRequest{},
 	}
 
 	for i := 0; i != 2; i++ {
 		item.LinkedItemRequests = append(item.LinkedItemRequests, &sdp.ItemRequest{
-			Type:    "person",
-			Method:  sdp.RequestMethod_GET,
-			Query:   RandomName(),
-			Context: "test",
+			Type:   "person",
+			Method: sdp.RequestMethod_GET,
+			Query:  RandomName(),
+			Scope:  "test",
 		})
 	}
 
@@ -63,7 +63,7 @@ func (s *SlowSource) Get(ctx context.Context, itemContext string, query string) 
 	return &item, nil
 }
 
-func (s *SlowSource) Find(ctx context.Context, itemContext string) ([]*sdp.Item, error) {
+func (s *SlowSource) List(ctx context.Context, scope string) ([]*sdp.Item, error) {
 	return []*sdp.Item{}, nil
 }
 
@@ -158,7 +158,7 @@ func TimeRequests(numRequests int, linkDepth int, numParallel int) TimedResults 
 				Type:      "person",
 				Method:    sdp.RequestMethod_GET,
 				Query:     RandomName(),
-				Context:   "test",
+				Scope:     "test",
 				LinkDepth: uint32(linkDepth),
 			},
 			Engine: &engine,

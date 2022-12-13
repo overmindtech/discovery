@@ -17,8 +17,8 @@ func TestExecuteRequest(t *testing.T) {
 	}
 
 	src := TestSource{
-		ReturnType:     "person",
-		ReturnContexts: []string{"test"},
+		ReturnType:   "person",
+		ReturnScopes: []string{"test"},
 	}
 
 	e.AddSources(&src)
@@ -28,7 +28,7 @@ func TestExecuteRequest(t *testing.T) {
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
 			Query:           "foo",
-			Context:         "test",
+			Scope:           "test",
 			LinkDepth:       3,
 			ItemSubject:     "items",
 			ResponseSubject: "responses",
@@ -73,12 +73,12 @@ func TestExecuteRequest(t *testing.T) {
 
 	})
 
-	t.Run("Wrong context Get request", func(t *testing.T) {
+	t.Run("Wrong scope Get request", func(t *testing.T) {
 		request := &sdp.ItemRequest{
 			Type:      "person",
 			Method:    sdp.RequestMethod_GET,
 			Query:     "foo",
-			Context:   "wrong",
+			Scope:     "wrong",
 			LinkDepth: 0,
 		}
 
@@ -89,8 +89,8 @@ func TestExecuteRequest(t *testing.T) {
 		}
 
 		if len(errs) == 1 {
-			if errs[0].ErrorType != sdp.ItemRequestError_NOCONTEXT {
-				t.Errorf("expected error type to be NOCONTEXT, got %v", errs[0].ErrorType)
+			if errs[0].ErrorType != sdp.ItemRequestError_NOSCOPE {
+				t.Errorf("expected error type to be NOSCOPE, got %v", errs[0].ErrorType)
 			}
 		} else {
 			t.Errorf("expected 1 error, got %v", len(errs))
@@ -103,7 +103,7 @@ func TestExecuteRequest(t *testing.T) {
 			Type:      "house",
 			Method:    sdp.RequestMethod_GET,
 			Query:     "foo",
-			Context:   "test",
+			Scope:     "test",
 			LinkDepth: 0,
 		}
 
@@ -114,19 +114,19 @@ func TestExecuteRequest(t *testing.T) {
 		}
 
 		if len(errs) == 1 {
-			if errs[0].ErrorType != sdp.ItemRequestError_NOCONTEXT {
-				t.Errorf("expected error type to be NOCONTEXT, got %v", errs[0].ErrorType)
+			if errs[0].ErrorType != sdp.ItemRequestError_NOSCOPE {
+				t.Errorf("expected error type to be NOSCOPE, got %v", errs[0].ErrorType)
 			}
 		} else {
 			t.Errorf("expected 1 error, got %v", len(errs))
 		}
 	})
 
-	t.Run("Basic Find request", func(t *testing.T) {
+	t.Run("Basic List request", func(t *testing.T) {
 		request := &sdp.ItemRequest{
 			Type:      "person",
-			Method:    sdp.RequestMethod_FIND,
-			Context:   "test",
+			Method:    sdp.RequestMethod_LIST,
+			Scope:     "test",
 			LinkDepth: 5,
 		}
 
@@ -150,7 +150,7 @@ func TestExecuteRequest(t *testing.T) {
 			Type:      "person",
 			Method:    sdp.RequestMethod_SEARCH,
 			Query:     "TEST",
-			Context:   "test",
+			Scope:     "test",
 			LinkDepth: 5,
 		}
 
@@ -178,7 +178,7 @@ func TestHandleItemRequest(t *testing.T) {
 
 	personSource := TestSource{
 		ReturnType: "person",
-		ReturnContexts: []string{
+		ReturnScopes: []string{
 			"test1",
 			"test2",
 		},
@@ -186,7 +186,7 @@ func TestHandleItemRequest(t *testing.T) {
 
 	dogSource := TestSource{
 		ReturnType: "dog",
-		ReturnContexts: []string{
+		ReturnScopes: []string{
 			"test1",
 			"testA",
 			"testB",
@@ -205,7 +205,7 @@ func TestHandleItemRequest(t *testing.T) {
 			Type:      sdp.WILDCARD,
 			Method:    sdp.RequestMethod_GET,
 			Query:     "Dylan",
-			Context:   "test1",
+			Scope:     "test1",
 			LinkDepth: 0,
 		}
 
@@ -222,7 +222,7 @@ func TestHandleItemRequest(t *testing.T) {
 		}
 	})
 
-	t.Run("Wildcard context should be expanded", func(t *testing.T) {
+	t.Run("Wildcard scope should be expanded", func(t *testing.T) {
 		t.Cleanup(func() {
 			personSource.ClearCalls()
 			dogSource.ClearCalls()
@@ -232,7 +232,7 @@ func TestHandleItemRequest(t *testing.T) {
 			Type:      "person",
 			Method:    sdp.RequestMethod_GET,
 			Query:     "Dylan1",
-			Context:   sdp.WILDCARD,
+			Scope:     sdp.WILDCARD,
 			LinkDepth: 0,
 		}
 
@@ -257,19 +257,19 @@ func TestWildcardSourceExpansion(t *testing.T) {
 
 	personSource := TestSource{
 		ReturnType: "person",
-		ReturnContexts: []string{
+		ReturnScopes: []string{
 			sdp.WILDCARD,
 		},
 	}
 
 	e.AddSources(&personSource)
 
-	t.Run("request context should be preserved", func(t *testing.T) {
+	t.Run("request scope should be preserved", func(t *testing.T) {
 		req := sdp.ItemRequest{
 			Type:      "person",
 			Method:    sdp.RequestMethod_GET,
 			Query:     "Dylan1",
-			Context:   "something.specific",
+			Scope:     "something.specific",
 			LinkDepth: 0,
 		}
 
@@ -283,7 +283,7 @@ func TestWildcardSourceExpansion(t *testing.T) {
 		call := personSource.GetCalls[0]
 
 		if expected := "something.specific"; call[0] != expected {
-			t.Errorf("expected itemContext to be %v, got %v", expected, call[0])
+			t.Errorf("expected scope to be %v, got %v", expected, call[0])
 		}
 
 		if expected := "Dylan1"; call[1] != expected {
@@ -309,7 +309,7 @@ func TestSendRequestSync(t *testing.T) {
 
 	src := TestSource{
 		ReturnType: "person",
-		ReturnContexts: []string{
+		ReturnScopes: []string{
 			"test",
 		},
 	}
@@ -332,7 +332,7 @@ func TestSendRequestSync(t *testing.T) {
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
 			Query:           "Dylan",
-			Context:         "test",
+			Scope:           "test",
 			LinkDepth:       0,
 			IgnoreCache:     false,
 			UUID:            u[:],
@@ -370,14 +370,14 @@ func TestExpandRequest(t *testing.T) {
 		Name: "expand-test",
 	}
 
-	t.Run("with a single source with a single context", func(t *testing.T) {
+	t.Run("with a single source with a single scope", func(t *testing.T) {
 		t.Cleanup(func() {
 			e.sourceMap = nil
 			e.ClearCache()
 		})
 
 		simple := TestSource{
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				"test1",
 			},
 		}
@@ -385,10 +385,10 @@ func TestExpandRequest(t *testing.T) {
 		e.AddSources(&simple)
 
 		e.HandleItemRequest(&sdp.ItemRequest{
-			Type:    "person",
-			Method:  sdp.RequestMethod_GET,
-			Query:   "Debby",
-			Context: "*",
+			Type:   "person",
+			Method: sdp.RequestMethod_GET,
+			Query:  "Debby",
+			Scope:  "*",
 		})
 
 		if expected := 1; len(simple.GetCalls) != expected {
@@ -396,7 +396,7 @@ func TestExpandRequest(t *testing.T) {
 		}
 	})
 
-	t.Run("with a single source with many contexts", func(t *testing.T) {
+	t.Run("with a single source with many scopes", func(t *testing.T) {
 		t.Cleanup(func() {
 			e.sourceMap = nil
 			e.ClearCache()
@@ -404,7 +404,7 @@ func TestExpandRequest(t *testing.T) {
 
 		many := TestSource{
 			ReturnName: "many",
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				"test1",
 				"test2",
 				"test3",
@@ -414,10 +414,10 @@ func TestExpandRequest(t *testing.T) {
 		e.AddSources(&many)
 
 		e.HandleItemRequest(&sdp.ItemRequest{
-			Type:    "person",
-			Method:  sdp.RequestMethod_GET,
-			Query:   "Debby",
-			Context: "*",
+			Type:   "person",
+			Method: sdp.RequestMethod_GET,
+			Query:  "Debby",
+			Scope:  "*",
 		})
 
 		if expected := 3; len(many.GetCalls) != expected {
@@ -425,7 +425,7 @@ func TestExpandRequest(t *testing.T) {
 		}
 	})
 
-	t.Run("with many sources with single contexts", func(t *testing.T) {
+	t.Run("with many sources with single scopes", func(t *testing.T) {
 		t.Cleanup(func() {
 			e.sourceMap = nil
 			e.ClearCache()
@@ -433,14 +433,14 @@ func TestExpandRequest(t *testing.T) {
 
 		sx := TestSource{
 			ReturnName: "sx",
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				"test1",
 			},
 		}
 
 		sy := TestSource{
 			ReturnName: "sy",
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				"test2",
 			},
 		}
@@ -449,10 +449,10 @@ func TestExpandRequest(t *testing.T) {
 		e.AddSources(&sy)
 
 		e.HandleItemRequest(&sdp.ItemRequest{
-			Type:    "person",
-			Method:  sdp.RequestMethod_GET,
-			Query:   "Daniel",
-			Context: "*",
+			Type:   "person",
+			Method: sdp.RequestMethod_GET,
+			Query:  "Daniel",
+			Scope:  "*",
 		})
 
 		if expected := 1; len(sx.GetCalls) != expected {
@@ -464,7 +464,7 @@ func TestExpandRequest(t *testing.T) {
 		}
 	})
 
-	t.Run("with many sources with many contexts", func(t *testing.T) {
+	t.Run("with many sources with many scopes", func(t *testing.T) {
 		t.Cleanup(func() {
 			e.sourceMap = nil
 			e.ClearCache()
@@ -472,7 +472,7 @@ func TestExpandRequest(t *testing.T) {
 
 		sx := TestSource{
 			ReturnName: "sx",
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				"test1",
 				"test2",
 				"test3",
@@ -481,7 +481,7 @@ func TestExpandRequest(t *testing.T) {
 
 		sy := TestSource{
 			ReturnName: "sy",
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				"test4",
 				"test5",
 				"test6",
@@ -492,10 +492,10 @@ func TestExpandRequest(t *testing.T) {
 		e.AddSources(&sy)
 
 		e.HandleItemRequest(&sdp.ItemRequest{
-			Type:    "person",
-			Method:  sdp.RequestMethod_GET,
-			Query:   "Steven",
-			Context: "*",
+			Type:   "person",
+			Method: sdp.RequestMethod_GET,
+			Query:  "Steven",
+			Scope:  "*",
 		})
 
 		if expected := 3; len(sx.GetCalls) != expected {
@@ -507,7 +507,7 @@ func TestExpandRequest(t *testing.T) {
 		}
 	})
 
-	t.Run("with many sources with many contexts which overlap GET", func(t *testing.T) {
+	t.Run("with many sources with many scopes which overlap GET", func(t *testing.T) {
 		t.Cleanup(func() {
 			e.sourceMap = nil
 			e.ClearCache()
@@ -515,7 +515,7 @@ func TestExpandRequest(t *testing.T) {
 
 		sx := TestSource{
 			ReturnName: "sx",
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				"test1",
 				"test2",
 				"test3",
@@ -525,7 +525,7 @@ func TestExpandRequest(t *testing.T) {
 
 		sy := TestSource{
 			ReturnName: "sy",
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				"test2",
 				"test3",
 				"test4",
@@ -537,10 +537,10 @@ func TestExpandRequest(t *testing.T) {
 		e.AddSources(&sy)
 
 		e.HandleItemRequest(&sdp.ItemRequest{
-			Type:    "person",
-			Method:  sdp.RequestMethod_GET,
-			Query:   "Jane",
-			Context: "*",
+			Type:   "person",
+			Method: sdp.RequestMethod_GET,
+			Query:  "Jane",
+			Scope:  "*",
 		})
 
 		if expected := 1; len(sx.GetCalls) != expected {
@@ -552,7 +552,7 @@ func TestExpandRequest(t *testing.T) {
 		}
 	})
 
-	t.Run("with many sources with many contexts which overlap FIND", func(t *testing.T) {
+	t.Run("with many sources with many scopes which overlap LIST", func(t *testing.T) {
 		t.Cleanup(func() {
 			e.sourceMap = nil
 			e.ClearCache()
@@ -560,7 +560,7 @@ func TestExpandRequest(t *testing.T) {
 
 		sx := TestSource{
 			ReturnName: "sx",
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				"test1",
 				"test2",
 				"test3",
@@ -569,7 +569,7 @@ func TestExpandRequest(t *testing.T) {
 
 		sy := TestSource{
 			ReturnName: "sy",
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				"test2",
 				"test3",
 				"test4",
@@ -580,18 +580,18 @@ func TestExpandRequest(t *testing.T) {
 		e.AddSources(&sy)
 
 		e.HandleItemRequest(&sdp.ItemRequest{
-			Type:    "person",
-			Method:  sdp.RequestMethod_FIND,
-			Query:   "Jane",
-			Context: "*",
+			Type:   "person",
+			Method: sdp.RequestMethod_LIST,
+			Query:  "Jane",
+			Scope:  "*",
 		})
 
-		if expected := 3; len(sx.FindCalls) != expected {
-			t.Errorf("Expected %v calls, got %v", expected, sx.FindCalls)
+		if expected := 3; len(sx.ListCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sx.ListCalls)
 		}
 
-		if expected := 3; len(sy.FindCalls) != expected {
-			t.Errorf("Expected %v calls, got %v", expected, sy.FindCalls)
+		if expected := 3; len(sy.ListCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sy.ListCalls)
 		}
 	})
 
@@ -603,7 +603,7 @@ func TestExpandRequest(t *testing.T) {
 
 		sx := TestSource{
 			ReturnName: "sx",
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				sdp.WILDCARD,
 			},
 		}
@@ -611,14 +611,14 @@ func TestExpandRequest(t *testing.T) {
 		e.AddSources(&sx)
 
 		e.HandleItemRequest(&sdp.ItemRequest{
-			Type:    "person",
-			Method:  sdp.RequestMethod_FIND,
-			Query:   "Rachel",
-			Context: "*",
+			Type:   "person",
+			Method: sdp.RequestMethod_LIST,
+			Query:  "Rachel",
+			Scope:  "*",
 		})
 
-		if expected := 1; len(sx.FindCalls) != expected {
-			t.Errorf("Expected %v calls, got %v", expected, sx.FindCalls)
+		if expected := 1; len(sx.ListCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sx.ListCalls)
 		}
 	})
 
@@ -630,21 +630,21 @@ func TestExpandRequest(t *testing.T) {
 
 		sx := TestSource{
 			ReturnName: "sx",
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				sdp.WILDCARD,
 			},
 		}
 
 		sy := TestSource{
 			ReturnName: "sy",
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				sdp.WILDCARD,
 			},
 		}
 
 		sz := TestSource{
 			ReturnName: "sz",
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				sdp.WILDCARD,
 			},
 		}
@@ -654,22 +654,22 @@ func TestExpandRequest(t *testing.T) {
 		e.AddSources(&sz)
 
 		e.HandleItemRequest(&sdp.ItemRequest{
-			Type:    "person",
-			Method:  sdp.RequestMethod_FIND,
-			Query:   "Ross",
-			Context: "*",
+			Type:   "person",
+			Method: sdp.RequestMethod_LIST,
+			Query:  "Ross",
+			Scope:  "*",
 		})
 
-		if expected := 1; len(sx.FindCalls) != expected {
-			t.Errorf("Expected %v calls, got %v", expected, sx.FindCalls)
+		if expected := 1; len(sx.ListCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sx.ListCalls)
 		}
 
-		if expected := 1; len(sy.FindCalls) != expected {
-			t.Errorf("Expected %v calls, got %v", expected, sy.FindCalls)
+		if expected := 1; len(sy.ListCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sy.ListCalls)
 		}
 
-		if expected := 1; len(sz.FindCalls) != expected {
-			t.Errorf("Expected %v calls, got %v", expected, sz.FindCalls)
+		if expected := 1; len(sz.ListCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sz.ListCalls)
 		}
 	})
 
@@ -681,21 +681,21 @@ func TestExpandRequest(t *testing.T) {
 
 		sx := TestSource{
 			ReturnName: "sx",
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				sdp.WILDCARD,
 			},
 		}
 
 		sy := TestSource{
 			ReturnName: "sy",
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				"test1",
 			},
 		}
 
 		sz := TestSource{
 			ReturnName: "sz",
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				"test2",
 				"test3",
 			},
@@ -706,22 +706,22 @@ func TestExpandRequest(t *testing.T) {
 		e.AddSources(&sz)
 
 		e.HandleItemRequest(&sdp.ItemRequest{
-			Type:    "person",
-			Method:  sdp.RequestMethod_FIND,
-			Query:   "Ross",
-			Context: "*",
+			Type:   "person",
+			Method: sdp.RequestMethod_LIST,
+			Query:  "Ross",
+			Scope:  "*",
 		})
 
-		if expected := 1; len(sx.FindCalls) != expected {
-			t.Errorf("Expected %v calls, got %v", expected, sx.FindCalls)
+		if expected := 1; len(sx.ListCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sx.ListCalls)
 		}
 
-		if expected := 1; len(sy.FindCalls) != expected {
-			t.Errorf("Expected %v calls, got %v", expected, sy.FindCalls)
+		if expected := 1; len(sy.ListCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sy.ListCalls)
 		}
 
-		if expected := 2; len(sz.FindCalls) != expected {
-			t.Errorf("Expected %v calls, got %v", expected, sz.FindCalls)
+		if expected := 2; len(sz.ListCalls) != expected {
+			t.Errorf("Expected %v calls, got %v", expected, sz.ListCalls)
 		}
 	})
 }
