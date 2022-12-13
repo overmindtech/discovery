@@ -11,7 +11,7 @@ require (
 	github.com/nats-io/nats.go v1.21.0
 	github.com/overmindtech/connect v0.5.0
 	github.com/overmindtech/sdp-go v0.14.0
-	github.com/overmindtech/sdpcache v0.3.2
+	github.com/overmindtech/sdpcache v0.4.0
 	github.com/sirupsen/logrus v1.9.0
 	google.golang.org/protobuf v1.28.1
 )
@@ -39,7 +39,7 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/json-iterator/go v0.0.0-20171115153421-f7279a603ede // indirect
-	github.com/klauspost/compress v1.15.12 // indirect
+	github.com/klauspost/compress v1.15.13 // indirect
 	github.com/minio/highwayhash v1.0.2 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/nats-io/jwt/v2 v2.3.0 // indirect
@@ -47,7 +47,7 @@ require (
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/overmindtech/api-client v0.4.2 // indirect
 	go.etcd.io/bbolt v1.3.5 // indirect
-	golang.org/x/crypto v0.3.0 // indirect
+	golang.org/x/crypto v0.4.0 // indirect
 	golang.org/x/net v0.3.0 // indirect
 	golang.org/x/oauth2 v0.3.0 // indirect
 	golang.org/x/sys v0.3.0 // indirect
