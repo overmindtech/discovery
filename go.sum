@@ -76,8 +76,8 @@ github.com/overmindtech/api-client v0.4.2 h1:n3kZoHPnFMmNYMuzDW//dZv3+PFPPWFb+Jz
 github.com/overmindtech/api-client v0.4.2/go.mod h1:DmP4oSk3C6ARt70UBE9c9/ZGhdc+f0v41JlHEccVIRI=
 github.com/overmindtech/connect v0.5.0 h1:A7CGHS3e5AZTa2RMYhiAhw1s9CgixRwBiZHOAPVILnY=
 github.com/overmindtech/connect v0.5.0/go.mod h1:RfaCfb5oTc6iviumd28UJpuOzEmM9OxbX+D0KiTZExQ=
-github.com/overmindtech/sdp-go v0.13.7 h1:+YTNXL1bnf8dw674Fu2JfBvFnjZ5x/bQZb+abzx1QqE=
-github.com/overmindtech/sdp-go v0.13.7/go.mod h1:9SFx+Se5hgWxQviaR6f/0MgFO0xBLbqOyfunqqks7T4=
+github.com/overmindtech/sdp-go v0.14.0 h1:YP4Qg+PPciPxVGjgs1YhhACkHPeqNFxuTFFBf5h+NK0=
+github.com/overmindtech/sdp-go v0.14.0/go.mod h1:9SFx+Se5hgWxQviaR6f/0MgFO0xBLbqOyfunqqks7T4=
 github.com/overmindtech/sdpcache v0.3.2 h1:0godJzpEH1QfNOO54ii14xH2LMn4mjHpiANRmqayEM4=
 github.com/overmindtech/sdpcache v0.3.2/go.mod h1:l937jFOK86yO37R9SdtpDbz0m3Uf8tEIiLWCXq690J8=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

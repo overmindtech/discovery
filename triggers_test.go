@@ -25,8 +25,8 @@ var testTrigger = Trigger{
 	Type:                      "person",
 	UniqueAttributeValueRegex: regexp.MustCompile(`^[Dd]ylan$`),
 	RequestGenerator: func(in *sdp.Item) (*sdp.ItemRequest, error) {
-		if in.GetContext() != "match" {
-			return nil, errors.New("context not match")
+		if in.GetScope() != "match" {
+			return nil, errors.New("scope not match")
 		} else {
 			return &sdp.ItemRequest{
 				Type:   "dog",
@@ -65,7 +65,7 @@ var tests = []TriggerTest{
 					Method:          sdp.RequestMethod_GET,
 					Query:           "dylan",
 					LinkDepth:       6,
-					Context:         "match",
+					Scope:           "match",
 					IgnoreCache:     true,
 					UUID:            u[:],
 					Timeout:         durationpb.New(20 * time.Second),
@@ -73,7 +73,7 @@ var tests = []TriggerTest{
 					ResponseSubject: "return.response." + nats.NewInbox(),
 				},
 			},
-			Context:            "match",
+			Scope:              "match",
 			LinkedItems:        []*sdp.Reference{},
 			LinkedItemRequests: []*sdp.ItemRequest{},
 		},
@@ -103,7 +103,7 @@ var tests = []TriggerTest{
 					Method:          sdp.RequestMethod_GET,
 					Query:           "oak",
 					LinkDepth:       6,
-					Context:         "match",
+					Scope:           "match",
 					IgnoreCache:     true,
 					UUID:            u[:],
 					Timeout:         durationpb.New(20 * time.Second),
@@ -111,7 +111,7 @@ var tests = []TriggerTest{
 					ResponseSubject: "responseSubject",
 				},
 			},
-			Context:            "match",
+			Scope:              "match",
 			LinkedItems:        []*sdp.Reference{},
 			LinkedItemRequests: []*sdp.ItemRequest{},
 		},
@@ -141,7 +141,7 @@ var tests = []TriggerTest{
 					Method:          sdp.RequestMethod_GET,
 					Query:           "dylan",
 					LinkDepth:       6,
-					Context:         "match",
+					Scope:           "match",
 					IgnoreCache:     true,
 					UUID:            u[:],
 					Timeout:         durationpb.New(20 * time.Second),
@@ -149,7 +149,7 @@ var tests = []TriggerTest{
 					ResponseSubject: "responseSubject",
 				},
 			},
-			Context:            "match",
+			Scope:              "match",
 			LinkedItems:        []*sdp.Reference{},
 			LinkedItemRequests: []*sdp.ItemRequest{},
 		},
@@ -174,8 +174,8 @@ func TestStandaloneTriggers(t *testing.T) {
 					t.Errorf("expected request to have a type pug, got %v", req.Type)
 				}
 
-				if req.Context != tt.Item.Context {
-					t.Errorf("expected request to have copied contextfrom item (%v) got %v", tt.Item.Context, req.Context)
+				if req.Scope != tt.Item.Scope {
+					t.Errorf("expected request to have copied scopefrom item (%v) got %v", tt.Item.Scope, req.Scope)
 				}
 
 				if req.Method != sdp.RequestMethod_SEARCH {
@@ -229,7 +229,7 @@ func TestNATSTriggers(t *testing.T) {
 	source := TestSource{
 		ReturnType: "dog",
 		IsHidden:   false,
-		ReturnContexts: []string{
+		ReturnScopes: []string{
 			"match",
 		},
 	}

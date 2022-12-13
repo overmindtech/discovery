@@ -13,9 +13,9 @@ import (
 )
 
 type SpeedTestSource struct {
-	QueryDelay     time.Duration
-	ReturnType     string
-	ReturnContexts []string
+	QueryDelay   time.Duration
+	ReturnType   string
+	ReturnScopes []string
 }
 
 func (s *SpeedTestSource) Type() string {
@@ -30,15 +30,15 @@ func (s *SpeedTestSource) Name() string {
 	return "SpeedTestSource"
 }
 
-func (s *SpeedTestSource) Contexts() []string {
-	if len(s.ReturnContexts) > 0 {
-		return s.ReturnContexts
+func (s *SpeedTestSource) Scopes() []string {
+	if len(s.ReturnScopes) > 0 {
+		return s.ReturnScopes
 	}
 
 	return []string{"test"}
 }
 
-func (s *SpeedTestSource) Get(ctx context.Context, itemContext string, query string) (*sdp.Item, error) {
+func (s *SpeedTestSource) Get(ctx context.Context, scope string, query string) (*sdp.Item, error) {
 	select {
 	case <-time.After(s.QueryDelay):
 		return &sdp.Item{
@@ -57,26 +57,26 @@ func (s *SpeedTestSource) Get(ctx context.Context, itemContext string, query str
 			},
 			LinkedItemRequests: []*sdp.ItemRequest{
 				{
-					Type:    "person",
-					Method:  sdp.RequestMethod_GET,
-					Query:   query + time.Now().String(),
-					Context: itemContext,
+					Type:   "person",
+					Method: sdp.RequestMethod_GET,
+					Query:  query + time.Now().String(),
+					Scope:  scope,
 				},
 			},
-			Context: itemContext,
+			Scope: scope,
 		}, nil
 	case <-ctx.Done():
 		return nil, &sdp.ItemRequestError{
 			ErrorType:   sdp.ItemRequestError_TIMEOUT,
 			ErrorString: ctx.Err().Error(),
-			Context:     itemContext,
+			Scope:       scope,
 		}
 	}
 
 }
 
-func (s *SpeedTestSource) Find(ctx context.Context, itemContext string) ([]*sdp.Item, error) {
-	item, err := s.Get(ctx, itemContext, "dylan")
+func (s *SpeedTestSource) List(ctx context.Context, scope string) ([]*sdp.Item, error) {
+	item, err := s.Get(ctx, scope, "dylan")
 
 	return []*sdp.Item{item}, err
 }
@@ -93,7 +93,7 @@ func TestExecute(t *testing.T) {
 
 	src := TestSource{
 		ReturnType: "person",
-		ReturnContexts: []string{
+		ReturnScopes: []string{
 			"test",
 		},
 	}
@@ -110,7 +110,7 @@ func TestExecute(t *testing.T) {
 				Method:    sdp.RequestMethod_GET,
 				Query:     "Dylan",
 				LinkDepth: 0,
-				Context:   "test",
+				Scope:     "test",
 			},
 		}
 
@@ -139,7 +139,7 @@ func TestExecute(t *testing.T) {
 				Method:    sdp.RequestMethod_GET,
 				Query:     "Dylan",
 				LinkDepth: 10,
-				Context:   "test",
+				Scope:     "test",
 			},
 		}
 
@@ -168,7 +168,7 @@ func TestExecute(t *testing.T) {
 				Method:    sdp.RequestMethod_GET,
 				Query:     "Dylan",
 				LinkDepth: 10,
-				Context:   "test",
+				Scope:     "test",
 			},
 		}
 
@@ -217,7 +217,7 @@ func TestTimeout(t *testing.T) {
 				Method:    sdp.RequestMethod_GET,
 				Query:     "Dylan",
 				LinkDepth: 0,
-				Context:   "test",
+				Scope:     "test",
 				Timeout:   durationpb.New(200 * time.Millisecond),
 			},
 		}
@@ -247,7 +247,7 @@ func TestTimeout(t *testing.T) {
 				Method:    sdp.RequestMethod_GET,
 				Query:     "somethingElse",
 				LinkDepth: 0,
-				Context:   "test",
+				Scope:     "test",
 				Timeout:   durationpb.New(50 * time.Millisecond),
 			},
 		}
@@ -267,7 +267,7 @@ func TestTimeout(t *testing.T) {
 				Method:    sdp.RequestMethod_GET,
 				Query:     "somethingElse1",
 				LinkDepth: 10,
-				Context:   "test",
+				Scope:     "test",
 				Timeout:   durationpb.New(350 * time.Millisecond),
 			},
 		}
@@ -309,7 +309,7 @@ func TestCancel(t *testing.T) {
 			Method:    sdp.RequestMethod_GET,
 			Query:     "somethingElse1",
 			LinkDepth: 10,
-			Context:   "test",
+			Scope:     "test",
 			UUID:      u[:],
 		},
 	}

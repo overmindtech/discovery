@@ -85,7 +85,7 @@ func (e *Engine) HandleItemRequest(itemRequest *sdp.ItemRequest) {
 		"method":            itemRequest.Method,
 		"query":             itemRequest.Query,
 		"linkDepth":         itemRequest.LinkDepth,
-		"context":           itemRequest.Context,
+		"scope":             itemRequest.Scope,
 		"timeout":           itemRequest.Timeout.AsDuration().String(),
 		"timeoutOverridden": timeoutOverride,
 		"uuid":              reqUUID.String(),
@@ -118,7 +118,7 @@ func (e *Engine) HandleItemRequest(itemRequest *sdp.ItemRequest) {
 			"requestMethod":      itemRequest.Method,
 			"requestQuery":       itemRequest.Query,
 			"requestLinkDepth":   itemRequest.LinkDepth,
-			"requestContext":     itemRequest.Context,
+			"requestScope":       itemRequest.Scope,
 			"requestTimeout":     itemRequest.Timeout.AsDuration().String(),
 			"requestUUID":        reqUUID.String(),
 			"requestIgnoreCache": itemRequest.IgnoreCache,
@@ -137,7 +137,7 @@ func (e *Engine) HandleItemRequest(itemRequest *sdp.ItemRequest) {
 			"method":      itemRequest.Method,
 			"query":       itemRequest.Query,
 			"linkDepth":   itemRequest.LinkDepth,
-			"context":     itemRequest.Context,
+			"scope":       itemRequest.Scope,
 			"timeout":     itemRequest.Timeout.AsDuration().String(),
 			"uuid":        reqUUID.String(),
 			"ignoreCache": itemRequest.IgnoreCache,
@@ -193,9 +193,9 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items
 
 	if len(expanded) == 0 {
 		errs <- &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_NOCONTEXT,
+			ErrorType:   sdp.ItemRequestError_NOSCOPE,
 			ErrorString: "no matching sources found",
-			Context:     req.Context,
+			Scope:       req.Scope,
 		}
 
 		return errors.New("no matching sources found")
@@ -221,8 +221,8 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items
 			switch req.GetMethod() {
 			case sdp.RequestMethod_GET:
 				requestItems, requestErrors = e.Get(ctx, r, sources)
-			case sdp.RequestMethod_FIND:
-				requestItems, requestErrors = e.Find(ctx, r, sources)
+			case sdp.RequestMethod_LIST:
+				requestItems, requestErrors = e.List(ctx, r, sources)
 			case sdp.RequestMethod_SEARCH:
 				requestItems, requestErrors = e.Search(ctx, r, sources)
 			}
@@ -284,11 +284,11 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items
 // type, this function will expand that request into 5 requests, one for each
 // type.
 //
-// The same goes for contexts, if we have a request with a wildcard context, and
-// a single source that supports 5 contexts, we will end up with 5 requests. The
-// exception to this is if we have a source that supports all contexts, but is
+// The same goes for scopes, if we have a request with a wildcard scope, and
+// a single source that supports 5 scopes, we will end up with 5 requests. The
+// exception to this is if we have a source that supports all scopes, but is
 // unable to list them. In this case there will still be some requests with
-// wildcard contexts as they can't be expanded
+// wildcard scopes as they can't be expanded
 //
 // This functions returns a map of requests with the sources that they should be
 // run against
@@ -317,27 +317,27 @@ func (e *Engine) ExpandRequest(request *sdp.ItemRequest) map[*sdp.ItemRequest][]
 			isHidden = hs.Hidden()
 		}
 
-		for _, sourceContext := range src.Contexts() {
+		for _, sourceScope := range src.Scopes() {
 			// Create a new request if:
 			//
-			// * The source supports all contexts, or
-			// * The request context is a wildcard (and the source is not hidden), or
-			// * The request context matches source context
-			if IsWildcard(sourceContext) || (IsWildcard(request.Context) && !isHidden) || sourceContext == request.Context {
-				var itemContext string
+			// * The source supports all scopes, or
+			// * The request scope is a wildcard (and the source is not hidden), or
+			// * The request scope matches source scope
+			if IsWildcard(sourceScope) || (IsWildcard(request.Scope) && !isHidden) || sourceScope == request.Scope {
+				var scope string
 
-				// Choose the more specific context
-				if IsWildcard(sourceContext) {
-					itemContext = request.Context
+				// Choose the more specific scope
+				if IsWildcard(sourceScope) {
+					scope = request.Scope
 				} else {
-					itemContext = sourceContext
+					scope = sourceScope
 				}
 
 				request := sdp.ItemRequest{
 					Type:            src.Type(),
 					Method:          request.Method,
 					Query:           request.Query,
-					Context:         itemContext,
+					Scope:           scope,
 					ItemSubject:     request.ItemSubject,
 					ResponseSubject: request.ResponseSubject,
 					LinkDepth:       request.LinkDepth,

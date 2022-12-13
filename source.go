@@ -15,7 +15,7 @@ import (
 //
 // Sources must implement all of the methods to satisfy this interface in order
 // to be able to used as an SDP source. Note that the `context.Context` value
-// that is passed to the Get(), Find() and Search() (optional) methods needs to
+// that is passed to the Get(), List() and Search() (optional) methods needs to
 // handled by each source individually. Source authors should make an effort
 // ensure that expensive operations that the source undertakes can be cancelled
 // if the context `ctx` is cancelled
@@ -26,27 +26,17 @@ type Source interface {
 	// Descriptive name for the source, used in logging and metadata
 	Name() string
 
-	// List of contexts that this source is capable of find items for. If the
-	// source supports all contexts the special value "*"
+	// List of scopes that this source is capable of find items for. If the
+	// source supports all scopes the special value "*"
 	// should be used
-	Contexts() []string
+	Scopes() []string
 
-	// Get Get a single item with a given context and query. The item returned
+	// Get Get a single item with a given scope and query. The item returned
 	// should have a UniqueAttributeValue that matches the `query` parameter.
-	//
-	// Note that the itemContext parameter represents the context of the item
-	// from the perspective of State Description Protocol (SDP), whereas the
-	// `context.Context` value is a golang context which is used for
-	// cancellations and timeouts
-	Get(ctx context.Context, itemContext string, query string) (*sdp.Item, error)
+	Get(ctx context.Context, scope string, query string) (*sdp.Item, error)
 
-	// Find Finds all items in a given context
-	//
-	// Note that the itemContext parameter represents the context of the item
-	// from the perspective of State Description Protocol (SDP), whereas the
-	// `context.Context` value is a golang context which is used for
-	// cancellations and timeouts
-	Find(ctx context.Context, itemContext string) ([]*sdp.Item, error)
+	// List Lists all items in a given scope
+	List(ctx context.Context, scope string) ([]*sdp.Item, error)
 
 	// Weight Returns the priority weighting of items returned by this source.
 	// This is used to resolve conflicts where two sources of the same type
@@ -62,12 +52,7 @@ type SearchableSource interface {
 	// result (and optionally an error). The specific format of the query that
 	// needs to be provided to Search is dependant on the source itself as each
 	// source will respond to searches differently
-	//
-	// Note that the itemContext parameter represents the context of the item
-	// from the perspective of State Description Protocol (SDP), whereas the
-	// `context.Context` value is a golang context which is used for
-	// cancellations and timeouts
-	Search(ctx context.Context, itemContext string, query string) ([]*sdp.Item, error)
+	Search(ctx context.Context, scope string, query string) ([]*sdp.Item, error)
 }
 
 // CacheDefiner Some backends may implement the CacheDefiner interface which
@@ -103,11 +88,11 @@ func (e *Engine) Get(ctx context.Context, r *sdp.ItemRequest, relevantSources []
 	return e.callSources(ctx, r, relevantSources, Get)
 }
 
-// Find executes Find() on all sources for a given type, returning the merged
+// List executes List() on all sources for a given type, returning the merged
 // results. Only returns an error if all sources fail, in which case returns the
 // first error
-func (e *Engine) Find(ctx context.Context, r *sdp.ItemRequest, relevantSources []Source) ([]*sdp.Item, []*sdp.ItemRequestError) {
-	return e.callSources(ctx, r, relevantSources, Find)
+func (e *Engine) List(ctx context.Context, r *sdp.ItemRequest, relevantSources []Source) ([]*sdp.Item, []*sdp.ItemRequestError) {
+	return e.callSources(ctx, r, relevantSources, List)
 }
 
 // Search executes Search() on all sources for a given type, returning the merged
@@ -130,7 +115,7 @@ type SourceMethod int64
 
 const (
 	Get SourceMethod = iota
-	Find
+	List
 	Search
 )
 
@@ -138,8 +123,8 @@ func (s SourceMethod) String() string {
 	switch s {
 	case Get:
 		return "Get"
-	case Find:
-		return "Find"
+	case List:
+		return "List"
 	case Search:
 		return "Search"
 	default:
@@ -151,17 +136,17 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 	errs := make([]*sdp.ItemRequestError, 0)
 	items := make([]*sdp.Item, 0)
 
-	// We want to avid having a Get and a Find running at the same time, we'd
-	// rather run the Find first, populate the cache, then have the Get just
-	// grab the value from the cache. To this end we use a GetFindMutex to allow
-	// a Find to block all subsequent Get requests until it is done
+	// We want to avid having a Get and a List running at the same time, we'd
+	// rather run the List first, populate the cache, then have the Get just
+	// grab the value from the cache. To this end we use a GetListMutex to allow
+	// a List to block all subsequent Get requests until it is done
 	switch method {
 	case Get:
-		e.gfm.GetLock(r.Context, r.Type)
-		defer e.gfm.GetUnlock(r.Context, r.Type)
-	case Find:
-		e.gfm.FindLock(r.Context, r.Type)
-		defer e.gfm.FindUnlock(r.Context, r.Type)
+		e.gfm.GetLock(r.Scope, r.Type)
+		defer e.gfm.GetUnlock(r.Scope, r.Type)
+	case List:
+		e.gfm.ListLock(r.Scope, r.Type)
+		defer e.gfm.ListUnlock(r.Scope, r.Type)
 	case Search:
 		// We don't need to lock for a search since they are independant and
 		// will only ever have a cache hit if the request is identical
@@ -170,7 +155,7 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 	for _, src := range relevantSources {
 		tags := sdpcache.Tags{
 			"sourceName": src.Name(),
-			"context":    r.Context,
+			"scope":      r.Scope,
 			"type":       r.Type,
 		}
 
@@ -179,7 +164,7 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 			// With a Get request we need just the one specific item, so also
 			// filter on uniqueAttributeValue
 			tags["uniqueAttributeValue"] = r.Query
-		case Find:
+		case List:
 			// In the case of a find, we just want everything that was found in
 			// the last find, so we only care about the method
 			tags["method"] = method.String()
@@ -193,7 +178,7 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 		logFields := log.Fields{
 			"sourceName": src.Name(),
 			"type":       r.Type,
-			"context":    r.Context,
+			"scope":      r.Scope,
 		}
 
 		if !r.IgnoreCache {
@@ -207,7 +192,7 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 					// If nothing was found then continue with execution
 				case *sdp.ItemRequestError:
 					// Add relevant info
-					err.Context = r.Context
+					err.Scope = r.Scope
 					err.ItemRequestUUID = r.UUID
 					err.SourceName = src.Name()
 					err.ItemType = r.Type
@@ -229,7 +214,7 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 						ItemRequestUUID: r.UUID,
 						ErrorType:       sdp.ItemRequestError_OTHER,
 						ErrorString:     err.Error(),
-						Context:         r.Context,
+						Scope:           r.Scope,
 						SourceName:      src.Name(),
 						ItemType:        r.Type,
 					})
@@ -274,16 +259,16 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 			case Get:
 				var newItem *sdp.Item
 
-				newItem, err = src.Get(ctx, r.Context, r.Query)
+				newItem, err = src.Get(ctx, r.Scope, r.Query)
 
 				if err == nil {
 					resultItems = []*sdp.Item{newItem}
 				}
-			case Find:
-				resultItems, err = src.Find(ctx, r.Context)
+			case List:
+				resultItems, err = src.List(ctx, r.Scope)
 			case Search:
 				if searchableSrc, ok := src.(SearchableSource); ok {
-					resultItems, err = searchableSrc.Search(ctx, r.Context, r.Query)
+					resultItems, err = searchableSrc.Search(ctx, r.Scope, r.Query)
 				} else {
 					err = &sdp.ItemRequestError{
 						ErrorType:   sdp.ItemRequestError_NOTFOUND,
@@ -311,8 +296,8 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 		if err != nil {
 			if sdpErr, ok := err.(*sdp.ItemRequestError); ok {
 				// Add details if they aren't populated
-				if sdpErr.Context == "" {
-					sdpErr.Context = r.Context
+				if sdpErr.Scope == "" {
+					sdpErr.Scope = r.Scope
 				}
 				sdpErr.ItemRequestUUID = r.UUID
 				sdpErr.ItemType = src.Type()
@@ -325,7 +310,7 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 					ItemRequestUUID: r.UUID,
 					ErrorType:       sdp.ItemRequestError_OTHER,
 					ErrorString:     err.Error(),
-					Context:         r.Context,
+					Scope:           r.Scope,
 					SourceName:      src.Name(),
 					ItemType:        r.Type,
 				})

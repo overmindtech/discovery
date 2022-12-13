@@ -32,10 +32,10 @@ func RandomName() string {
 	return fmt.Sprintf("%v-%v", name, randGarbage)
 }
 
-func (s *TestSource) NewTestItem(itemContext string, query string) *sdp.Item {
+func (s *TestSource) NewTestItem(scope string, query string) *sdp.Item {
 	return &sdp.Item{
 		Type:            s.Type(),
-		Context:         itemContext,
+		Scope:           scope,
 		UniqueAttribute: "name",
 		Attributes: &sdp.ItemAttributes{
 			AttrStruct: &structpb.Struct{
@@ -47,30 +47,30 @@ func (s *TestSource) NewTestItem(itemContext string, query string) *sdp.Item {
 		},
 		LinkedItemRequests: []*sdp.ItemRequest{
 			{
-				Type:    "person",
-				Method:  sdp.RequestMethod_GET,
-				Query:   RandomName(),
-				Context: itemContext,
+				Type:   "person",
+				Method: sdp.RequestMethod_GET,
+				Query:  RandomName(),
+				Scope:  scope,
 			},
 		},
 	}
 }
 
 type TestSource struct {
-	ReturnContexts []string
-	ReturnType     string
-	GetCalls       [][]string
-	FindCalls      [][]string
-	SearchCalls    [][]string
-	IsHidden       bool
-	ReturnWeight   int    // Weight to be returned
-	ReturnName     string // The name of the source
-	mutex          sync.Mutex
+	ReturnScopes []string
+	ReturnType   string
+	GetCalls     [][]string
+	ListCalls    [][]string
+	SearchCalls  [][]string
+	IsHidden     bool
+	ReturnWeight int    // Weight to be returned
+	ReturnName   string // The name of the source
+	mutex        sync.Mutex
 }
 
 // ClearCalls Clears the call counters between tests
 func (s *TestSource) ClearCalls() {
-	s.FindCalls = make([][]string, 0)
+	s.ListCalls = make([][]string, 0)
 	s.SearchCalls = make([][]string, 0)
 	s.GetCalls = make([][]string, 0)
 }
@@ -91,9 +91,9 @@ func (s *TestSource) DefaultCacheDuration() time.Duration {
 	return 100 * time.Millisecond
 }
 
-func (s *TestSource) Contexts() []string {
-	if len(s.ReturnContexts) > 0 {
-		return s.ReturnContexts
+func (s *TestSource) Scopes() []string {
+	if len(s.ReturnScopes) > 0 {
+		return s.ReturnScopes
 	}
 
 	return []string{"test"}
@@ -103,74 +103,74 @@ func (s *TestSource) Hidden() bool {
 	return s.IsHidden
 }
 
-func (s *TestSource) Get(ctx context.Context, itemContext string, query string) (*sdp.Item, error) {
+func (s *TestSource) Get(ctx context.Context, scope string, query string) (*sdp.Item, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.GetCalls = append(s.GetCalls, []string{itemContext, query})
+	s.GetCalls = append(s.GetCalls, []string{scope, query})
 
-	switch itemContext {
+	switch scope {
 	case "empty":
 		return nil, &sdp.ItemRequestError{
 			ErrorType:   sdp.ItemRequestError_NOTFOUND,
 			ErrorString: "not found (test)",
-			Context:     itemContext,
+			Scope:       scope,
 		}
 	case "error":
 		return nil, &sdp.ItemRequestError{
 			ErrorType:   sdp.ItemRequestError_OTHER,
 			ErrorString: "Error for testing",
-			Context:     itemContext,
+			Scope:       scope,
 		}
 	default:
-		return s.NewTestItem(itemContext, query), nil
+		return s.NewTestItem(scope, query), nil
 	}
 }
 
-func (s *TestSource) Find(ctx context.Context, itemContext string) ([]*sdp.Item, error) {
+func (s *TestSource) List(ctx context.Context, scope string) ([]*sdp.Item, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	s.FindCalls = append(s.FindCalls, []string{itemContext})
+	s.ListCalls = append(s.ListCalls, []string{scope})
 
-	switch itemContext {
+	switch scope {
 	case "empty":
 		return nil, &sdp.ItemRequestError{
 			ErrorType:   sdp.ItemRequestError_NOTFOUND,
 			ErrorString: "no items found",
-			Context:     itemContext,
+			Scope:       scope,
 		}
 	case "error":
 		return nil, &sdp.ItemRequestError{
 			ErrorType:   sdp.ItemRequestError_OTHER,
 			ErrorString: "Error for testing",
-			Context:     itemContext,
+			Scope:       scope,
 		}
 	default:
-		return []*sdp.Item{s.NewTestItem(itemContext, "Dylan")}, nil
+		return []*sdp.Item{s.NewTestItem(scope, "Dylan")}, nil
 	}
 }
 
-func (s *TestSource) Search(ctx context.Context, itemContext string, query string) ([]*sdp.Item, error) {
+func (s *TestSource) Search(ctx context.Context, scope string, query string) ([]*sdp.Item, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.SearchCalls = append(s.SearchCalls, []string{itemContext, query})
+	s.SearchCalls = append(s.SearchCalls, []string{scope, query})
 
-	switch itemContext {
+	switch scope {
 	case "empty":
 		return nil, &sdp.ItemRequestError{
 			ErrorType:   sdp.ItemRequestError_NOTFOUND,
 			ErrorString: "no items found",
-			Context:     itemContext,
+			Scope:       scope,
 		}
 	case "error":
 		return nil, &sdp.ItemRequestError{
 			ErrorType:   sdp.ItemRequestError_OTHER,
 			ErrorString: "Error for testing",
-			Context:     itemContext,
+			Scope:       scope,
 		}
 	default:
-		return []*sdp.Item{s.NewTestItem(itemContext, "Dylan")}, nil
+		return []*sdp.Item{s.NewTestItem(scope, "Dylan")}, nil
 	}
 }
 

@@ -67,8 +67,8 @@ Type names should match RFC1123 (lower case). This means the name must:
 			t.Errorf("LinkedItem %v of item %v has empty UniqueAttributeValue", index, i.GloballyUniqueName())
 		}
 
-		// We don't need to check for an empty context here since if it's empty
-		// it will just inherit the context of the parent
+		// We don't need to check for an empty scope here since if it's empty
+		// it will just inherit the scope of the parent
 	}
 
 	for index, linkedItemRequest := range i.GetLinkedItemRequests() {
@@ -76,14 +76,14 @@ Type names should match RFC1123 (lower case). This means the name must:
 			t.Errorf("LinkedItemRequest %v of item %v has empty type", index, i.GloballyUniqueName())
 		}
 
-		if linkedItemRequest.GetMethod() != sdp.RequestMethod_FIND {
+		if linkedItemRequest.GetMethod() != sdp.RequestMethod_LIST {
 			if linkedItemRequest.GetQuery() == "" {
-				t.Errorf("LinkedItemRequest %v of item %v has empty query. This is not allowed unless the method is FIND", index, i.GloballyUniqueName())
+				t.Errorf("LinkedItemRequest %v of item %v has empty query. This is not allowed unless the method is LIST", index, i.GloballyUniqueName())
 			}
 		}
 
-		if linkedItemRequest.GetContext() == "" {
-			t.Errorf("LinkedItemRequest %v of item %v has empty context", index, i.GloballyUniqueName())
+		if linkedItemRequest.GetScope() == "" {
+			t.Errorf("LinkedItemRequest %v of item %v has empty scope", index, i.GloballyUniqueName())
 		}
 	}
 }

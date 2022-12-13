@@ -96,7 +96,7 @@ func TestMetaSourceSearchType(t *testing.T) {
 	})
 }
 
-func TestMetaSourceSearchContext(t *testing.T) {
+func TestMetaSourceSearchScope(t *testing.T) {
 	s, err := NewMetaSource(newTestEngine(), Type)
 
 	if err != nil {
@@ -113,7 +113,7 @@ func TestMetaSourceSearchContext(t *testing.T) {
 
 		for _, prefix := range prefixes {
 			t.Run(prefix, func(t *testing.T) {
-				results, err := s.SearchField(Context, prefix)
+				results, err := s.SearchField(Scope, prefix)
 
 				if err != nil {
 					t.Fatal(err)
@@ -139,7 +139,7 @@ func TestMetaSourceSearchContext(t *testing.T) {
 
 		for _, word := range words {
 			t.Run(word, func(t *testing.T) {
-				results, err := s.SearchField(Context, word)
+				results, err := s.SearchField(Scope, word)
 
 				if err != nil {
 					t.Fatal(err)
@@ -192,9 +192,9 @@ func TestTypeSource(t *testing.T) {
 		})
 	})
 
-	t.Run("Find", func(t *testing.T) {
-		t.Run("good context", func(t *testing.T) {
-			items, err := s.Find(context.Background(), "global")
+	t.Run("List", func(t *testing.T) {
+		t.Run("good scope", func(t *testing.T) {
+			items, err := s.List(context.Background(), "global")
 
 			if err != nil {
 				t.Fatal(err)
@@ -205,8 +205,8 @@ func TestTypeSource(t *testing.T) {
 			}
 		})
 
-		t.Run("bad context", func(t *testing.T) {
-			_, err := s.Find(context.Background(), "bad")
+		t.Run("bad scope", func(t *testing.T) {
+			_, err := s.List(context.Background(), "bad")
 
 			if err == nil {
 				t.Error("expected error")
@@ -241,8 +241,8 @@ func TestTypeSource(t *testing.T) {
 	})
 }
 
-func TestContextSource(t *testing.T) {
-	s, err := NewMetaSource(newTestEngine(), Context)
+func TestScopeSource(t *testing.T) {
+	s, err := NewMetaSource(newTestEngine(), Scope)
 
 	if err != nil {
 		t.Fatal(err)
@@ -259,19 +259,19 @@ func TestContextSource(t *testing.T) {
 	}
 
 	t.Run("Get", func(t *testing.T) {
-		t.Run("good context", func(t *testing.T) {
-			item, err := s.Get(context.Background(), "global", "some-other-context")
+		t.Run("good scope", func(t *testing.T) {
+			item, err := s.Get(context.Background(), "global", "some-other-scope")
 
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			if item.UniqueAttributeValue() != "some-other-context" {
-				t.Errorf("expected item to be some-other-context, got %v", item.UniqueAttributeValue())
+			if item.UniqueAttributeValue() != "some-other-scope" {
+				t.Errorf("expected item to be some-other-scope, got %v", item.UniqueAttributeValue())
 			}
 		})
 
-		t.Run("bad context", func(t *testing.T) {
+		t.Run("bad scope", func(t *testing.T) {
 			_, err := s.Get(context.Background(), "global", "aws-ec2")
 
 			if err == nil {
@@ -280,21 +280,21 @@ func TestContextSource(t *testing.T) {
 		})
 	})
 
-	t.Run("Find", func(t *testing.T) {
-		t.Run("good context", func(t *testing.T) {
-			items, err := s.Find(context.Background(), "global")
+	t.Run("List", func(t *testing.T) {
+		t.Run("good scope", func(t *testing.T) {
+			items, err := s.List(context.Background(), "global")
 
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			if len(items) == 0 {
-				t.Error("no contexts")
+				t.Error("no scopes")
 			}
 		})
 
-		t.Run("bad context", func(t *testing.T) {
-			_, err := s.Find(context.Background(), "bad")
+		t.Run("bad scope", func(t *testing.T) {
+			_, err := s.List(context.Background(), "bad")
 
 			if err == nil {
 				t.Error("expected error")
@@ -303,7 +303,7 @@ func TestContextSource(t *testing.T) {
 	})
 
 	t.Run("Search", func(t *testing.T) {
-		t.Run("good context", func(t *testing.T) {
+		t.Run("good scope", func(t *testing.T) {
 			items, err := s.Search(context.Background(), "global", "AccountInternetBanking")
 
 			if err != nil {
@@ -315,7 +315,7 @@ func TestContextSource(t *testing.T) {
 			}
 		})
 
-		t.Run("bad context", func(t *testing.T) {
+		t.Run("bad scope", func(t *testing.T) {
 			items, err := s.Search(context.Background(), "global", "somethingElse")
 
 			if err != nil {
@@ -337,7 +337,7 @@ func newTestEngine() *Engine {
 	e.AddSources(
 		&TestSource{
 			ReturnType: "aws-ec2instance",
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				"prodAccountInternetBanking",
 				"devAccountInternetBanking",
 				"global",
@@ -346,16 +346,16 @@ func newTestEngine() *Engine {
 		},
 		&TestSource{
 			ReturnType: "aws-elasticloadbalancer",
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				"devAccountInternetBanking",
-				"some-other-context",
+				"some-other-scope",
 				"global",
 			},
 			ReturnName: "test-aws-elasticloadbalancer-source",
 		},
 		&TestSource{
 			ReturnType: "ip",
-			ReturnContexts: []string{
+			ReturnScopes: []string{
 				"global",
 			},
 			ReturnName: "test-ip-source",

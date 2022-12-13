@@ -68,8 +68,8 @@ type Engine struct {
 	triggers      []*Trigger
 	triggersMutex sync.RWMutex
 
-	// GetFindMutex used for locking
-	gfm GetFindMutex
+	// GetListMutex used for locking
+	gfm GetListMutex
 
 	// trackedRequests is used for storing requests that have a UUID so they can
 	// be cancelled if required
@@ -164,7 +164,7 @@ func (e *Engine) AddSources(sources ...Source) {
 }
 
 // AddTriggers Adds a trigger to this engine. Triggers cause the engine to
-// listen for items from other contexts and will fire a custom ItemRequest if
+// listen for items from other scopes and will fire a custom ItemRequest if
 // they match
 func (e *Engine) AddTriggers(triggers ...Trigger) {
 	e.triggersMutex.Lock()
@@ -323,7 +323,7 @@ func (e *Engine) connect() error {
 		}
 
 		// Loop over all sources and work out what subscriptions we need to make
-		// depending on what contexts they support. These context names are then
+		// depending on what scopes they support. These scope names are then
 		// stored in a map for de-duplication before being subscribed to
 		subscriptionMap := make(map[string]bool)
 
@@ -334,23 +334,23 @@ func (e *Engine) connect() error {
 		var wildcardExists bool
 
 		for _, src := range e.Sources() {
-			for _, itemContext := range src.Contexts() {
-				if itemContext == sdp.WILDCARD {
+			for _, itemScope := range src.Scopes() {
+				if itemScope == sdp.WILDCARD {
 					wildcardExists = true
 				} else {
-					subscriptionMap[itemContext] = true
+					subscriptionMap[itemScope] = true
 				}
 			}
 		}
 
 		// Now actually create the required subscriptions
 		if wildcardExists {
-			e.subscribe("request.context.>", e.ItemRequestHandler)
-			e.subscribe("cancel.context.>", e.CancelHandler)
+			e.subscribe("request.scope.>", e.ItemRequestHandler)
+			e.subscribe("cancel.scope.>", e.CancelHandler)
 		} else {
 			for suffix := range subscriptionMap {
-				e.subscribe(fmt.Sprintf("request.context.%v", suffix), e.ItemRequestHandler)
-				e.subscribe(fmt.Sprintf("cancel.context.%v", suffix), e.CancelHandler)
+				e.subscribe(fmt.Sprintf("request.scope.%v", suffix), e.ItemRequestHandler)
+				e.subscribe(fmt.Sprintf("cancel.scope.%v", suffix), e.CancelHandler)
 			}
 		}
 
@@ -409,20 +409,20 @@ func (e *Engine) Start() error {
 	e.SetupMaxRequestTimeout()
 
 	var typeSource Source
-	var contextSource Source
+	var scopeSource Source
 	var sourceSource Source
 	var ms *MetaSource
 	var err error
 
 	// Add meta-sources so that we can respond to requests for `overmind-type`,
-	// `overmind-context` and `overmind-source` resources
+	// `overmind-scope` and `overmind-source` resources
 	typeSource, err = NewMetaSource(e, Type)
 
 	if err != nil {
 		return err
 	}
 
-	contextSource, err = NewMetaSource(e, Context)
+	scopeSource, err = NewMetaSource(e, Scope)
 
 	if err != nil {
 		return err
@@ -438,7 +438,7 @@ func (e *Engine) Start() error {
 		MetaSource: *ms,
 	}
 
-	e.AddSources(typeSource, contextSource, sourceSource)
+	e.AddSources(typeSource, scopeSource, sourceSource)
 
 	// Start purging cache
 	e.cache.StartPurger()

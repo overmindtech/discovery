@@ -24,7 +24,7 @@ Look at the tests for some simple examples of starting and running an engine, or
 
 Triggers allow source developers to have their source be triggered by the discover of other items on the NATS network. This allows for a pattern where a source is triggered by a relevant resource being discovered by another query, rather than by being queried directly. This can be used to write secondary sources that fire automatically e.g.
 
-> When a package with the name "nginx" is found in any context, the source should be triggered to try to find the config file for nginx in this context, parse it, and return more detailed information.
+> When a package with the name "nginx" is found in any scope, the source should be triggered to try to find the config file for nginx in this scope, parse it, and return more detailed information.
 
 The anatomy of a trigger is as follows:
 
@@ -39,8 +39,8 @@ var trigger = Trigger{
     // function should return the request that should be forwarded to the
     // engine that the trigger is registered with
     RequestGenerator: func(in *sdp.Item) (*sdp.ItemRequest, error) {
-        if in.GetContext() != "something" {
-            return nil, errors.New("only 'something' context supported")
+        if in.GetScope() != "something" {
+            return nil, errors.New("only 'something' scope supported")
         } else {
             return &sdp.ItemRequest{
                 Type:   "dog",
@@ -63,17 +63,17 @@ This source returns information about other sources as SDP items. Can be used to
 Methods:
 
 * [x] `Get()`: Returns sources by their descriptive name
-* [x] `Find()`
+* [x] `List()`
 * [ ] `Search()`
 
-### `overmind-context`
+### `overmind-scope`
 
-Returns available contexts as SDP items. This is intended to be used to improve UX in the GUI since users will be able to see what contexts are available.
+Returns available scopes as SDP items. This is intended to be used to improve UX in the GUI since users will be able to see what scopes are available.
 
 Methods:
 
-* [x] `Get()`: Returns contexts by their name
-* [x] `Find()`
+* [x] `Get()`: Returns scopes by their name
+* [x] `List()`
 * [x] `Search()`: Search by any string. Intended to be used by autocomplete in the GUI and therefore places extra weight on prefixes however will also perform free-text and fuzzy matching too
 
 ### `overmind-type`
@@ -82,8 +82,8 @@ Returns available types as SDP items. This is intended to be used to improve UX 
 
 Methods:
 
-* [x] `Get()`: Returns contexts by their name
-* [x] `Find()`
+* [x] `Get()`: Returns scopes by their name
+* [x] `List()`
 * [x] `Search()`: Search by any string. Intended to be used by autocomplete in the GUI and therefore places extra weight on prefixes however will also perform free-text and fuzzy matching too
 
 
