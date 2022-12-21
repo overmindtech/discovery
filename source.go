@@ -176,9 +176,9 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 		}
 
 		logFields := log.Fields{
-			"sourceName": src.Name(),
-			"type":       r.Type,
-			"scope":      r.Scope,
+			"sourceName":   src.Name(),
+			"requestType":  r.Type,
+			"requestScope": r.Scope,
 		}
 
 		if !r.IgnoreCache {
