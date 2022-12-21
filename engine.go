@@ -90,7 +90,7 @@ func (e *Engine) TrackRequest(uuid uuid.UUID, request *RequestTracker) {
 	e.trackedRequests[uuid] = request
 }
 
-// GetTrackedRequest Returns the RequestTracked object for a given UUID. THis
+// GetTrackedRequest Returns the RequestTracked object for a given UUID. This
 // tracker can then be used to cancel the request
 func (e *Engine) GetTrackedRequest(uuid uuid.UUID) (*RequestTracker, error) {
 	e.ensureTrackedRequests()
