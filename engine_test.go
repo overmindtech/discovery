@@ -470,10 +470,11 @@ func TestNatsConnections(t *testing.T) {
 }
 
 func TestNATSFailureRestart(t *testing.T) {
-	test.DefaultTestOptions.Port = 4112
+	restartTestOption := test.DefaultTestOptions
+	restartTestOption.Port = 4112
 
 	// We are running a custom server here so that we can control its lifecycle
-	s := test.RunServer(&test.DefaultTestOptions)
+	s := test.RunServer(&restartTestOption)
 
 	if !s.ReadyForConnections(10 * time.Second) {
 		t.Fatal("Could not start goroutine NATS server")
@@ -518,8 +519,10 @@ func TestNATSFailureRestart(t *testing.T) {
 	// thing
 	time.Sleep(2 * time.Second)
 
-	s = test.RunServer(&test.DefaultTestOptions)
-	s.ReadyForConnections(10 * time.Second)
+	s = test.RunServer(&restartTestOption)
+	if !s.ReadyForConnections(10 * time.Second) {
+		t.Fatal("Could not start goroutine NATS server a second time")
+	}
 
 	t.Cleanup(func() {
 		s.Shutdown()

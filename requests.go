@@ -81,15 +81,15 @@ func (e *Engine) HandleItemRequest(itemRequest *sdp.ItemRequest) {
 	reqUUID, uuidErr := uuid.FromBytes(itemRequest.UUID)
 
 	log.WithFields(log.Fields{
-		"type":              itemRequest.Type,
-		"method":            itemRequest.Method,
-		"query":             itemRequest.Query,
-		"linkDepth":         itemRequest.LinkDepth,
-		"scope":             itemRequest.Scope,
-		"timeout":           itemRequest.Timeout.AsDuration().String(),
-		"timeoutOverridden": timeoutOverride,
-		"uuid":              reqUUID.String(),
-		"ignoreCache":       itemRequest.IgnoreCache,
+		"requestType":              itemRequest.Type,
+		"requestMethod":            itemRequest.Method,
+		"requestQuery":             itemRequest.Query,
+		"requestLinkDepth":         itemRequest.LinkDepth,
+		"requestScope":             itemRequest.Scope,
+		"requestTimeout":           itemRequest.Timeout.AsDuration().String(),
+		"requestTimeoutOverridden": timeoutOverride,
+		"requestUUID":              reqUUID.String(),
+		"requestIgnoreCache":       itemRequest.IgnoreCache,
 	}).Info("Received request")
 
 	requestTracker := RequestTracker{
@@ -112,16 +112,17 @@ func (e *Engine) HandleItemRequest(itemRequest *sdp.ItemRequest) {
 		}
 
 		logEntry := log.WithFields(log.Fields{
-			"errorType":          "OTHER",
-			"errorString":        err.Error(),
-			"requestType":        itemRequest.Type,
-			"requestMethod":      itemRequest.Method,
-			"requestQuery":       itemRequest.Query,
-			"requestLinkDepth":   itemRequest.LinkDepth,
-			"requestScope":       itemRequest.Scope,
-			"requestTimeout":     itemRequest.Timeout.AsDuration().String(),
-			"requestUUID":        reqUUID.String(),
-			"requestIgnoreCache": itemRequest.IgnoreCache,
+			"errorType":                "OTHER",
+			"errorString":              err.Error(),
+			"requestType":              itemRequest.Type,
+			"requestMethod":            itemRequest.Method,
+			"requestQuery":             itemRequest.Query,
+			"requestLinkDepth":         itemRequest.LinkDepth,
+			"requestScope":             itemRequest.Scope,
+			"requestTimeout":           itemRequest.Timeout.AsDuration().String(),
+			"requestTimeoutOverridden": timeoutOverride,
+			"requestUUID":              reqUUID.String(),
+			"requestIgnoreCache":       itemRequest.IgnoreCache,
 		})
 
 		if ire, ok := err.(*sdp.ItemRequestError); ok && ire.ErrorType == sdp.ItemRequestError_OTHER {
@@ -133,14 +134,15 @@ func (e *Engine) HandleItemRequest(itemRequest *sdp.ItemRequest) {
 		responder.Done()
 
 		log.WithFields(log.Fields{
-			"type":        itemRequest.Type,
-			"method":      itemRequest.Method,
-			"query":       itemRequest.Query,
-			"linkDepth":   itemRequest.LinkDepth,
-			"scope":       itemRequest.Scope,
-			"timeout":     itemRequest.Timeout.AsDuration().String(),
-			"uuid":        reqUUID.String(),
-			"ignoreCache": itemRequest.IgnoreCache,
+			"requestType":              itemRequest.Type,
+			"requestMethod":            itemRequest.Method,
+			"requestQuery":             itemRequest.Query,
+			"requestLinkDepth":         itemRequest.LinkDepth,
+			"requestScope":             itemRequest.Scope,
+			"requestTimeout":           itemRequest.Timeout.AsDuration().String(),
+			"requestTimeoutOverridden": timeoutOverride,
+			"requestUUID":              reqUUID.String(),
+			"requestIgnoreCache":       itemRequest.IgnoreCache,
 		}).Info("Request complete")
 	}
 }

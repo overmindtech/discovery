@@ -87,7 +87,7 @@ func (r *RequestTracker) queueUnlinkedItem(i *sdp.Item) {
 }
 
 // startLinking Starts linking items that have been added to the queue using
-// `queueUnlinkedItem()`. Once an item is fully linked it will be published ot
+// `queueUnlinkedItem()`. Once an item is fully linked it will be published to
 // NATS
 func (r *RequestTracker) startLinking(ctx context.Context) {
 	// Link items
