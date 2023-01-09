@@ -59,16 +59,6 @@ func (n NilConnection) QueueSubscribe(subj, queue string, cb nats.MsgHandler) (*
 }
 
 // Request Does nothing except log an error
-func (n NilConnection) Request(ctx context.Context, subj string, in proto.Message, out proto.Message) error {
-	log.WithFields(log.Fields{
-		"subject": subj,
-		"message": fmt.Sprint(in),
-	}).Error("Could not publish NATS request due to no connection")
-
-	return nil
-}
-
-// Request Does nothing except log an error
 func (n NilConnection) RequestMsg(ctx context.Context, msg *nats.Msg) (*nats.Msg, error) {
 	log.WithFields(log.Fields{
 		"subject": msg.Subject,
