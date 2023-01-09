@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
@@ -203,7 +204,7 @@ func TestNats(t *testing.T) {
 			ItemSubject:     NewItemSubject(),
 		})
 
-		_, _, err := req.Execute(e.natsConnection)
+		_, _, err := req.Execute(context.Background(), e.natsConnection)
 
 		if err != nil {
 			t.Error(err)
@@ -230,7 +231,7 @@ func TestNats(t *testing.T) {
 			ItemSubject:     NewItemSubject(),
 		})
 
-		_, _, err := req.Execute(e.natsConnection)
+		_, _, err := req.Execute(context.Background(), e.natsConnection)
 
 		if err != nil {
 			t.Error(err)
@@ -301,7 +302,7 @@ func TestNatsCancel(t *testing.T) {
 		items := make(chan *sdp.Item, 1000)
 		errs := make(chan *sdp.ItemRequestError, 1000)
 
-		err := progress.Start(conn, items, errs)
+		err := progress.Start(context.Background(), conn, items, errs)
 
 		if err != nil {
 			t.Error(err)
@@ -309,7 +310,7 @@ func TestNatsCancel(t *testing.T) {
 
 		time.Sleep(1 * time.Second)
 
-		conn.Publish("cancel.all", &sdp.CancelItemRequest{
+		conn.Publish(context.Background(), "cancel.all", &sdp.CancelItemRequest{
 			UUID: u[:],
 		})
 
@@ -590,7 +591,7 @@ func TestNatsAuth(t *testing.T) {
 			Scope:           "test",
 			ResponseSubject: NewResponseSubject(),
 			ItemSubject:     NewItemSubject(),
-		}).Execute(e.natsConnection)
+		}).Execute(context.Background(), e.natsConnection)
 
 		if err != nil {
 			t.Error(err)
@@ -615,7 +616,7 @@ func TestNatsAuth(t *testing.T) {
 			Scope:           "test",
 			ResponseSubject: NewResponseSubject(),
 			ItemSubject:     NewItemSubject(),
-		}).Execute(e.natsConnection)
+		}).Execute(context.Background(), e.natsConnection)
 
 		if err != nil {
 			t.Error(err)

@@ -39,13 +39,13 @@ func NewResponseSubject() string {
 
 // ItemRequestHandler Calls HandleItemRequest but in a goroutine so that it can
 // happen in parallel
-func (e *Engine) ItemRequestHandler(itemRequest *sdp.ItemRequest) {
-	go e.HandleItemRequest(itemRequest)
+func (e *Engine) ItemRequestHandler(ctx context.Context, itemRequest *sdp.ItemRequest) {
+	go e.HandleItemRequest(ctx, itemRequest)
 }
 
 // HandleItemRequest Handles a single request. This includes responses, linking
 // etc.
-func (e *Engine) HandleItemRequest(itemRequest *sdp.ItemRequest) {
+func (e *Engine) HandleItemRequest(ctx context.Context, itemRequest *sdp.ItemRequest) {
 	if len(e.ExpandRequest(itemRequest)) == 0 {
 		// If we don't have any relevant sources, exit
 		return
@@ -73,6 +73,7 @@ func (e *Engine) HandleItemRequest(itemRequest *sdp.ItemRequest) {
 	}
 
 	responder.Start(
+		ctx,
 		pub,
 		e.Name,
 	)

@@ -134,7 +134,7 @@ func (r *RequestTracker) startLinking(ctx context.Context) {
 						if e := r.Engine; e != nil && hasSourceRequest {
 							if e.IsNATSConnected() {
 								// Respond with the Item
-								err := e.natsConnection.Publish(itemSubject, i)
+								err := e.natsConnection.Publish(ctx, itemSubject, i)
 
 								if err != nil {
 									// TODO: I probably shouldn't be logging directly here but I
@@ -296,8 +296,8 @@ func (r *RequestTracker) Execute() ([]*sdp.Item, []*sdp.ItemRequestError, error)
 			if ok {
 				sdpErrs = append(sdpErrs, err)
 
-				if r.Request.ErrorSubject != "" && r.Engine.natsConnection != nil {
-					pubErr := r.Engine.natsConnection.Publish(r.Request.ErrorSubject, err)
+				if r.Request.ErrorSubject != "" && r.Engine.natsConnection.Underlying() != nil {
+					pubErr := r.Engine.natsConnection.Publish(ctx, r.Request.ErrorSubject, err)
 
 					if pubErr != nil {
 						// TODO: I probably shouldn't be logging directly here but I
