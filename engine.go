@@ -303,20 +303,20 @@ func (e *Engine) connect() error {
 			"URL:":     e.natsConnection.Underlying().ConnectedUrl(),
 		}).Info("NATS connected")
 
-		err = e.subscribe("request.all", sdp.NewMsgHandler("ItemRequestHandler", e.ItemRequestHandler))
+		err = e.subscribe("request.all", sdp.NewItemRequestHandler("ItemRequestHandler", e.ItemRequestHandler))
 
 		if err != nil {
 			return err
 		}
 
-		err = e.subscribe("cancel.all", sdp.NewMsgHandler("CancelHandler", e.CancelHandler))
+		err = e.subscribe("cancel.all", sdp.NewCancelItemRequestHandler("CancelHandler", e.CancelHandler))
 
 		if err != nil {
 			return err
 		}
 
 		if len(e.triggers) > 0 {
-			err = e.subscribe("return.item.>", sdp.NewMsgHandler("ProcessTriggers", e.ProcessTriggers))
+			err = e.subscribe("return.item.>", sdp.NewItemHandler("ProcessTriggers", e.ProcessTriggers))
 
 			if err != nil {
 				return err
@@ -346,12 +346,12 @@ func (e *Engine) connect() error {
 
 		// Now actually create the required subscriptions
 		if wildcardExists {
-			e.subscribe("request.scope.>", sdp.NewMsgHandler("WildcardItemRequestHandler", e.ItemRequestHandler))
-			e.subscribe("cancel.scope.>", sdp.NewMsgHandler("WildcardCancelHandler", e.CancelHandler))
+			e.subscribe("request.scope.>", sdp.NewItemRequestHandler("WildcardItemRequestHandler", e.ItemRequestHandler))
+			e.subscribe("cancel.scope.>", sdp.NewCancelItemRequestHandler("WildcardCancelHandler", e.CancelHandler))
 		} else {
 			for suffix := range subscriptionMap {
-				e.subscribe(fmt.Sprintf("request.scope.%v", suffix), sdp.NewMsgHandler("WildcardItemRequestHandler", e.ItemRequestHandler))
-				e.subscribe(fmt.Sprintf("cancel.scope.%v", suffix), sdp.NewMsgHandler("WildcardCancelHandler", e.CancelHandler))
+				e.subscribe(fmt.Sprintf("request.scope.%v", suffix), sdp.NewItemRequestHandler("WildcardItemRequestHandler", e.ItemRequestHandler))
+				e.subscribe(fmt.Sprintf("cancel.scope.%v", suffix), sdp.NewCancelItemRequestHandler("WildcardCancelHandler", e.CancelHandler))
 			}
 		}
 

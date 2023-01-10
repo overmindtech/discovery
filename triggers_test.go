@@ -268,7 +268,7 @@ func TestNATSTriggers(t *testing.T) {
 			progress := sdp.NewRequestProgress(tt.Item.Metadata.SourceRequest)
 			_, err = engine.natsConnection.Subscribe(
 				tt.Item.Metadata.SourceRequest.ResponseSubject,
-				sdp.NewMsgHandler("ProcessResponse", progress.ProcessResponse),
+				sdp.NewResponseHandler("ProcessResponse", progress.ProcessResponse),
 			)
 
 			if err != nil {
