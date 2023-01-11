@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"runtime"
@@ -54,7 +55,7 @@ type Engine struct {
 	cache sdpcache.Cache
 
 	// The NATS connection
-	natsConnection      *nats.EncodedConn
+	natsConnection      sdp.EncodedConnection
 	natsConnectionMutex sync.Mutex
 
 	// List of all current subscriptions
@@ -189,7 +190,7 @@ func (e *Engine) ClearTriggers() {
 
 // ProcessTriggers Checks all triggers against a given item and fires them if
 // required
-func (e *Engine) ProcessTriggers(item *sdp.Item) {
+func (e *Engine) ProcessTriggers(ctx context.Context, item *sdp.Item) {
 	e.triggersMutex.RLock()
 	defer e.triggersMutex.RUnlock()
 
@@ -209,7 +210,7 @@ func (e *Engine) ProcessTriggers(item *sdp.Item) {
 			}
 
 			// Fire the trigger and send the request to the engine
-			e.ItemRequestHandler(req)
+			e.ItemRequestHandler(ctx, req)
 		}(trigger)
 	}
 
@@ -220,7 +221,7 @@ func (e *Engine) ProcessTriggers(item *sdp.Item) {
 // ManagedConnection Returns the connection that the engine is using. Note that
 // the lifecycle of this connection is managed by the engine, causing it to
 // disconnect will cause issues with the engine. Use Engine.Stop() instead
-func (e *Engine) ManagedConnection() *nats.EncodedConn {
+func (e *Engine) ManagedConnection() sdp.EncodedConnection {
 	e.natsConnectionMutex.Lock()
 	defer e.natsConnectionMutex.Unlock()
 	return e.natsConnection
@@ -264,18 +265,18 @@ func (e *Engine) NonHiddenSources() []Source {
 func (e *Engine) connect() error {
 	// Try to connect to NATS
 	if no := e.NATSOptions; no != nil {
-		enc, err := e.NATSOptions.Connect()
+		ec, err := e.NATSOptions.Connect()
 
 		if err != nil {
 			return err
 		}
 
 		e.natsConnectionMutex.Lock()
-		e.natsConnection = enc
+		e.natsConnection = ec
 		e.natsConnectionMutex.Unlock()
 
 		e.ConnectionWatcher = NATSWatcher{
-			Connection: e.natsConnection.Conn,
+			Connection: e.natsConnection,
 			FailureHandler: func() {
 				go func() {
 					if err := e.disconnect(); err != nil {
@@ -291,31 +292,31 @@ func (e *Engine) connect() error {
 		e.ConnectionWatcher.Start(e.ConnectionWatchInterval)
 
 		// Wait for the connection to be completed
-		err = e.natsConnection.FlushTimeout(10 * time.Minute)
+		err = e.natsConnection.Underlying().FlushTimeout(10 * time.Minute)
 
 		if err != nil {
 			return err
 		}
 
 		log.WithFields(log.Fields{
-			"ServerID": e.natsConnection.Conn.ConnectedServerId(),
-			"URL:":     e.natsConnection.Conn.ConnectedUrl(),
+			"ServerID": e.natsConnection.Underlying().ConnectedServerId(),
+			"URL:":     e.natsConnection.Underlying().ConnectedUrl(),
 		}).Info("NATS connected")
 
-		err = e.subscribe("request.all", e.ItemRequestHandler)
+		err = e.subscribe("request.all", sdp.NewItemRequestHandler("ItemRequestHandler", e.ItemRequestHandler))
 
 		if err != nil {
 			return err
 		}
 
-		err = e.subscribe("cancel.all", e.CancelHandler)
+		err = e.subscribe("cancel.all", sdp.NewCancelItemRequestHandler("CancelHandler", e.CancelHandler))
 
 		if err != nil {
 			return err
 		}
 
 		if len(e.triggers) > 0 {
-			err = e.subscribe("return.item.>", e.ProcessTriggers)
+			err = e.subscribe("return.item.>", sdp.NewItemHandler("ProcessTriggers", e.ProcessTriggers))
 
 			if err != nil {
 				return err
@@ -345,12 +346,12 @@ func (e *Engine) connect() error {
 
 		// Now actually create the required subscriptions
 		if wildcardExists {
-			e.subscribe("request.scope.>", e.ItemRequestHandler)
-			e.subscribe("cancel.scope.>", e.CancelHandler)
+			e.subscribe("request.scope.>", sdp.NewItemRequestHandler("WildcardItemRequestHandler", e.ItemRequestHandler))
+			e.subscribe("cancel.scope.>", sdp.NewCancelItemRequestHandler("WildcardCancelHandler", e.CancelHandler))
 		} else {
 			for suffix := range subscriptionMap {
-				e.subscribe(fmt.Sprintf("request.scope.%v", suffix), e.ItemRequestHandler)
-				e.subscribe(fmt.Sprintf("cancel.scope.%v", suffix), e.CancelHandler)
+				e.subscribe(fmt.Sprintf("request.scope.%v", suffix), sdp.NewItemRequestHandler("WildcardItemRequestHandler", e.ItemRequestHandler))
+				e.subscribe(fmt.Sprintf("cancel.scope.%v", suffix), sdp.NewCancelItemRequestHandler("WildcardCancelHandler", e.CancelHandler))
 			}
 		}
 
@@ -367,11 +368,15 @@ func (e *Engine) disconnect() error {
 	e.natsConnectionMutex.Lock()
 	defer e.natsConnectionMutex.Unlock()
 
-	if e.natsConnection != nil {
+	if e.natsConnection == nil {
+		return nil
+	}
+
+	if e.natsConnection.Underlying() != nil {
 		// Only unsubscribe if the connection is not closed. If it's closed
 		// there is no point
 		for _, c := range e.subscriptions {
-			if e.natsConnection.Conn.Status() != nats.CONNECTED {
+			if e.natsConnection.Status() != nats.CONNECTED {
 				// If the connection is not connected we can't unsubscribe
 				continue
 			}
@@ -395,7 +400,7 @@ func (e *Engine) disconnect() error {
 		e.natsConnection.Close()
 	}
 
-	e.natsConnection = nil
+	e.natsConnection.Drop()
 
 	return nil
 }
@@ -446,15 +451,16 @@ func (e *Engine) Start() error {
 	return e.connect()
 }
 
-// subscribe Subscribes to a subject using the current NATS connection
-func (e *Engine) subscribe(subject string, handler nats.Handler) error {
+// subscribe Subscribes to a subject using the current NATS connection.
+// Remember to use sdp.NewMsgHandler to get a nats.MsgHandler with otel propagation and protobuf marshaling
+func (e *Engine) subscribe(subject string, handler nats.MsgHandler) error {
 	var subscription *nats.Subscription
 	var err error
 
 	e.natsConnectionMutex.Lock()
 	defer e.natsConnectionMutex.Unlock()
 
-	if e.natsConnection == nil {
+	if e.natsConnection.Underlying() == nil {
 		return errors.New("cannot subscribe. NATS connection is nil")
 	}
 
@@ -516,22 +522,24 @@ func (e *Engine) IsNATSConnected() bool {
 	e.natsConnectionMutex.Lock()
 	defer e.natsConnectionMutex.Unlock()
 
-	if enc := e.natsConnection; enc != nil {
-		if conn := enc.Conn; conn != nil {
-			return conn.IsConnected()
-		}
+	if e.natsConnection == nil {
 		return false
 	}
+
+	if conn := e.natsConnection.Underlying(); conn != nil {
+		return conn.IsConnected()
+	}
+
 	return false
 }
 
 // CancelHandler calls HandleCancelItemRequest in a goroutine
-func (e *Engine) CancelHandler(cancelRequest *sdp.CancelItemRequest) {
-	go e.HandleCancelItemRequest(cancelRequest)
+func (e *Engine) CancelHandler(ctx context.Context, cancelRequest *sdp.CancelItemRequest) {
+	go e.HandleCancelItemRequest(ctx, cancelRequest)
 }
 
 // HandleCancelItemRequest Takes a CancelItemRequest and cancels that request if it exists
-func (e *Engine) HandleCancelItemRequest(cancelRequest *sdp.CancelItemRequest) {
+func (e *Engine) HandleCancelItemRequest(ctx context.Context, cancelRequest *sdp.CancelItemRequest) {
 	u, err := uuid.FromBytes(cancelRequest.UUID)
 
 	if err != nil {

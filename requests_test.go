@@ -210,7 +210,7 @@ func TestHandleItemRequest(t *testing.T) {
 		}
 
 		// Run the handler
-		e.HandleItemRequest(&req)
+		e.HandleItemRequest(context.Background(), &req)
 
 		// I'm expecting both sources to get a request since the type was *
 		if l := len(personSource.GetCalls); l != 1 {
@@ -237,7 +237,7 @@ func TestHandleItemRequest(t *testing.T) {
 		}
 
 		// Run the handler
-		e.HandleItemRequest(&req)
+		e.HandleItemRequest(context.Background(), &req)
 
 		if l := len(personSource.GetCalls); l != 2 {
 			t.Errorf("expected person backend to have 2 Get calls, got %v", l)
@@ -274,7 +274,7 @@ func TestWildcardSourceExpansion(t *testing.T) {
 		}
 
 		// Run the handler
-		e.HandleItemRequest(&req)
+		e.HandleItemRequest(context.Background(), &req)
 
 		if len(personSource.GetCalls) != 1 {
 			t.Errorf("expected 1 get call got %v", len(personSource.GetCalls))
@@ -296,7 +296,7 @@ func TestSendRequestSync(t *testing.T) {
 	SkipWithoutNats(t)
 
 	e := Engine{
-		Name: "nats-test",
+		Name: "nats-test-srs",
 		NATSOptions: &connect.NATSOptions{
 			Servers:           NatsTestURLs,
 			ConnectionName:    "test-connection",
@@ -341,7 +341,7 @@ func TestSendRequestSync(t *testing.T) {
 			ResponseSubject: NewResponseSubject(),
 		})
 
-		items, errs, err := progress.Execute(e.natsConnection)
+		items, errs, err := progress.Execute(context.Background(), e.natsConnection)
 
 		if err != nil {
 			t.Fatal(err)
@@ -358,7 +358,7 @@ func TestSendRequestSync(t *testing.T) {
 		}
 
 		if progress.NumComplete() != 1 {
-			t.Fatalf("expected 1 to be complete, got %v", progress.NumComplete())
+			t.Fatalf("expected 1 to be complete, got %v\nProgress: %v", progress.NumComplete(), progress)
 		}
 
 	}
@@ -384,7 +384,7 @@ func TestExpandRequest(t *testing.T) {
 
 		e.AddSources(&simple)
 
-		e.HandleItemRequest(&sdp.ItemRequest{
+		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
 			Type:   "person",
 			Method: sdp.RequestMethod_GET,
 			Query:  "Debby",
@@ -413,7 +413,7 @@ func TestExpandRequest(t *testing.T) {
 
 		e.AddSources(&many)
 
-		e.HandleItemRequest(&sdp.ItemRequest{
+		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
 			Type:   "person",
 			Method: sdp.RequestMethod_GET,
 			Query:  "Debby",
@@ -448,7 +448,7 @@ func TestExpandRequest(t *testing.T) {
 		e.AddSources(&sx)
 		e.AddSources(&sy)
 
-		e.HandleItemRequest(&sdp.ItemRequest{
+		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
 			Type:   "person",
 			Method: sdp.RequestMethod_GET,
 			Query:  "Daniel",
@@ -491,7 +491,7 @@ func TestExpandRequest(t *testing.T) {
 		e.AddSources(&sx)
 		e.AddSources(&sy)
 
-		e.HandleItemRequest(&sdp.ItemRequest{
+		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
 			Type:   "person",
 			Method: sdp.RequestMethod_GET,
 			Query:  "Steven",
@@ -536,7 +536,7 @@ func TestExpandRequest(t *testing.T) {
 		e.AddSources(&sx)
 		e.AddSources(&sy)
 
-		e.HandleItemRequest(&sdp.ItemRequest{
+		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
 			Type:   "person",
 			Method: sdp.RequestMethod_GET,
 			Query:  "Jane",
@@ -579,7 +579,7 @@ func TestExpandRequest(t *testing.T) {
 		e.AddSources(&sx)
 		e.AddSources(&sy)
 
-		e.HandleItemRequest(&sdp.ItemRequest{
+		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
 			Type:   "person",
 			Method: sdp.RequestMethod_LIST,
 			Query:  "Jane",
@@ -610,7 +610,7 @@ func TestExpandRequest(t *testing.T) {
 
 		e.AddSources(&sx)
 
-		e.HandleItemRequest(&sdp.ItemRequest{
+		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
 			Type:   "person",
 			Method: sdp.RequestMethod_LIST,
 			Query:  "Rachel",
@@ -653,7 +653,7 @@ func TestExpandRequest(t *testing.T) {
 		e.AddSources(&sy)
 		e.AddSources(&sz)
 
-		e.HandleItemRequest(&sdp.ItemRequest{
+		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
 			Type:   "person",
 			Method: sdp.RequestMethod_LIST,
 			Query:  "Ross",
@@ -705,7 +705,7 @@ func TestExpandRequest(t *testing.T) {
 		e.AddSources(&sy)
 		e.AddSources(&sz)
 
-		e.HandleItemRequest(&sdp.ItemRequest{
+		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
 			Type:   "person",
 			Method: sdp.RequestMethod_LIST,
 			Query:  "Ross",

@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"context"
 	"errors"
 	"regexp"
 	"testing"
@@ -18,7 +19,7 @@ type TriggerTest struct {
 	Name        string
 	Trigger     Trigger
 	ExpectError bool
-	Item        sdp.Item
+	Item        *sdp.Item
 }
 
 var testTrigger = Trigger{
@@ -44,7 +45,7 @@ var tests = []TriggerTest{
 		Name:        "with matching item",
 		Trigger:     testTrigger,
 		ExpectError: false,
-		Item: sdp.Item{
+		Item: &sdp.Item{
 			Type:            "person",
 			UniqueAttribute: "name",
 			Attributes: &sdp.ItemAttributes{
@@ -82,7 +83,7 @@ var tests = []TriggerTest{
 		Name:        "with a mismatched type",
 		Trigger:     testTrigger,
 		ExpectError: true,
-		Item: sdp.Item{
+		Item: &sdp.Item{
 			Type:            "tree",
 			UniqueAttribute: "name",
 			Attributes: &sdp.ItemAttributes{
@@ -120,7 +121,7 @@ var tests = []TriggerTest{
 		Name:        "with a mismatched UniqueAttributeValue",
 		Trigger:     testTrigger,
 		ExpectError: true,
-		Item: sdp.Item{
+		Item: &sdp.Item{
 			Type:            "person",
 			UniqueAttribute: "name",
 			Attributes: &sdp.ItemAttributes{
@@ -159,7 +160,7 @@ var tests = []TriggerTest{
 func TestStandaloneTriggers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
-			req, err := tt.Trigger.ProcessItem(&tt.Item)
+			req, err := tt.Trigger.ProcessItem(tt.Item)
 
 			if tt.ExpectError {
 				if err == nil {
@@ -267,7 +268,7 @@ func TestNATSTriggers(t *testing.T) {
 			progress := sdp.NewRequestProgress(tt.Item.Metadata.SourceRequest)
 			_, err = engine.natsConnection.Subscribe(
 				tt.Item.Metadata.SourceRequest.ResponseSubject,
-				progress.ProcessResponse,
+				sdp.NewResponseHandler("ProcessResponse", progress.ProcessResponse),
 			)
 
 			if err != nil {
@@ -276,8 +277,9 @@ func TestNATSTriggers(t *testing.T) {
 
 			// Send the test item as if it was the result of some other query
 			err = engine.natsConnection.Publish(
+				context.Background(),
 				"return.item."+nats.NewInbox(),
-				&tt.Item,
+				tt.Item,
 			)
 
 			if err != nil {
@@ -287,7 +289,7 @@ func TestNATSTriggers(t *testing.T) {
 			items := make(chan *sdp.Item, 1000)
 			errs := make(chan *sdp.ItemRequestError, 1000)
 
-			progress.Start(engine.natsConnection, items, errs)
+			progress.Start(context.Background(), engine.natsConnection, items, errs)
 
 			for range items {
 				// Do nothing

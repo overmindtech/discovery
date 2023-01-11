@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
@@ -203,7 +204,7 @@ func TestNats(t *testing.T) {
 			ItemSubject:     NewItemSubject(),
 		})
 
-		_, _, err := req.Execute(e.natsConnection)
+		_, _, err := req.Execute(context.Background(), e.natsConnection)
 
 		if err != nil {
 			t.Error(err)
@@ -230,7 +231,7 @@ func TestNats(t *testing.T) {
 			ItemSubject:     NewItemSubject(),
 		})
 
-		_, _, err := req.Execute(e.natsConnection)
+		_, _, err := req.Execute(context.Background(), e.natsConnection)
 
 		if err != nil {
 			t.Error(err)
@@ -301,7 +302,7 @@ func TestNatsCancel(t *testing.T) {
 		items := make(chan *sdp.Item, 1000)
 		errs := make(chan *sdp.ItemRequestError, 1000)
 
-		err := progress.Start(conn, items, errs)
+		err := progress.Start(context.Background(), conn, items, errs)
 
 		if err != nil {
 			t.Error(err)
@@ -309,7 +310,7 @@ func TestNatsCancel(t *testing.T) {
 
 		time.Sleep(1 * time.Second)
 
-		conn.Publish("cancel.all", &sdp.CancelItemRequest{
+		conn.Publish(context.Background(), "cancel.all", &sdp.CancelItemRequest{
 			UUID: u[:],
 		})
 
@@ -334,9 +335,6 @@ func TestNatsCancel(t *testing.T) {
 }
 
 func TestNatsConnections(t *testing.T) {
-	// Need to change this to avoid port clashes in github actions
-	test.DefaultTestOptions.Port = 4111
-
 	t.Run("with a bad hostname", func(t *testing.T) {
 		e := Engine{
 			Name: "nats-test",
@@ -359,7 +357,10 @@ func TestNatsConnections(t *testing.T) {
 
 	t.Run("with a server that disconnects", func(t *testing.T) {
 		// We are running a custom server here so that we can control its lifecycle
-		s := test.RunServer(&test.DefaultTestOptions)
+		opts := test.DefaultTestOptions
+		// Need to change this to avoid port clashes in github actions
+		opts.Port = 4111
+		s := test.RunServer(&opts)
 
 		if !s.ReadyForConnections(10 * time.Second) {
 			t.Fatal("Could not start goroutine NATS server")
@@ -409,7 +410,7 @@ func TestNatsConnections(t *testing.T) {
 		}
 
 		// Reset the server
-		s = test.RunServer(&test.DefaultTestOptions)
+		s = test.RunServer(&opts)
 
 		// Wait for the server to start
 		s.ReadyForConnections(10 * time.Second)
@@ -429,12 +430,17 @@ func TestNatsConnections(t *testing.T) {
 	})
 
 	t.Run("with a server that takes a while to start", func(t *testing.T) {
+		// We are running a custom server here so that we can control its lifecycle
+		opts := test.DefaultTestOptions
+		// Need to change this to avoid port clashes in github actions
+		opts.Port = 4112
+
 		e := Engine{
 			Name: "nats-test",
 			NATSOptions: &connect.NATSOptions{
 				NumRetries:        10,
 				RetryDelay:        time.Second,
-				Servers:           []string{"127.0.0.1:4111"},
+				Servers:           []string{"127.0.0.1:4112"},
 				ConnectionName:    "test-disconnection",
 				ConnectionTimeout: time.Second,
 				MaxReconnects:     10,
@@ -452,7 +458,7 @@ func TestNatsConnections(t *testing.T) {
 			time.Sleep(2 * time.Second)
 
 			// We are running a custom server here so that we can control its lifecycle
-			s = test.RunServer(&test.DefaultTestOptions)
+			s = test.RunServer(&opts)
 
 			t.Cleanup(func() {
 				if s != nil {
@@ -471,7 +477,7 @@ func TestNatsConnections(t *testing.T) {
 
 func TestNATSFailureRestart(t *testing.T) {
 	restartTestOption := test.DefaultTestOptions
-	restartTestOption.Port = 4112
+	restartTestOption.Port = 4113
 
 	// We are running a custom server here so that we can control its lifecycle
 	s := test.RunServer(&restartTestOption)
@@ -485,7 +491,7 @@ func TestNATSFailureRestart(t *testing.T) {
 		NATSOptions: &connect.NATSOptions{
 			NumRetries:        10,
 			RetryDelay:        time.Second,
-			Servers:           []string{"127.0.0.1:4112"},
+			Servers:           []string{"127.0.0.1:4113"},
 			ConnectionName:    "test-disconnection",
 			ConnectionTimeout: time.Second,
 			MaxReconnects:     10,
@@ -590,7 +596,7 @@ func TestNatsAuth(t *testing.T) {
 			Scope:           "test",
 			ResponseSubject: NewResponseSubject(),
 			ItemSubject:     NewItemSubject(),
-		}).Execute(e.natsConnection)
+		}).Execute(context.Background(), e.natsConnection)
 
 		if err != nil {
 			t.Error(err)
@@ -615,7 +621,7 @@ func TestNatsAuth(t *testing.T) {
 			Scope:           "test",
 			ResponseSubject: NewResponseSubject(),
 			ItemSubject:     NewItemSubject(),
-		}).Execute(e.natsConnection)
+		}).Execute(context.Background(), e.natsConnection)
 
 		if err != nil {
 			t.Error(err)
