@@ -95,9 +95,9 @@ func TestParallelRequestPerformance(t *testing.T) {
 }
 
 // RunLinearPerformanceTest Runs a test with a given number in input requests,
-// link depth and parallelisation limit. Expected results and expected duration
+// link depth and parallelization limit. Expected results and expected duration
 // are determined automatically meaning all this is testing for is the fact that
-// the perfomance continues to be linear and predictable
+// the performance continues to be linear and predictable
 func RunLinearPerformanceTest(t *testing.T, name string, numRequests int, linkDepth int, numParallel int) {
 	t.Helper()
 
@@ -105,7 +105,7 @@ func RunLinearPerformanceTest(t *testing.T, name string, numRequests int, linkDe
 		result := TimeRequests(numRequests, linkDepth, numParallel)
 
 		if len(result.Results) != result.ExpectedItems {
-			t.Errorf("Expected %v items, got %v", result.ExpectedItems, len(result.Results))
+			t.Errorf("Expected %v items, got %v (%v errors)", result.ExpectedItems, len(result.Results), len(result.Errors))
 		}
 
 		if result.TimeTaken > result.MaxTime {
