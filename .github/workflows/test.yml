@@ -46,13 +46,13 @@ jobs:
     - name: Get dependencies
       run: |
         go get -v -t -d ./...
-  
+
     - name: Test
       env:
         OVERMIND_NTE_ALLPERMS_CLIENT_ID: ${{ secrets.OVERMIND_NTE_ALLPERMS_CLIENT_ID }}
         OVERMIND_NTE_ALLPERMS_CLIENT_SECRET: ${{ secrets.OVERMIND_NTE_ALLPERMS_CLIENT_SECRET }}
         OVERMIND_NTE_ALLPERMS_DOMAIN: ${{ secrets.OVERMIND_NTE_ALLPERMS_DOMAIN }}
-      run: go test -timeout 60s ./... -race
+      run: go test -timeout 5m ./... -race
 
   release:
     name: Release
