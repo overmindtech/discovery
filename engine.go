@@ -368,6 +368,10 @@ func (e *Engine) disconnect() error {
 	e.natsConnectionMutex.Lock()
 	defer e.natsConnectionMutex.Unlock()
 
+	if e.natsConnection == nil {
+		return nil
+	}
+
 	if e.natsConnection.Underlying() != nil {
 		// Only unsubscribe if the connection is not closed. If it's closed
 		// there is no point
@@ -518,9 +522,14 @@ func (e *Engine) IsNATSConnected() bool {
 	e.natsConnectionMutex.Lock()
 	defer e.natsConnectionMutex.Unlock()
 
+	if e.natsConnection == nil {
+		return false
+	}
+
 	if conn := e.natsConnection.Underlying(); conn != nil {
 		return conn.IsConnected()
 	}
+
 	return false
 }
 
