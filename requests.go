@@ -73,7 +73,7 @@ func (e *Engine) HandleItemRequest(ctx context.Context, itemRequest *sdp.ItemReq
 	}
 
 	responder.Start(
-		ctx,
+		context.Background(),
 		pub,
 		e.Name,
 	)

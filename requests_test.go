@@ -296,7 +296,7 @@ func TestSendRequestSync(t *testing.T) {
 	SkipWithoutNats(t)
 
 	e := Engine{
-		Name: "nats-test",
+		Name: "nats-test-srs",
 		NATSOptions: &connect.NATSOptions{
 			Servers:           NatsTestURLs,
 			ConnectionName:    "test-connection",
@@ -358,7 +358,7 @@ func TestSendRequestSync(t *testing.T) {
 		}
 
 		if progress.NumComplete() != 1 {
-			t.Fatalf("expected 1 to be complete, got %v", progress.NumComplete())
+			t.Fatalf("expected 1 to be complete, got %v\nProgress: %v", progress.NumComplete(), progress)
 		}
 
 	}
