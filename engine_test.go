@@ -699,7 +699,7 @@ func GetTestOAuthTokenClient(t *testing.T) *connect.OAuthTokenClient {
 	ccc := connect.ClientCredentialsConfig{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
-		Org:          "org_hdeUXbB55sMMvJLa",
+		Account:      "org_hdeUXbB55sMMvJLa",
 	}
 
 	return connect.NewOAuthTokenClient(
