@@ -55,14 +55,14 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ${{ steps.go-cache-paths.outputs.go-mod }}
-        key: ${{ runner.os }}-test-go-mod-${{ hashFiles('**/go.sum') }}
+        key: ${{ runner.os }}-test-go-${{ matrix.go-version }}-mod-${{ hashFiles('**/go.sum') }}
 
     # Cache go build cache, used to speedup go test
     - name: Go Build Cache
       uses: actions/cache@v3
       with:
         path: ${{ steps.go-cache-paths.outputs.go-build }}
-        key: ${{ runner.os }}-test-go-build-${{ hashFiles('**/go.sum') }}
+        key: ${{ runner.os }}-test-go-${{ matrix.go-version }}-build-${{ hashFiles('**/go.sum') }}
 
     - name: Get dependencies
       run: |
