@@ -40,6 +40,9 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/felixge/httpsnoop v1.0.3 h1:s/nj+GCswXYzN5v2DpNMuMQYe+0DDwt5WVCU6CWBdXk=
 github.com/felixge/httpsnoop v1.0.3/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
+github.com/getsentry/sentry-go v0.17.0 h1:UustVWnOoDFHBS7IJUB2QK/nB5pap748ZEp0swnQJak=
+github.com/getsentry/sentry-go v0.17.0/go.mod h1:B82dxtBvxG0KaPD8/hfSV+VcHD+Lg/xUS4JuQn1P4cM=
+github.com/go-errors/errors v1.4.2 h1:J6MZopCL4uSllY1OfXM374weqZFFItUbrImctkmUxIA=
 github.com/go-logr/logr v1.2.2/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=
 github.com/go-logr/logr v1.2.3 h1:2DntVwHkVopvECVRSlL5PSo9eG+cAkDCuckLubN+rq0=
 github.com/go-logr/logr v1.2.3/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=
@@ -87,10 +90,12 @@ github.com/overmindtech/api-client v0.10.1 h1:YUyV0vSCoAfRdyJPLXGYkRLjZ5fLZaLqKa
 github.com/overmindtech/api-client v0.10.1/go.mod h1:zQEMpN8Je/LWS6GcZhkGvh+UE4VzbHRVVMW74Kx9+3c=
 github.com/overmindtech/connect v0.7.0 h1:W8Mp4dHO0zqQkNTI4DrKmS5d5F23gxIoaDuL76MrNb8=
 github.com/overmindtech/connect v0.7.0/go.mod h1:wAqCOQ5NwxSXuq4Cr+/P+9XpEQU5wiBDnk0Q6QK+s4I=
-github.com/overmindtech/sdp-go v0.15.1 h1:HV8xPxYGwujXX0MXhcZaDqJgl+VYZnlVVfwCzNa17qE=
-github.com/overmindtech/sdp-go v0.15.1/go.mod h1:EupyGKxoXVD8Zp6LgDdGIoF2aafPC4AkazBBlgi+bhE=
+github.com/overmindtech/sdp-go v0.15.2 h1:T857mHnGOd2oallbUqxC+qdG/qZEPtsAEvTT15FPaFc=
+github.com/overmindtech/sdp-go v0.15.2/go.mod h1:+IYVaWhXKpeP9VZGDoKOuES+5SNSGG/+TrFMQ6jfAAQ=
 github.com/overmindtech/sdpcache v0.4.0 h1:ZwKlIjgrDQAQrgPI5epSlyx0xvyGlmNyOHvWYwkOGMY=
 github.com/overmindtech/sdpcache v0.4.0/go.mod h1:9JSClXB6VzGEqcgTpO/oJNK34yys2vFM48PRs/lvJBs=
+github.com/pingcap/errors v0.11.4 h1:lFuQV/oaUMGcD2tqt+01ROSmJs75VG1ToEOkZIZ4nE4=
+github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/sirupsen/logrus v1.9.0 h1:trlNQbNUG3OdDrDil03MCb1H2o9nJ1x4/5LYw7byDE0=
@@ -131,6 +136,8 @@ golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1/go.mod h1:bj7SfCRtBDWHUb9sn
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.2/go.mod h1:bEr9sfX3Q8Zfm5fL9x+3itogRgK3+ptLWKqgva+5dAk=
 golang.org/x/text v0.3.3/go.mod h1:5Zoc/QRtKVWzQhOtBMvqHzDpF6irO9z98xDceosuGiQ=
+golang.org/x/text v0.6.0 h1:3XmdazWV+ubf7QgHSTWeykHOci5oeekaGJBLkrkaw4k=
+golang.org/x/text v0.6.0/go.mod h1:mrYo+phRRbMaCq/xk9113O4dZlRixOauAjOtrjsXDZ8=
 golang.org/x/time v0.3.0 h1:rg5rLMjNzMS1RkNLzCG38eapWhnYLFYXDXj2gOlr8j4=
 golang.org/x/time v0.3.0/go.mod h1:tRJNPiyCQ0inRvYxbN9jk5I+vvW/OXSQhTDSoE431IQ=
 golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
