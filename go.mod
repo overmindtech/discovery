@@ -10,7 +10,7 @@ require (
 	github.com/nats-io/nats-server/v2 v2.9.11
 	github.com/nats-io/nats.go v1.23.0
 	github.com/overmindtech/connect v0.7.0
-	github.com/overmindtech/sdp-go v0.15.1
+	github.com/overmindtech/sdp-go v0.15.2
 	github.com/overmindtech/sdpcache v0.4.0
 	github.com/sirupsen/logrus v1.9.0
 	google.golang.org/protobuf v1.28.1
@@ -62,4 +62,9 @@ require (
 	golang.org/x/sys v0.4.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
+)
+
+require (
+	github.com/getsentry/sentry-go v0.17.0 // indirect
+	golang.org/x/text v0.6.0 // indirect
 )
