@@ -9,8 +9,8 @@ require (
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats-server/v2 v2.9.12
 	github.com/nats-io/nats.go v1.23.0
-	github.com/overmindtech/connect v0.7.2
-	github.com/overmindtech/sdp-go v0.15.2
+	github.com/overmindtech/connect v0.8.1
+	github.com/overmindtech/sdp-go v0.15.3
 	github.com/overmindtech/sdpcache v0.4.1
 	github.com/sirupsen/logrus v1.9.0
 	google.golang.org/protobuf v1.28.1
@@ -50,7 +50,7 @@ require (
 	github.com/nats-io/jwt/v2 v2.3.0 // indirect
 	github.com/nats-io/nkeys v0.3.0 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
-	github.com/overmindtech/api-client v0.10.1 // indirect
+	github.com/overmindtech/api-client v0.11.0 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.38.0 // indirect
 	go.opentelemetry.io/otel v1.12.0 // indirect
