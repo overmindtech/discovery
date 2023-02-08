@@ -92,8 +92,8 @@ github.com/overmindtech/connect v0.7.2 h1:fu9tfC1xaX9BZDMhbmzxIC1fERirkG4jPmsqIx
 github.com/overmindtech/connect v0.7.2/go.mod h1:OGADa4NxsT+3q7SK3QJ6lojJZncIFu53YBAY1g4lNpk=
 github.com/overmindtech/sdp-go v0.15.2 h1:T857mHnGOd2oallbUqxC+qdG/qZEPtsAEvTT15FPaFc=
 github.com/overmindtech/sdp-go v0.15.2/go.mod h1:+IYVaWhXKpeP9VZGDoKOuES+5SNSGG/+TrFMQ6jfAAQ=
-github.com/overmindtech/sdpcache v0.4.0 h1:ZwKlIjgrDQAQrgPI5epSlyx0xvyGlmNyOHvWYwkOGMY=
-github.com/overmindtech/sdpcache v0.4.0/go.mod h1:9JSClXB6VzGEqcgTpO/oJNK34yys2vFM48PRs/lvJBs=
+github.com/overmindtech/sdpcache v0.4.1 h1:dUakghojsaR8y00nLY8SaLwzAeJdL43o3Z1bri42DI4=
+github.com/overmindtech/sdpcache v0.4.1/go.mod h1:4k2tTOJXWZFin5HhekzHpPvg2p5XiV5/D/J8b7K4VSY=
 github.com/pingcap/errors v0.11.4 h1:lFuQV/oaUMGcD2tqt+01ROSmJs75VG1ToEOkZIZ4nE4=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

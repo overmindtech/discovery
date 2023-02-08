@@ -11,7 +11,7 @@ require (
 	github.com/nats-io/nats.go v1.23.0
 	github.com/overmindtech/connect v0.7.2
 	github.com/overmindtech/sdp-go v0.15.2
-	github.com/overmindtech/sdpcache v0.4.0
+	github.com/overmindtech/sdpcache v0.4.1
 	github.com/sirupsen/logrus v1.9.0
 	google.golang.org/protobuf v1.28.1
 )
