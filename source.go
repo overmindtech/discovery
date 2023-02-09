@@ -291,10 +291,7 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 				sourceDuration = time.Since(start)
 			}(ctx)
 
-			span.SetAttributes(
-				attribute.Int("om.source.numItems", len(resultItems)),
-				attribute.String("om.source.error", err.Error()),
-			)
+			span.SetAttributes(attribute.Int("om.source.numItems", len(resultItems)))
 
 			if considerFailed(err) {
 				span.SetStatus(codes.Error, err.Error())
@@ -307,6 +304,8 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 			}
 
 			if err != nil {
+				span.SetAttributes(attribute.String("om.source.error", err.Error()))
+
 				if sdpErr, ok := err.(*sdp.ItemRequestError); ok {
 					// Add details if they aren't populated
 					if sdpErr.Scope == "" {
