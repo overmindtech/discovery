@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/overmindtech/sdp-go"
-	log "github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
@@ -46,8 +46,12 @@ func (e *Engine) ItemRequestHandler(ctx context.Context, itemRequest *sdp.ItemRe
 // HandleItemRequest Handles a single request. This includes responses, linking
 // etc.
 func (e *Engine) HandleItemRequest(ctx context.Context, itemRequest *sdp.ItemRequest) {
+	ctx, span := tracer.Start(ctx, "HandleItemRequest")
+	defer span.End()
+
 	if len(e.ExpandRequest(itemRequest)) == 0 {
 		// If we don't have any relevant sources, exit
+		span.AddEvent("no relevant sources, nothing to do")
 		return
 	}
 
@@ -73,7 +77,7 @@ func (e *Engine) HandleItemRequest(ctx context.Context, itemRequest *sdp.ItemReq
 	}
 
 	responder.Start(
-		context.Background(),
+		ctx,
 		pub,
 		e.Name,
 	)
@@ -81,17 +85,17 @@ func (e *Engine) HandleItemRequest(ctx context.Context, itemRequest *sdp.ItemReq
 	// Extract and parse the UUID
 	reqUUID, uuidErr := uuid.FromBytes(itemRequest.UUID)
 
-	log.WithFields(log.Fields{
-		"requestType":              itemRequest.Type,
-		"requestMethod":            itemRequest.Method,
-		"requestQuery":             itemRequest.Query,
-		"requestLinkDepth":         itemRequest.LinkDepth,
-		"requestScope":             itemRequest.Scope,
-		"requestTimeout":           itemRequest.Timeout.AsDuration().String(),
-		"requestTimeoutOverridden": timeoutOverride,
-		"requestUUID":              reqUUID.String(),
-		"requestIgnoreCache":       itemRequest.IgnoreCache,
-	}).Info("Received request")
+	span.SetAttributes(
+		attribute.String("om.sdp.requestType", itemRequest.Type),
+		attribute.String("om.sdp.requestMethod", itemRequest.Method.String()),
+		attribute.String("om.sdp.requestQuery", itemRequest.Query),
+		attribute.Int("om.sdp.requestLinkDepth", int(itemRequest.LinkDepth)),
+		attribute.String("om.sdp.requestScope", itemRequest.Scope),
+		attribute.String("om.sdp.requestTimeout", itemRequest.Timeout.AsDuration().String()),
+		attribute.Bool("om.sdp.requestTimeoutOverridden", timeoutOverride),
+		attribute.String("om.sdp.requestUUID", reqUUID.String()),
+		attribute.Bool("om.sdp.requestIgnoreCache", itemRequest.IgnoreCache),
+	)
 
 	requestTracker := RequestTracker{
 		Request: itemRequest,
@@ -102,7 +106,7 @@ func (e *Engine) HandleItemRequest(ctx context.Context, itemRequest *sdp.ItemReq
 		e.TrackRequest(reqUUID, &requestTracker)
 	}
 
-	_, _, err := requestTracker.Execute()
+	_, _, err := requestTracker.Execute(ctx)
 
 	// If all failed then return an error
 	if err != nil {
@@ -112,39 +116,12 @@ func (e *Engine) HandleItemRequest(ctx context.Context, itemRequest *sdp.ItemReq
 			responder.Error()
 		}
 
-		logEntry := log.WithFields(log.Fields{
-			"errorType":                "OTHER",
-			"errorString":              err.Error(),
-			"requestType":              itemRequest.Type,
-			"requestMethod":            itemRequest.Method,
-			"requestQuery":             itemRequest.Query,
-			"requestLinkDepth":         itemRequest.LinkDepth,
-			"requestScope":             itemRequest.Scope,
-			"requestTimeout":           itemRequest.Timeout.AsDuration().String(),
-			"requestTimeoutOverridden": timeoutOverride,
-			"requestUUID":              reqUUID.String(),
-			"requestIgnoreCache":       itemRequest.IgnoreCache,
-		})
-
-		if ire, ok := err.(*sdp.ItemRequestError); ok && ire.ErrorType == sdp.ItemRequestError_OTHER {
-			logEntry.Error("Request ended with unknown error")
-		} else {
-			logEntry.Info("Request ended with error")
-		}
+		span.SetAttributes(
+			attribute.String("om.sdp.errorType", "OTHER"),
+			attribute.String("om.sdp.errorString", err.Error()),
+		)
 	} else {
 		responder.Done()
-
-		log.WithFields(log.Fields{
-			"requestType":              itemRequest.Type,
-			"requestMethod":            itemRequest.Method,
-			"requestQuery":             itemRequest.Query,
-			"requestLinkDepth":         itemRequest.LinkDepth,
-			"requestScope":             itemRequest.Scope,
-			"requestTimeout":           itemRequest.Timeout.AsDuration().String(),
-			"requestTimeoutOverridden": timeoutOverride,
-			"requestUUID":              reqUUID.String(),
-			"requestIgnoreCache":       itemRequest.IgnoreCache,
-		}).Info("Request complete")
 	}
 }
 
@@ -176,7 +153,7 @@ func (e *Engine) ExecuteRequestSync(ctx context.Context, req *sdp.ItemRequest) (
 // Items and errors will be sent to the supplied channels as they are found.
 // Note that if these channels are not buffered, something will need to be
 // receiving the results or this method will never finish. If results are not
-// requered the channels can be nil
+// required the channels can be nil
 func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items chan<- *sdp.Item, errs chan<- *sdp.ItemRequestError) error {
 	// Make sure we close channels once we're done
 	if items != nil {
@@ -204,7 +181,7 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items
 		return errors.New("no matching sources found")
 	}
 
-	// These are used to calcualte whether all sourcces have failed or not
+	// These are used to calculate whether all sources have failed or not
 	var numSources int
 	var numErrs int
 
@@ -213,7 +190,7 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items
 
 		e.throttle.Lock()
 
-		go func(r *sdp.ItemRequest, sources []Source) {
+		go func(ctx context.Context, r *sdp.ItemRequest, sources []Source) {
 			defer wg.Done()
 			defer e.throttle.Unlock()
 			var requestItems []*sdp.Item
@@ -266,7 +243,7 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items
 					}
 				}
 			}
-		}(request, sources)
+		}(ctx, request, sources)
 	}
 
 	// Wait for all requests to complete
