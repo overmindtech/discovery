@@ -169,7 +169,7 @@ func TimeRequests(numRequests int, linkDepth int, numParallel int) TimedResults 
 		go func(rt *RequestTracker) {
 			defer wg.Done()
 
-			items, errs, _ := rt.Execute()
+			items, errs, _ := rt.Execute(context.Background())
 
 			resultsMutex.Lock()
 			results = append(results, items...)

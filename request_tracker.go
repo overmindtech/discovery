@@ -249,7 +249,7 @@ func (r *RequestTracker) stopLinking() {
 // relevant nats subjects. Returns the full list of items, errors, and a final
 // error. The final error will be populated if all sources failed, or some other
 // error was encountered while trying run the request
-func (r *RequestTracker) Execute() ([]*sdp.Item, []*sdp.ItemRequestError, error) {
+func (r *RequestTracker) Execute(ctx context.Context) ([]*sdp.Item, []*sdp.ItemRequestError, error) {
 	if r.unlinkedItems == nil {
 		r.unlinkedItems = make(chan *sdp.Item)
 	}
@@ -268,7 +268,7 @@ func (r *RequestTracker) Execute() ([]*sdp.Item, []*sdp.ItemRequestError, error)
 	sdpErrs := make([]*sdp.ItemRequestError, 0)
 
 	// Create context to enforce timeouts
-	ctx, cancel := r.Request.TimeoutContext()
+	ctx, cancel := r.Request.TimeoutContext(ctx)
 	r.cancelFuncMutex.Lock()
 	r.cancelFunc = cancel
 	r.cancelFuncMutex.Unlock()

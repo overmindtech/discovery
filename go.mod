@@ -10,9 +10,11 @@ require (
 	github.com/nats-io/nats-server/v2 v2.9.12
 	github.com/nats-io/nats.go v1.23.0
 	github.com/overmindtech/connect v0.8.1
-	github.com/overmindtech/sdp-go v0.15.3
+	github.com/overmindtech/sdp-go v0.15.5
 	github.com/overmindtech/sdpcache v0.4.1
 	github.com/sirupsen/logrus v1.9.0
+	go.opentelemetry.io/otel v1.13.0
+	go.opentelemetry.io/otel/trace v1.13.0
 	google.golang.org/protobuf v1.28.1
 )
 
@@ -36,6 +38,7 @@ require (
 	github.com/blevesearch/zapx/v14 v14.3.7 // indirect
 	github.com/blevesearch/zapx/v15 v15.3.8 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
+	github.com/getsentry/sentry-go v0.18.0 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/geo v0.0.0-20210211234256-740aa86cb551 // indirect
@@ -53,18 +56,12 @@ require (
 	github.com/overmindtech/api-client v0.11.1 // indirect
 	go.etcd.io/bbolt v1.3.7 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.39.0 // indirect
-	go.opentelemetry.io/otel v1.13.0 // indirect
 	go.opentelemetry.io/otel/metric v0.36.0 // indirect
-	go.opentelemetry.io/otel/trace v1.13.0 // indirect
 	golang.org/x/crypto v0.6.0 // indirect
 	golang.org/x/net v0.6.0 // indirect
 	golang.org/x/oauth2 v0.5.0 // indirect
 	golang.org/x/sys v0.5.0 // indirect
+	golang.org/x/text v0.7.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-)
-
-require (
-	github.com/getsentry/sentry-go v0.18.0 // indirect
-	golang.org/x/text v0.7.0 // indirect
 )
