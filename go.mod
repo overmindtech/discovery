@@ -7,10 +7,10 @@ require (
 	github.com/blevesearch/bleve/v2 v2.3.6
 	github.com/google/uuid v1.3.0
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
-	github.com/nats-io/nats-server/v2 v2.9.12
+	github.com/nats-io/nats-server/v2 v2.9.14
 	github.com/nats-io/nats.go v1.23.0
-	github.com/overmindtech/connect v0.8.2
-	github.com/overmindtech/sdp-go v0.15.5
+	github.com/overmindtech/connect v0.8.3
+	github.com/overmindtech/sdp-go v0.16.0
 	github.com/overmindtech/sdpcache v0.4.1
 	github.com/sirupsen/logrus v1.9.0
 	go.opentelemetry.io/otel v1.13.0

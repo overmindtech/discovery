@@ -210,7 +210,7 @@ func (e *Engine) ProcessTriggers(ctx context.Context, item *sdp.Item) {
 			}
 
 			// Fire the trigger and send the request to the engine
-			e.ItemRequestHandler(ctx, req)
+			go e.HandleItemRequest(ctx, req)
 		}(trigger)
 	}
 
@@ -303,20 +303,26 @@ func (e *Engine) connect() error {
 			"URL:":     e.natsConnection.Underlying().ConnectedUrl(),
 		}).Info("NATS connected")
 
-		err = e.subscribe("request.all", sdp.NewItemRequestHandler("ItemRequestHandler", e.ItemRequestHandler))
+		err = e.subscribe("request.all", sdp.NewAsyncRawItemRequestHandler("ItemRequestHandler", func(ctx context.Context, _ *nats.Msg, i *sdp.ItemRequest) {
+			e.HandleItemRequest(ctx, i)
+		}))
 
 		if err != nil {
 			return err
 		}
 
-		err = e.subscribe("cancel.all", sdp.NewCancelItemRequestHandler("CancelHandler", e.CancelHandler))
+		err = e.subscribe("cancel.all", sdp.NewAsyncRawCancelItemRequestHandler("CancelHandler", func(ctx context.Context, m *nats.Msg, i *sdp.CancelItemRequest) {
+			e.HandleCancelItemRequest(ctx, i)
+		}))
 
 		if err != nil {
 			return err
 		}
 
 		if len(e.triggers) > 0 {
-			err = e.subscribe("return.item.>", sdp.NewItemHandler("ProcessTriggers", e.ProcessTriggers))
+			err = e.subscribe("return.item.>", sdp.NewAsyncRawItemHandler("ProcessTriggers", func(ctx context.Context, m *nats.Msg, i *sdp.Item) {
+				e.ProcessTriggers(ctx, i)
+			}))
 
 			if err != nil {
 				return err
@@ -346,12 +352,20 @@ func (e *Engine) connect() error {
 
 		// Now actually create the required subscriptions
 		if wildcardExists {
-			e.subscribe("request.scope.>", sdp.NewItemRequestHandler("WildcardItemRequestHandler", e.ItemRequestHandler))
-			e.subscribe("cancel.scope.>", sdp.NewCancelItemRequestHandler("WildcardCancelHandler", e.CancelHandler))
+			e.subscribe("request.scope.>", sdp.NewAsyncRawItemRequestHandler("WildcardItemRequestHandler", func(ctx context.Context, m *nats.Msg, i *sdp.ItemRequest) {
+				e.HandleItemRequest(ctx, i)
+			}))
+			e.subscribe("cancel.scope.>", sdp.NewAsyncRawCancelItemRequestHandler("WildcardCancelHandler", func(ctx context.Context, m *nats.Msg, i *sdp.CancelItemRequest) {
+				e.HandleCancelItemRequest(ctx, i)
+			}))
 		} else {
 			for suffix := range subscriptionMap {
-				e.subscribe(fmt.Sprintf("request.scope.%v", suffix), sdp.NewItemRequestHandler("WildcardItemRequestHandler", e.ItemRequestHandler))
-				e.subscribe(fmt.Sprintf("cancel.scope.%v", suffix), sdp.NewCancelItemRequestHandler("WildcardCancelHandler", e.CancelHandler))
+				e.subscribe(fmt.Sprintf("request.scope.%v", suffix), sdp.NewAsyncRawItemRequestHandler("WildcardItemRequestHandler", func(ctx context.Context, m *nats.Msg, i *sdp.ItemRequest) {
+					e.HandleItemRequest(ctx, i)
+				}))
+				e.subscribe(fmt.Sprintf("cancel.scope.%v", suffix), sdp.NewAsyncRawCancelItemRequestHandler("WildcardCancelHandler", func(ctx context.Context, m *nats.Msg, i *sdp.CancelItemRequest) {
+					e.HandleCancelItemRequest(ctx, i)
+				}))
 			}
 		}
 
@@ -531,11 +545,6 @@ func (e *Engine) IsNATSConnected() bool {
 	}
 
 	return false
-}
-
-// CancelHandler calls HandleCancelItemRequest in a goroutine
-func (e *Engine) CancelHandler(ctx context.Context, cancelRequest *sdp.CancelItemRequest) {
-	go e.HandleCancelItemRequest(ctx, cancelRequest)
 }
 
 // HandleCancelItemRequest Takes a CancelItemRequest and cancels that request if it exists

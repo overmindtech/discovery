@@ -37,12 +37,6 @@ func NewResponseSubject() string {
 	return fmt.Sprintf("return.response.%v", nats.NewInbox())
 }
 
-// ItemRequestHandler Calls HandleItemRequest but in a goroutine so that it can
-// happen in parallel
-func (e *Engine) ItemRequestHandler(ctx context.Context, itemRequest *sdp.ItemRequest) {
-	go e.HandleItemRequest(ctx, itemRequest)
-}
-
 // HandleItemRequest Handles a single request. This includes responses, linking
 // etc.
 func (e *Engine) HandleItemRequest(ctx context.Context, itemRequest *sdp.ItemRequest) {
