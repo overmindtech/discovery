@@ -10,7 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// RequestTracker is used for tracking the progress of a single requestt. This
+// RequestTracker is used for tracking the progress of a single request. This
 // is used because a single request could have a link depth that results in many
 // requests being executed meaning that we need to not only track the first
 // request, but also all other requests and items that result from linking
@@ -36,7 +36,7 @@ type RequestTracker struct {
 	linkedItems      map[string]*sdp.Item
 	linkedItemsMutex sync.RWMutex
 
-	// cancelFunc A cuntion that will cancel all requests when called
+	// cancelFunc A function that will cancel all requests when called
 	cancelFunc      context.CancelFunc
 	cancelFuncMutex sync.Mutex
 }
@@ -56,7 +56,7 @@ func (r *RequestTracker) LinkedItems() []*sdp.Item {
 	return items
 }
 
-// registerLinkedItem Registers aqn item in the database of linked items,
+// registerLinkedItem Registers an item in the database of linked items,
 // returns an error if the item is already present
 func (r *RequestTracker) registerLinkedItem(i *sdp.Item) error {
 	r.linkedItemsMutex.Lock()
@@ -332,7 +332,7 @@ func (r *RequestTracker) Execute(ctx context.Context) ([]*sdp.Item, []*sdp.ItemR
 	return r.LinkedItems(), sdpErrs, ctx.Err()
 }
 
-// Cancel Cancells the currently running request
+// Cancel Cancels the currently running request
 func (r *RequestTracker) Cancel() {
 	r.cancelFuncMutex.Lock()
 	defer r.cancelFuncMutex.Unlock()

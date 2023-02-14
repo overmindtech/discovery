@@ -41,7 +41,7 @@ type Engine struct {
 
 	// The maximum request timeout. Defaults to `DefaultMaxRequestTimeout` if
 	// set to zero. If a client does not send a timeout, it will default to this
-	// value. Requests with timouts larger than this value will have their
+	// value. Requests with timeouts larger than this value will have their
 	// timeouts overridden
 	MaxRequestTimeout time.Duration
 
@@ -71,7 +71,7 @@ type Engine struct {
 	triggers      []*Trigger
 	triggersMutex sync.RWMutex
 
-	// GetListMutex used for locking
+	// GetListMutex used for locking out Get requests when there's a List happening
 	gfm GetListMutex
 
 	// trackedRequests is used for storing requests that have a UUID so they can
@@ -222,7 +222,7 @@ func (e *Engine) Sources() []Source {
 	return sources
 }
 
-// NonHiddenSources Returns a slice of all known sources excliding hidden ones
+// NonHiddenSources Returns a slice of all known sources excluding hidden ones
 func (e *Engine) NonHiddenSources() []Source {
 	allSources := e.Sources()
 	nonHiddenSources := make([]Source, 0)

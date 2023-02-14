@@ -121,7 +121,7 @@ func (e *Engine) HandleItemRequest(ctx context.Context, itemRequest *sdp.ItemReq
 }
 
 // ExecuteRequestSync Executes a request, waiting for all results, then returns
-// them along with the error, rather than paiing the results back along channels
+// them along with the error, rather than passing the results back along channels
 func (e *Engine) ExecuteRequestSync(ctx context.Context, req *sdp.ItemRequest) ([]*sdp.Item, []*sdp.ItemRequestError, error) {
 	itemsChan := make(chan *sdp.Item, 100_000)
 	errsChan := make(chan *sdp.ItemRequestError, 100_000)
@@ -203,7 +203,7 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items
 			}
 
 			for _, i := range requestItems {
-				// If the main request had a linkDepth of great than zero it means we
+				// If the main request had a linkDepth of greater than zero it means we
 				// need to keep linking, this means that we need to pass down all of the
 				// subject info along with the number of remaining links. If the link
 				// depth is zero then we just pass then back in their normal form as we
