@@ -99,6 +99,7 @@ func TestExecute(t *testing.T) {
 	}
 
 	engine.AddSources(&src)
+	engine.prepCache()
 
 	t.Run("Without linking", func(t *testing.T) {
 		t.Parallel()
@@ -206,6 +207,7 @@ func TestTimeout(t *testing.T) {
 	}
 
 	engine.AddSources(&src)
+	engine.prepCache()
 
 	t.Run("With a timeout, but not exceeding it", func(t *testing.T) {
 		t.Parallel()
@@ -299,6 +301,7 @@ func TestCancel(t *testing.T) {
 	}
 
 	engine.AddSources(&src)
+	engine.prepCache()
 
 	u := uuid.New()
 

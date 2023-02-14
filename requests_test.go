@@ -22,6 +22,7 @@ func TestExecuteRequest(t *testing.T) {
 	}
 
 	e.AddSources(&src)
+	e.prepCache()
 
 	t.Run("Basic happy-path Get request", func(t *testing.T) {
 		request := &sdp.ItemRequest{
@@ -194,6 +195,7 @@ func TestHandleItemRequest(t *testing.T) {
 	}
 
 	e.AddSources(&personSource, &dogSource)
+	e.prepCache()
 
 	t.Run("Wildcard type should be expanded", func(t *testing.T) {
 		t.Cleanup(func() {
@@ -263,6 +265,7 @@ func TestWildcardSourceExpansion(t *testing.T) {
 	}
 
 	e.AddSources(&personSource)
+	e.prepCache()
 
 	t.Run("request scope should be preserved", func(t *testing.T) {
 		req := sdp.ItemRequest{
@@ -369,6 +372,7 @@ func TestExpandRequest(t *testing.T) {
 	e := Engine{
 		Name: "expand-test",
 	}
+	e.prepCache()
 
 	t.Run("with a single source with a single scope", func(t *testing.T) {
 		t.Cleanup(func() {

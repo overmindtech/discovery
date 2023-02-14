@@ -11,7 +11,7 @@ require (
 	github.com/nats-io/nats.go v1.23.0
 	github.com/overmindtech/connect v0.8.3
 	github.com/overmindtech/sdp-go v0.16.0
-	github.com/overmindtech/sdpcache v0.4.1
+	github.com/overmindtech/sdpcache v1.2.0
 	github.com/sirupsen/logrus v1.9.0
 	go.opentelemetry.io/otel v1.13.0
 	go.opentelemetry.io/otel/trace v1.13.0
@@ -44,6 +44,7 @@ require (
 	github.com/golang/geo v0.0.0-20210211234256-740aa86cb551 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
+	github.com/google/btree v1.1.2 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.15.15 // indirect
 	github.com/minio/highwayhash v1.0.2 // indirect

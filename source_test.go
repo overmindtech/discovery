@@ -304,7 +304,7 @@ func TestGet(t *testing.T) {
 		var err error
 
 		e.cache.MinWaitTime = (10 * time.Millisecond)
-		e.cache.StartPurger()
+		e.cache.StartPurger(context.Background())
 		req := sdp.ItemRequest{
 			Type:   "person",
 			Scope:  "test",
@@ -489,8 +489,9 @@ func TestListSearchCaching(t *testing.T) {
 	}
 
 	e.AddSources(&src)
+	e.prepCache()
 	e.cache.MinWaitTime = (10 * time.Millisecond)
-	e.cache.StartPurger()
+	e.cache.StartPurger(context.Background())
 
 	t.Run("caching with successful find", func(t *testing.T) {
 		t.Cleanup(func() {
@@ -746,8 +747,9 @@ func TestSearchGetCaching(t *testing.T) {
 	}
 
 	e.AddSources(&src)
+	e.prepCache()
 	e.cache.MinWaitTime = (10 * time.Millisecond)
-	e.cache.StartPurger()
+	e.cache.StartPurger(context.Background())
 
 	t.Run("caching with successful search", func(t *testing.T) {
 		t.Cleanup(func() {

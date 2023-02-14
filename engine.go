@@ -52,7 +52,7 @@ type Engine struct {
 	throttle Throttle
 
 	// Cache that is used for storing SDP items in memory
-	cache sdpcache.Cache
+	cache *sdpcache.Cache
 
 	// The NATS connection
 	natsConnection      sdp.EncodedConnection
@@ -79,6 +79,9 @@ type Engine struct {
 
 	// Prevents the engine being restarted many times in parallel
 	restartMutex sync.Mutex
+
+	cacheContext context.Context
+	cacheCancel  context.CancelFunc
 }
 
 // TrackRequest Stores a RequestTracker in the engine so that it can be looked
@@ -459,10 +462,18 @@ func (e *Engine) Start() error {
 
 	e.AddSources(typeSource, scopeSource, sourceSource)
 
+	e.prepCache()
+	e.cacheContext, e.cacheCancel = context.WithCancel(context.Background())
+
 	// Start purging cache
-	e.cache.StartPurger()
+	e.cache.StartPurger(e.cacheContext)
 
 	return e.connect()
+}
+
+// prepCache Prepares the cache for use
+func (e *Engine) prepCache() {
+	e.cache = sdpcache.NewCache()
 }
 
 // subscribe Subscribes to a subject using the current NATS connection.
@@ -507,9 +518,9 @@ func (e *Engine) Stop() error {
 		return err
 	}
 
-	// Clear the cache
+	// Stop purging and clear the cache
+	e.cacheCancel()
 	e.cache.Clear()
-	e.cache.StopPurger()
 
 	return nil
 }
@@ -579,8 +590,8 @@ func (e *Engine) ClearCache() {
 }
 
 // IsWildcard checks if a string is the wildcard. Use this instead of
-// implementing the wildcard check everwhere so that if we need to change the
-// woldcard at a later date we can do so here
+// implementing the wildcard check everywhere so that if we need to change the
+// wildcard at a later date we can do so here
 func IsWildcard(s string) bool {
 	return s == sdp.WILDCARD
 }
