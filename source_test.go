@@ -13,6 +13,7 @@ func TestFilterSources(t *testing.T) {
 		Name: "testEngine",
 	}
 
+	e.prepCache()
 	e.AddSources(
 		&TestSource{
 			ReturnScopes: []string{"test"},
@@ -225,6 +226,7 @@ func TestGet(t *testing.T) {
 	}
 
 	e.AddSources(&src)
+	e.prepCache()
 
 	t.Run("Basic test", func(t *testing.T) {
 		t.Cleanup(func() {
@@ -430,6 +432,7 @@ func TestList(t *testing.T) {
 	src := TestSource{}
 
 	e.AddSources(&src)
+	e.prepCache()
 
 	e.ExecuteRequestSync(context.Background(), &sdp.ItemRequest{
 		Type:   "person",
@@ -456,6 +459,7 @@ func TestSearch(t *testing.T) {
 	src := TestSource{}
 
 	e.AddSources(&src)
+	e.prepCache()
 
 	e.ExecuteRequestSync(context.Background(), &sdp.ItemRequest{
 		Type:   "person",

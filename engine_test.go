@@ -275,6 +275,7 @@ func TestNatsCancel(t *testing.T) {
 	}
 
 	e.AddSources(&src)
+	e.prepCache()
 
 	t.Run("Starting", func(t *testing.T) {
 		err := e.Start()
