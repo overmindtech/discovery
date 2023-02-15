@@ -32,11 +32,24 @@ func NewThrottle(numParallel int) *Throttle {
 	return &t
 }
 
+// Lock Waits for permission to run
 func (t *Throttle) Lock() {
+	// If the throttle or channel is nil then act as unlimited
+	if t == nil || t.permissionChan == nil {
+		return
+	}
+
 	<-t.permissionChan
 }
 
+// Unlock Tells the throttle that we are done and it can let another process
+// start
 func (t *Throttle) Unlock() {
+	// If the throttle or channel is nil then act as unlimited
+	if t == nil || t.permissionChan == nil {
+		return
+	}
+
 	// Check that we are not unlocking beyond the original buffer length as this will hang forever
 	if len(t.permissionChan) == int(t.numParallel) {
 		panic("attempt to unlock already fully unlocked Throttle")
