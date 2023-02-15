@@ -41,9 +41,7 @@ func TestDeleteItemRequest(t *testing.T) {
 }
 
 func TestTrackRequest(t *testing.T) {
-	e := Engine{
-		Name: "test",
-	}
+	e := NewEngine()
 
 	t.Run("With normal request", func(t *testing.T) {
 		t.Parallel()
@@ -108,9 +106,7 @@ func TestTrackRequest(t *testing.T) {
 func TestDeleteTrackedRequest(t *testing.T) {
 	t.Parallel()
 
-	e := Engine{
-		Name: "test",
-	}
+	e := NewEngine()
 
 	var wg sync.WaitGroup
 
@@ -151,19 +147,18 @@ func TestDeleteTrackedRequest(t *testing.T) {
 func TestNats(t *testing.T) {
 	SkipWithoutNats(t)
 
-	e := Engine{
-		Name: "nats-test",
-		NATSOptions: &connect.NATSOptions{
-			NumRetries:        5,
-			RetryDelay:        time.Second,
-			Servers:           NatsTestURLs,
-			ConnectionName:    "test-connection",
-			ConnectionTimeout: time.Second,
-			MaxReconnects:     5,
-		},
-		NATSQueueName:         "test",
-		MaxParallelExecutions: 10,
+	e := NewEngine()
+	e.Name = "nats-test"
+	e.NATSOptions = &connect.NATSOptions{
+		NumRetries:        5,
+		RetryDelay:        time.Second,
+		Servers:           NatsTestURLs,
+		ConnectionName:    "test-connection",
+		ConnectionTimeout: time.Second,
+		MaxReconnects:     5,
 	}
+	e.NATSQueueName = "test"
+	e.MaxParallelExecutions = 10
 
 	src := TestSource{}
 
@@ -254,19 +249,19 @@ func TestNats(t *testing.T) {
 func TestNatsCancel(t *testing.T) {
 	SkipWithoutNats(t)
 
-	e := Engine{
-		Name: "nats-test",
-		NATSOptions: &connect.NATSOptions{
-			NumRetries:        5,
-			RetryDelay:        time.Second,
-			Servers:           NatsTestURLs,
-			ConnectionName:    "test-connection",
-			ConnectionTimeout: time.Second,
-			MaxReconnects:     5,
-		},
-		NATSQueueName:         "test",
-		MaxParallelExecutions: 1,
+	e := NewEngine()
+
+	e.Name = "nats-test"
+	e.NATSOptions = &connect.NATSOptions{
+		NumRetries:        5,
+		RetryDelay:        time.Second,
+		Servers:           NatsTestURLs,
+		ConnectionName:    "test-connection",
+		ConnectionTimeout: time.Second,
+		MaxReconnects:     5,
 	}
+	e.NATSQueueName = "test"
+	e.MaxParallelExecutions = 1
 
 	src := SpeedTestSource{
 		QueryDelay:   250 * time.Millisecond,
@@ -275,7 +270,6 @@ func TestNatsCancel(t *testing.T) {
 	}
 
 	e.AddSources(&src)
-	e.prepCache()
 
 	t.Run("Starting", func(t *testing.T) {
 		err := e.Start()
@@ -337,17 +331,16 @@ func TestNatsCancel(t *testing.T) {
 
 func TestNatsConnections(t *testing.T) {
 	t.Run("with a bad hostname", func(t *testing.T) {
-		e := Engine{
-			Name: "nats-test",
-			NATSOptions: &connect.NATSOptions{
-				Servers:           []string{"nats://bad.server"},
-				ConnectionName:    "test-disconnection",
-				ConnectionTimeout: time.Second,
-				MaxReconnects:     1,
-			},
-			NATSQueueName:         "test",
-			MaxParallelExecutions: 1,
+		e := NewEngine()
+		e.Name = "nats-test"
+		e.NATSOptions = &connect.NATSOptions{
+			Servers:           []string{"nats://bad.server"},
+			ConnectionName:    "test-disconnection",
+			ConnectionTimeout: time.Second,
+			MaxReconnects:     1,
 		}
+		e.NATSQueueName = "test"
+		e.MaxParallelExecutions = 1
 
 		err := e.Start()
 
@@ -373,21 +366,20 @@ func TestNatsConnections(t *testing.T) {
 			}
 		})
 
-		e := Engine{
-			Name: "nats-test",
-			NATSOptions: &connect.NATSOptions{
-				NumRetries:        5,
-				RetryDelay:        time.Second,
-				Servers:           []string{"127.0.0.1:4111"},
-				ConnectionName:    "test-disconnection",
-				ConnectionTimeout: time.Second,
-				MaxReconnects:     10,
-				ReconnectWait:     time.Second,
-				ReconnectJitter:   time.Second,
-			},
-			NATSQueueName:         "test",
-			MaxParallelExecutions: 1,
+		e := NewEngine()
+		e.Name = "nats-test"
+		e.NATSOptions = &connect.NATSOptions{
+			NumRetries:        5,
+			RetryDelay:        time.Second,
+			Servers:           []string{"127.0.0.1:4111"},
+			ConnectionName:    "test-disconnection",
+			ConnectionTimeout: time.Second,
+			MaxReconnects:     10,
+			ReconnectWait:     time.Second,
+			ReconnectJitter:   time.Second,
 		}
+		e.NATSQueueName = "test"
+		e.MaxParallelExecutions = 1
 
 		err := e.Start()
 
@@ -436,21 +428,20 @@ func TestNatsConnections(t *testing.T) {
 		// Need to change this to avoid port clashes in github actions
 		opts.Port = 4112
 
-		e := Engine{
-			Name: "nats-test",
-			NATSOptions: &connect.NATSOptions{
-				NumRetries:        10,
-				RetryDelay:        time.Second,
-				Servers:           []string{"127.0.0.1:4112"},
-				ConnectionName:    "test-disconnection",
-				ConnectionTimeout: time.Second,
-				MaxReconnects:     10,
-				ReconnectWait:     time.Second,
-				ReconnectJitter:   time.Second,
-			},
-			NATSQueueName:         "test",
-			MaxParallelExecutions: 1,
+		e := NewEngine()
+		e.Name = "nats-test"
+		e.NATSOptions = &connect.NATSOptions{
+			NumRetries:        10,
+			RetryDelay:        time.Second,
+			Servers:           []string{"127.0.0.1:4112"},
+			ConnectionName:    "test-disconnection",
+			ConnectionTimeout: time.Second,
+			MaxReconnects:     10,
+			ReconnectWait:     time.Second,
+			ReconnectJitter:   time.Second,
 		}
+		e.NATSQueueName = "test"
+		e.MaxParallelExecutions = 1
 
 		var s *server.Server
 
@@ -487,22 +478,21 @@ func TestNATSFailureRestart(t *testing.T) {
 		t.Fatal("Could not start goroutine NATS server")
 	}
 
-	e := Engine{
-		Name: "nats-test",
-		NATSOptions: &connect.NATSOptions{
-			NumRetries:        10,
-			RetryDelay:        time.Second,
-			Servers:           []string{"127.0.0.1:4113"},
-			ConnectionName:    "test-disconnection",
-			ConnectionTimeout: time.Second,
-			MaxReconnects:     10,
-			ReconnectWait:     100 * time.Millisecond,
-			ReconnectJitter:   10 * time.Millisecond,
-		},
-		NATSQueueName:           "test",
-		MaxParallelExecutions:   1,
-		ConnectionWatchInterval: 1 * time.Second,
+	e := NewEngine()
+	e.Name = "nats-test"
+	e.NATSOptions = &connect.NATSOptions{
+		NumRetries:        10,
+		RetryDelay:        time.Second,
+		Servers:           []string{"127.0.0.1:4113"},
+		ConnectionName:    "test-disconnection",
+		ConnectionTimeout: time.Second,
+		MaxReconnects:     10,
+		ReconnectWait:     100 * time.Millisecond,
+		ReconnectJitter:   10 * time.Millisecond,
 	}
+	e.NATSQueueName = "test"
+	e.MaxParallelExecutions = 1
+	e.ConnectionWatchInterval = 1 * time.Second
 
 	// Connect successfully
 	err := e.Start()
@@ -545,20 +535,19 @@ func TestNATSFailureRestart(t *testing.T) {
 func TestNatsAuth(t *testing.T) {
 	SkipWithoutNatsAuth(t)
 
-	e := Engine{
-		Name: "nats-test",
-		NATSOptions: &connect.NATSOptions{
-			NumRetries:        5,
-			RetryDelay:        time.Second,
-			Servers:           NatsTestURLs,
-			ConnectionName:    "test-connection",
-			ConnectionTimeout: time.Second,
-			MaxReconnects:     5,
-			TokenClient:       GetTestOAuthTokenClient(t),
-		},
-		NATSQueueName:         "test",
-		MaxParallelExecutions: 10,
+	e := NewEngine()
+	e.Name = "nats-test"
+	e.NATSOptions = &connect.NATSOptions{
+		NumRetries:        5,
+		RetryDelay:        time.Second,
+		Servers:           NatsTestURLs,
+		ConnectionName:    "test-connection",
+		ConnectionTimeout: time.Second,
+		MaxReconnects:     5,
+		TokenClient:       GetTestOAuthTokenClient(t),
 	}
+	e.NATSQueueName = "test"
+	e.MaxParallelExecutions = 10
 
 	src := TestSource{}
 
@@ -645,9 +634,7 @@ func TestNatsAuth(t *testing.T) {
 
 func TestSetupMaxRequestTimeout(t *testing.T) {
 	t.Run("with no value", func(t *testing.T) {
-		e := Engine{}
-
-		e.SetupMaxRequestTimeout()
+		e := NewEngine()
 
 		if e.MaxRequestTimeout != DefaultMaxRequestTimeout {
 			t.Errorf("max request timeout did not default. Got %v expected %v", e.MaxRequestTimeout.String(), DefaultMaxRequestTimeout.String())
@@ -655,11 +642,8 @@ func TestSetupMaxRequestTimeout(t *testing.T) {
 	})
 
 	t.Run("with a value", func(t *testing.T) {
-		e := Engine{
-			MaxRequestTimeout: 1 * time.Second,
-		}
-
-		e.SetupMaxRequestTimeout()
+		e := NewEngine()
+		e.MaxRequestTimeout = 1 * time.Second
 
 		if e.MaxRequestTimeout != 1*time.Second {
 			t.Errorf("max request timeout did not take provided value. Got %v expected %v", e.MaxRequestTimeout.String(), (1 * time.Second).String())

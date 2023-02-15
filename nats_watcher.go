@@ -31,15 +31,9 @@ type NATSWatcher struct {
 	watchingMutex  sync.Mutex
 }
 
-const DefaultCheckInterval = 3 * time.Second
-
 func (w *NATSWatcher) Start(checkInterval time.Duration) {
 	if w == nil || w.Connection == nil {
 		return
-	}
-
-	if checkInterval == 0 {
-		checkInterval = DefaultCheckInterval
 	}
 
 	w.watcherContext, w.watcherCancel = context.WithCancel(context.Background())

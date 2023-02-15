@@ -219,13 +219,12 @@ func TestStandaloneTriggers(t *testing.T) {
 func TestNATSTriggers(t *testing.T) {
 	SkipWithoutNats(t)
 
-	engine := Engine{
-		Name: "trigger-testing",
-		NATSOptions: &connect.NATSOptions{
-			Servers: NatsTestURLs,
-		},
-		MaxParallelExecutions: 1,
+	engine := NewEngine()
+	engine.Name = "trigger-testing"
+	engine.NATSOptions = &connect.NATSOptions{
+		Servers: NatsTestURLs,
 	}
+	engine.MaxParallelExecutions = 1
 
 	source := TestSource{
 		ReturnType: "dog",

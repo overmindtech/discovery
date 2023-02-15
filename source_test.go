@@ -9,11 +9,8 @@ import (
 )
 
 func TestFilterSources(t *testing.T) {
-	e := Engine{
-		Name: "testEngine",
-	}
+	e := NewEngine()
 
-	e.prepCache()
 	e.AddSources(
 		&TestSource{
 			ReturnScopes: []string{"test"},
@@ -199,9 +196,7 @@ func (e *ExpectExpand) Validate(t *testing.T, m map[*sdp.ItemRequest][]Source) {
 }
 
 func TestSourceAdd(t *testing.T) {
-	e := Engine{
-		Name: "testEngine",
-	}
+	e := NewEngine()
 
 	src := TestSource{}
 
@@ -213,9 +208,8 @@ func TestSourceAdd(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	e := Engine{
-		Name: "testEngine",
-	}
+	e := NewEngine()
+	e.Name = "testEngine"
 
 	src := TestSource{
 		ReturnName: "orange",
@@ -226,7 +220,6 @@ func TestGet(t *testing.T) {
 	}
 
 	e.AddSources(&src)
-	e.prepCache()
 
 	t.Run("Basic test", func(t *testing.T) {
 		t.Cleanup(func() {
@@ -425,14 +418,11 @@ func TestGet(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	e := Engine{
-		Name: "testEngine",
-	}
+	e := NewEngine()
 
 	src := TestSource{}
 
 	e.AddSources(&src)
-	e.prepCache()
 
 	e.ExecuteRequestSync(context.Background(), &sdp.ItemRequest{
 		Type:   "person",
@@ -452,14 +442,11 @@ func TestList(t *testing.T) {
 }
 
 func TestSearch(t *testing.T) {
-	e := Engine{
-		Name: "testEngine",
-	}
+	e := NewEngine()
 
 	src := TestSource{}
 
 	e.AddSources(&src)
-	e.prepCache()
 
 	e.ExecuteRequestSync(context.Background(), &sdp.ItemRequest{
 		Type:   "person",
@@ -480,9 +467,7 @@ func TestSearch(t *testing.T) {
 }
 
 func TestListSearchCaching(t *testing.T) {
-	e := Engine{
-		Name: "testEngine",
-	}
+	e := NewEngine()
 
 	src := TestSource{
 		ReturnScopes: []string{
@@ -493,7 +478,6 @@ func TestListSearchCaching(t *testing.T) {
 	}
 
 	e.AddSources(&src)
-	e.prepCache()
 	e.cache.MinWaitTime = (10 * time.Millisecond)
 	e.cache.StartPurger(context.Background())
 
@@ -740,9 +724,7 @@ func TestListSearchCaching(t *testing.T) {
 func TestSearchGetCaching(t *testing.T) {
 	// We want to be sure that if an item has been found via a search and
 	// cached, the cache will be hit if a Get is run for that particular item
-	e := Engine{
-		Name: "testEngine",
-	}
+	e := NewEngine()
 
 	src := TestSource{
 		ReturnScopes: []string{
@@ -751,7 +733,6 @@ func TestSearchGetCaching(t *testing.T) {
 	}
 
 	e.AddSources(&src)
-	e.prepCache()
 	e.cache.MinWaitTime = (10 * time.Millisecond)
 	e.cache.StartPurger(context.Background())
 
@@ -813,7 +794,5 @@ func TestSearchGetCaching(t *testing.T) {
 		if searchResult[0].Metadata.Timestamp.String() != getResult[0].Metadata.Timestamp.String() {
 			t.Error("Item timestamps do not match, caching has not worked")
 		}
-
 	})
-
 }

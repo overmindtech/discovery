@@ -86,10 +86,9 @@ func (s *SpeedTestSource) Weight() int {
 }
 
 func TestExecute(t *testing.T) {
-	engine := Engine{
-		Name:                  "test",
-		MaxParallelExecutions: 1,
-	}
+	engine := NewEngine()
+	engine.Name = "test"
+	engine.MaxParallelExecutions = 1
 
 	src := TestSource{
 		ReturnType: "person",
@@ -99,7 +98,6 @@ func TestExecute(t *testing.T) {
 	}
 
 	engine.AddSources(&src)
-	engine.prepCache()
 
 	t.Run("Without linking", func(t *testing.T) {
 		t.Parallel()
@@ -197,17 +195,15 @@ func TestExecute(t *testing.T) {
 }
 
 func TestTimeout(t *testing.T) {
-	engine := Engine{
-		Name:                  "test",
-		MaxParallelExecutions: 1,
-	}
+	engine := NewEngine()
+	engine.Name = "test"
+	engine.MaxParallelExecutions = 1
 
 	src := SpeedTestSource{
 		QueryDelay: 100 * time.Millisecond,
 	}
 
 	engine.AddSources(&src)
-	engine.prepCache()
 
 	t.Run("With a timeout, but not exceeding it", func(t *testing.T) {
 		t.Parallel()
@@ -291,17 +287,15 @@ func TestTimeout(t *testing.T) {
 }
 
 func TestCancel(t *testing.T) {
-	engine := Engine{
-		Name:                  "test",
-		MaxParallelExecutions: 1,
-	}
+	engine := NewEngine()
+	engine.Name = "test"
+	engine.MaxParallelExecutions = 1
 
 	src := SpeedTestSource{
 		QueryDelay: 1 * time.Second,
 	}
 
 	engine.AddSources(&src)
-	engine.prepCache()
 
 	u := uuid.New()
 
