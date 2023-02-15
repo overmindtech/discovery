@@ -51,7 +51,7 @@ type Engine struct {
 
 	// Internal throttle used to limit MaxParallelExecutions. This reads
 	// MaxParallelExecutions and is populated when the engine is started
-	throttle Throttle
+	throttle *Throttle
 
 	// Cache that is used for storing SDP items in memory
 	cache *sdpcache.Cache
@@ -127,13 +127,6 @@ func (e *Engine) DeleteTrackedRequest(uuid [16]byte) {
 	e.trackedRequestsMutex.Lock()
 	defer e.trackedRequestsMutex.Unlock()
 	delete(e.trackedRequests, uuid)
-}
-
-// setupThrottle Sets up the throttling based on MaxParallelExecutions
-func (e *Engine) setupThrottle() {
-	e.throttle = Throttle{
-		NumParallel: e.MaxParallelExecutions,
-	}
 }
 
 // AddSources Adds a source to this engine
@@ -412,7 +405,7 @@ func (e *Engine) disconnect() error {
 // modifying the Sources value after an engine has been started will not have
 // any effect until the engine is restarted
 func (e *Engine) Start() error {
-	e.setupThrottle()
+	e.throttle = NewThrottle(e.MaxParallelExecutions)
 
 	var typeSource Source
 	var scopeSource Source
