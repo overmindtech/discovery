@@ -9,6 +9,7 @@ import (
 	"github.com/overmindtech/sdpcache"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -135,7 +136,9 @@ func (s SourceMethod) String() string {
 }
 
 func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSources []Source, method SourceMethod) ([]*sdp.Item, []*sdp.ItemRequestError) {
-	ctx, span := tracer.Start(ctx, "CallSources")
+	ctx, span := tracer.Start(ctx, "CallSources", trace.WithAttributes(
+		attribute.String("om.engine.method", method.String()),
+	))
 	defer span.End()
 
 	errs := make([]*sdp.ItemRequestError, 0)
@@ -265,9 +268,7 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 			var sourceDuration time.Duration
 
 			func(ctx context.Context) {
-				ctx, span := tracer.Start(ctx, method.String())
 				start := time.Now()
-				defer span.End()
 
 				switch method {
 				case Get:
