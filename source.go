@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/overmindtech/sdp-go"
@@ -161,26 +162,28 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 			ctx, span := tracer.Start(ctx, src.Name())
 			defer span.End()
 
-			tags := sdpcache.Tags{
-				"sourceName": src.Name(),
-				"scope":      r.Scope,
-				"type":       r.Type,
+			query := sdpcache.CacheQuery{
+				SST: sdpcache.SST{
+					SourceName: src.Name(),
+					Scope:      r.Scope,
+					Type:       r.Type,
+				},
 			}
 
 			switch method {
 			case Get:
 				// With a Get request we need just the one specific item, so also
 				// filter on uniqueAttributeValue
-				tags["uniqueAttributeValue"] = r.Query
+				query.UniqueAttributeValue = &r.Query
 			case List:
 				// In the case of a find, we just want everything that was found in
 				// the last find, so we only care about the method
-				tags["method"] = method.String()
+				query.Method = &r.Method
 			case Search:
 				// For a search, we only want to get from the cache items that were
 				// found using search, and with the exact same query
-				tags["method"] = method.String()
-				tags["query"] = r.Query
+				query.Method = &r.Method
+				query.Query = &r.Query
 			}
 
 			span.SetAttributes(
@@ -190,31 +193,31 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 			)
 
 			if !r.IgnoreCache {
-				cachedItems, err := e.cache.Search(tags)
+				cachedItems, err := e.cache.Search(query)
 
 				if err != nil {
-					switch err := err.(type) {
-					case sdpcache.CacheNotFoundError:
+					var ire *sdp.ItemRequestError
+					if errors.Is(err, sdpcache.ErrCacheNotFound) {
 						// If nothing was found then continue with execution
-					case *sdp.ItemRequestError:
+					} else if errors.As(err, &ire) {
 						// Add relevant info
-						err.Scope = r.Scope
-						err.ItemRequestUUID = r.UUID
-						err.SourceName = src.Name()
-						err.ItemType = r.Type
+						ire.Scope = r.Scope
+						ire.ItemRequestUUID = r.UUID
+						ire.SourceName = src.Name()
+						ire.ItemType = r.Type
 
-						errs = append(errs, err)
+						errs = append(errs, ire)
 
 						span.SetAttributes(attribute.String("om.cache.error", err.Error()))
 
-						if err.ErrorType == sdp.ItemRequestError_NOTFOUND {
+						if ire.ErrorType == sdp.ItemRequestError_NOTFOUND {
 							span.SetStatus(codes.Ok, "cache hit: item not found")
 						} else {
 							span.SetStatus(codes.Ok, "cache hit: ItemRequestError")
 						}
 
 						return false
-					default:
+					} else {
 						// If it's an unknown error, convert it to SDP and skip this source
 						errs = append(errs, &sdp.ItemRequestError{
 							ItemRequestUUID: r.UUID,
@@ -246,7 +249,7 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 						} else {
 							span.AddEvent("cache returned >1 value, purging and continuing")
 
-							e.cache.Delete(tags)
+							e.cache.Delete(query)
 						}
 					} else {
 						span.SetStatus(codes.Ok, "cache hit: multiple items")
@@ -299,7 +302,7 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 				if err != nil {
 					// In this case the error must be a NOTFOUND error, which we
 					// want to cache
-					e.cache.StoreError(err, GetCacheDuration(src), tags)
+					e.cache.StoreError(err, GetCacheDuration(src), query)
 				}
 			}
 
@@ -348,6 +351,7 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 					SourceDuration:        durationpb.New(sourceDuration),
 					SourceDurationPerItem: durationpb.New(time.Duration(sourceDuration.Nanoseconds() / int64(len(resultItems)))),
 					SourceName:            src.Name(),
+					SourceRequest:         r,
 				}
 
 				// Mark the item as hidden if the source is a hidden source
@@ -356,7 +360,7 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 				}
 
 				// Cache the item
-				e.cache.StoreItem(item, GetCacheDuration(src), tags)
+				e.cache.StoreItem(item, GetCacheDuration(src))
 			}
 
 			items = append(items, resultItems...)

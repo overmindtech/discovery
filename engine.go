@@ -20,6 +20,7 @@ import (
 )
 
 const DefaultMaxRequestTimeout = 1 * time.Minute
+const DefaultConnectionWatchInterval = 3 * time.Second
 
 // Engine is the main discovery engine. This is where all of the Sources and
 // sources are stored and is responsible for calling out to the right sources to
@@ -46,13 +47,14 @@ type Engine struct {
 
 	// How often to check for closed connections and try to recover
 	ConnectionWatchInterval time.Duration
-	ConnectionWatcher       NATSWatcher
+	connectionWatcher       NATSWatcher
 
-	// Internal throttle used to limit MaxParallelExecutions
-	throttle Throttle
+	// Internal throttle used to limit MaxParallelExecutions. This reads
+	// MaxParallelExecutions and is populated when the engine is started
+	throttle *Throttle
 
 	// Cache that is used for storing SDP items in memory
-	cache sdpcache.Cache
+	cache *sdpcache.Cache
 
 	// The NATS connection
 	natsConnection      sdp.EncodedConnection
@@ -79,13 +81,29 @@ type Engine struct {
 
 	// Prevents the engine being restarted many times in parallel
 	restartMutex sync.Mutex
+
+	// Context to control cache purging. Purging will stop when the cache is cancelled
+	cacheContext context.Context
+	// Func that cancels cache purging
+	cacheCancel context.CancelFunc
+}
+
+func NewEngine() Engine {
+	return Engine{
+		MaxParallelExecutions:   runtime.NumCPU(),
+		MaxRequestTimeout:       DefaultMaxRequestTimeout,
+		ConnectionWatchInterval: DefaultConnectionWatchInterval,
+		cache:                   sdpcache.NewCache(),
+		sourceMap:               make(map[string][]Source),
+		triggers:                make([]*Trigger, 0),
+		trackedRequests:         make(map[uuid.UUID]*RequestTracker),
+	}
 }
 
 // TrackRequest Stores a RequestTracker in the engine so that it can be looked
 // up later and cancelled if required. The UUID should be supplied as part of
 // the request itself
 func (e *Engine) TrackRequest(uuid uuid.UUID, request *RequestTracker) {
-	e.ensureTrackedRequests()
 	e.trackedRequestsMutex.Lock()
 	defer e.trackedRequestsMutex.Unlock()
 	e.trackedRequests[uuid] = request
@@ -94,7 +112,6 @@ func (e *Engine) TrackRequest(uuid uuid.UUID, request *RequestTracker) {
 // GetTrackedRequest Returns the RequestTracked object for a given UUID. This
 // tracker can then be used to cancel the request
 func (e *Engine) GetTrackedRequest(uuid uuid.UUID) (*RequestTracker, error) {
-	e.ensureTrackedRequests()
 	e.trackedRequestsMutex.RLock()
 	defer e.trackedRequestsMutex.RUnlock()
 
@@ -107,47 +124,15 @@ func (e *Engine) GetTrackedRequest(uuid uuid.UUID) (*RequestTracker, error) {
 
 // DeleteTrackedRequest Deletes a request from tracking
 func (e *Engine) DeleteTrackedRequest(uuid [16]byte) {
-	e.ensureTrackedRequests()
 	e.trackedRequestsMutex.Lock()
 	defer e.trackedRequestsMutex.Unlock()
 	delete(e.trackedRequests, uuid)
-}
-
-// ensureTrackedRequests Makes sure the trackedRequests map has been created
-func (e *Engine) ensureTrackedRequests() {
-	e.trackedRequestsMutex.Lock()
-	defer e.trackedRequestsMutex.Unlock()
-	if e.trackedRequests == nil {
-		e.trackedRequests = make(map[uuid.UUID]*RequestTracker)
-	}
-}
-
-// SetupThrottle Sets up the throttling based on MaxParallelExecutions,
-// including ensuring that it's not set to zero
-func (e *Engine) SetupThrottle() {
-	if e.MaxParallelExecutions == 0 {
-		e.MaxParallelExecutions = runtime.NumCPU()
-	}
-
-	e.throttle = Throttle{
-		NumParallel: e.MaxParallelExecutions,
-	}
-}
-
-func (e *Engine) SetupMaxRequestTimeout() {
-	if e.MaxRequestTimeout == 0 {
-		e.MaxRequestTimeout = DefaultMaxRequestTimeout
-	}
 }
 
 // AddSources Adds a source to this engine
 func (e *Engine) AddSources(sources ...Source) {
 	e.sourceMapMutex.Lock()
 	defer e.sourceMapMutex.Unlock()
-
-	if e.sourceMap == nil {
-		e.sourceMap = make(map[string][]Source)
-	}
 
 	for _, src := range sources {
 		allSources := append(e.sourceMap[src.Type()], src)
@@ -170,10 +155,6 @@ func (e *Engine) AddSources(sources ...Source) {
 func (e *Engine) AddTriggers(triggers ...Trigger) {
 	e.triggersMutex.Lock()
 	defer e.triggersMutex.Unlock()
-
-	if e.triggers == nil {
-		e.triggers = make([]*Trigger, 0)
-	}
 
 	for _, trigger := range triggers {
 		e.triggers = append(e.triggers, &trigger)
@@ -275,7 +256,7 @@ func (e *Engine) connect() error {
 		e.natsConnection = ec
 		e.natsConnectionMutex.Unlock()
 
-		e.ConnectionWatcher = NATSWatcher{
+		e.connectionWatcher = NATSWatcher{
 			Connection: e.natsConnection,
 			FailureHandler: func() {
 				go func() {
@@ -289,7 +270,7 @@ func (e *Engine) connect() error {
 				}()
 			},
 		}
-		e.ConnectionWatcher.Start(e.ConnectionWatchInterval)
+		e.connectionWatcher.Start(e.ConnectionWatchInterval)
 
 		// Wait for the connection to be completed
 		err = e.natsConnection.Underlying().FlushTimeout(10 * time.Minute)
@@ -377,7 +358,7 @@ func (e *Engine) connect() error {
 
 // disconnect Disconnects the engine from the NATS network
 func (e *Engine) disconnect() error {
-	e.ConnectionWatcher.Stop()
+	e.connectionWatcher.Stop()
 
 	e.natsConnectionMutex.Lock()
 	defer e.natsConnectionMutex.Unlock()
@@ -424,8 +405,7 @@ func (e *Engine) disconnect() error {
 // modifying the Sources value after an engine has been started will not have
 // any effect until the engine is restarted
 func (e *Engine) Start() error {
-	e.SetupThrottle()
-	e.SetupMaxRequestTimeout()
+	e.throttle = NewThrottle(e.MaxParallelExecutions)
 
 	var typeSource Source
 	var scopeSource Source
@@ -459,8 +439,10 @@ func (e *Engine) Start() error {
 
 	e.AddSources(typeSource, scopeSource, sourceSource)
 
+	e.cacheContext, e.cacheCancel = context.WithCancel(context.Background())
+
 	// Start purging cache
-	e.cache.StartPurger()
+	e.cache.StartPurger(e.cacheContext)
 
 	return e.connect()
 }
@@ -507,9 +489,9 @@ func (e *Engine) Stop() error {
 		return err
 	}
 
-	// Clear the cache
+	// Stop purging and clear the cache
+	e.cacheCancel()
 	e.cache.Clear()
-	e.cache.StopPurger()
 
 	return nil
 }
@@ -579,8 +561,8 @@ func (e *Engine) ClearCache() {
 }
 
 // IsWildcard checks if a string is the wildcard. Use this instead of
-// implementing the wildcard check everwhere so that if we need to change the
-// woldcard at a later date we can do so here
+// implementing the wildcard check everywhere so that if we need to change the
+// wildcard at a later date we can do so here
 func IsWildcard(s string) bool {
 	return s == sdp.WILDCARD
 }

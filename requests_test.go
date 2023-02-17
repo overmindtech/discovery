@@ -12,9 +12,8 @@ import (
 )
 
 func TestExecuteRequest(t *testing.T) {
-	e := Engine{
-		Name: "test",
-	}
+	e := NewEngine()
+	e.Name = "test"
 
 	src := TestSource{
 		ReturnType:   "person",
@@ -172,9 +171,8 @@ func TestExecuteRequest(t *testing.T) {
 }
 
 func TestHandleItemRequest(t *testing.T) {
-	e := Engine{
-		Name: "test",
-	}
+	e := NewEngine()
+	e.Name = "test"
 
 	personSource := TestSource{
 		ReturnType: "person",
@@ -251,9 +249,8 @@ func TestHandleItemRequest(t *testing.T) {
 }
 
 func TestWildcardSourceExpansion(t *testing.T) {
-	e := Engine{
-		Name: "test",
-	}
+	e := NewEngine()
+	e.Name = "test"
 
 	personSource := TestSource{
 		ReturnType: "person",
@@ -295,17 +292,16 @@ func TestWildcardSourceExpansion(t *testing.T) {
 func TestSendRequestSync(t *testing.T) {
 	SkipWithoutNats(t)
 
-	e := Engine{
-		Name: "nats-test-srs",
-		NATSOptions: &connect.NATSOptions{
-			Servers:           NatsTestURLs,
-			ConnectionName:    "test-connection",
-			ConnectionTimeout: time.Second,
-			MaxReconnects:     5,
-		},
-		NATSQueueName:         "test",
-		MaxParallelExecutions: 10,
+	e := NewEngine()
+	e.Name = "nats-test-srs"
+	e.NATSOptions = &connect.NATSOptions{
+		Servers:           NatsTestURLs,
+		ConnectionName:    "test-connection",
+		ConnectionTimeout: time.Second,
+		MaxReconnects:     5,
 	}
+	e.NATSQueueName = "test"
+	e.MaxParallelExecutions = 10
 
 	src := TestSource{
 		ReturnType: "person",
@@ -366,13 +362,11 @@ func TestSendRequestSync(t *testing.T) {
 }
 
 func TestExpandRequest(t *testing.T) {
-	e := Engine{
-		Name: "expand-test",
-	}
+	e := NewEngine()
 
 	t.Run("with a single source with a single scope", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sourceMap = nil
+			e.sourceMap = make(map[string][]Source)
 			e.ClearCache()
 		})
 
@@ -398,7 +392,7 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with a single source with many scopes", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sourceMap = nil
+			e.sourceMap = make(map[string][]Source)
 			e.ClearCache()
 		})
 
@@ -427,7 +421,7 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with many sources with single scopes", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sourceMap = nil
+			e.sourceMap = make(map[string][]Source)
 			e.ClearCache()
 		})
 
@@ -466,7 +460,7 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with many sources with many scopes", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sourceMap = nil
+			e.sourceMap = make(map[string][]Source)
 			e.ClearCache()
 		})
 
@@ -509,7 +503,7 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with many sources with many scopes which overlap GET", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sourceMap = nil
+			e.sourceMap = make(map[string][]Source)
 			e.ClearCache()
 		})
 
@@ -554,7 +548,7 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with many sources with many scopes which overlap LIST", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sourceMap = nil
+			e.sourceMap = make(map[string][]Source)
 			e.ClearCache()
 		})
 
@@ -597,7 +591,7 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with a single wildcard source", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sourceMap = nil
+			e.sourceMap = make(map[string][]Source)
 			e.ClearCache()
 		})
 
@@ -624,7 +618,7 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with a many wildcard sources", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sourceMap = nil
+			e.sourceMap = make(map[string][]Source)
 			e.ClearCache()
 		})
 
@@ -675,7 +669,7 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with a many wildcard sources and static sources", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sourceMap = nil
+			e.sourceMap = make(map[string][]Source)
 			e.ClearCache()
 		})
 

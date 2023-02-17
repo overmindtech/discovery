@@ -56,6 +56,8 @@ github.com/golang/protobuf v1.5.2 h1:ROPKBNFfQgOUMifHyP+KYbvpjbdoFNs+aK7DXlji0Tw
 github.com/golang/protobuf v1.5.2/go.mod h1:XVQd3VNwM+JqD3oG2Ue2ip4fOMUkwXdXDdiuN0vRsmY=
 github.com/golang/snappy v0.0.4 h1:yAGX7huGHXlcLOEtBnF4w7FQwA26wojNCwOYAEhLjQM=
 github.com/golang/snappy v0.0.4/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEWrmP2Q=
+github.com/google/btree v1.1.2 h1:xf4v41cLI2Z6FxbKm+8Bu+m8ifhj15JuZ9sa0jZCMUU=
+github.com/google/btree v1.1.2/go.mod h1:qOPhT0dTNdNzV6Z/lhRX0YXUafgPLFUh+gZMl761Gm4=
 github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-cmp v0.5.9 h1:O2Tfq5qg4qc4AmwVlvv0oLiVAGB7enBSJ2x2DqQFi38=
 github.com/google/gofuzz v1.0.0/go.mod h1:dBl0BpW6vV/+mYPU4Po3pmUjxk6FQPldtuIdl/M65Eg=
@@ -92,8 +94,8 @@ github.com/overmindtech/connect v0.8.3 h1:vyjtArC87LpA78pubzGTBUKrgVv9SVWqApoQbJ
 github.com/overmindtech/connect v0.8.3/go.mod h1:kx5dP9p/14/c2iNOv+Dkr5U1jPCXwA5jBM6jdQmn9x4=
 github.com/overmindtech/sdp-go v0.16.0 h1:dumS4mV/VJXic+K80MmPTB6AQ87m6lLOdHLSrSBSCNA=
 github.com/overmindtech/sdp-go v0.16.0/go.mod h1:SbXUluUgQ7LzY++EPM6bxnbJjebMio3JvKx/2qgRIEo=
-github.com/overmindtech/sdpcache v0.4.1 h1:dUakghojsaR8y00nLY8SaLwzAeJdL43o3Z1bri42DI4=
-github.com/overmindtech/sdpcache v0.4.1/go.mod h1:4k2tTOJXWZFin5HhekzHpPvg2p5XiV5/D/J8b7K4VSY=
+github.com/overmindtech/sdpcache v1.2.1 h1:1UCamovaBuJitcU0brdZB6u2Z+LZ8BqAc1ddTpJeNxM=
+github.com/overmindtech/sdpcache v1.2.1/go.mod h1:9nV0Fw5drpWWJkvaoekWNY5ZJmC28MzVjNbBRYp47Mk=
 github.com/pingcap/errors v0.11.4 h1:lFuQV/oaUMGcD2tqt+01ROSmJs75VG1ToEOkZIZ4nE4=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

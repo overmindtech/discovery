@@ -123,10 +123,8 @@ type TimedResults struct {
 }
 
 func TimeRequests(numRequests int, linkDepth int, numParallel int) TimedResults {
-	engine := Engine{
-		Name:                  "performance-test",
-		MaxParallelExecutions: numParallel,
-	}
+	engine := NewEngine()
+	engine.MaxParallelExecutions = numParallel
 	engine.AddSources(&SlowSource{
 		RequestDuration: 100 * time.Millisecond,
 	})

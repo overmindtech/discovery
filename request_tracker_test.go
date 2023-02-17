@@ -86,10 +86,9 @@ func (s *SpeedTestSource) Weight() int {
 }
 
 func TestExecute(t *testing.T) {
-	engine := Engine{
-		Name:                  "test",
-		MaxParallelExecutions: 1,
-	}
+	engine := NewEngine()
+	engine.Name = "test"
+	engine.MaxParallelExecutions = 1
 
 	src := TestSource{
 		ReturnType: "person",
@@ -196,10 +195,9 @@ func TestExecute(t *testing.T) {
 }
 
 func TestTimeout(t *testing.T) {
-	engine := Engine{
-		Name:                  "test",
-		MaxParallelExecutions: 1,
-	}
+	engine := NewEngine()
+	engine.Name = "test"
+	engine.MaxParallelExecutions = 1
 
 	src := SpeedTestSource{
 		QueryDelay: 100 * time.Millisecond,
@@ -289,10 +287,9 @@ func TestTimeout(t *testing.T) {
 }
 
 func TestCancel(t *testing.T) {
-	engine := Engine{
-		Name:                  "test",
-		MaxParallelExecutions: 1,
-	}
+	engine := NewEngine()
+	engine.Name = "test"
+	engine.MaxParallelExecutions = 1
 
 	src := SpeedTestSource{
 		QueryDelay: 1 * time.Second,

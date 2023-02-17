@@ -330,9 +330,7 @@ func TestScopeSource(t *testing.T) {
 }
 
 func newTestEngine() *Engine {
-	e := Engine{
-		Name: "test",
-	}
+	e := NewEngine()
 
 	e.AddSources(
 		&TestSource{

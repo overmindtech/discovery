@@ -9,9 +9,7 @@ import (
 
 func TestThrottle(t *testing.T) {
 	t.Run("can be unlocked and lock the expected number of times", func(t *testing.T) {
-		throttle := Throttle{
-			NumParallel: 4,
-		}
+		throttle := NewThrottle(4)
 
 		ctx, cancel := context.WithTimeout(context.Background(), (1 * time.Second))
 		doneChan := make(chan bool)
@@ -45,9 +43,7 @@ func TestThrottle(t *testing.T) {
 }
 
 func TestWaiting(t *testing.T) {
-	throttle := Throttle{
-		NumParallel: 4,
-	}
+	throttle := NewThrottle(4)
 
 	var workComplete time.Time
 	var newWorkStarted time.Time

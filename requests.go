@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
@@ -176,7 +177,7 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items
 	}
 
 	// These are used to calculate whether all sources have failed or not
-	var numSources int
+	var numSources atomic.Int32
 	var numErrs int
 
 	for request, sources := range expanded {
@@ -189,7 +190,7 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items
 			defer e.throttle.Unlock()
 			var requestItems []*sdp.Item
 			var requestErrors []*sdp.ItemRequestError
-			numSources++
+			numSources.Add(1)
 
 			// Make the request of all sources
 			switch req.GetMethod() {
@@ -244,9 +245,9 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items
 	wg.Wait()
 
 	// If all failed then return first error
-	if numErrs == numSources {
+	if numSourcesInt := numSources.Load(); numErrs == int(numSourcesInt) {
 		return AllSourcesFailedError{
-			NumSources: numSources,
+			NumSources: int(numSourcesInt),
 		}
 	}
 
