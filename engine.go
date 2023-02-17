@@ -199,15 +199,6 @@ func (e *Engine) ProcessTriggers(ctx context.Context, item *sdp.Item) {
 	wg.Wait()
 }
 
-// ManagedConnection Returns the connection that the engine is using. Note that
-// the lifecycle of this connection is managed by the engine, causing it to
-// disconnect will cause issues with the engine. Use Engine.Stop() instead
-func (e *Engine) ManagedConnection() sdp.EncodedConnection {
-	e.natsConnectionMutex.Lock()
-	defer e.natsConnectionMutex.Unlock()
-	return e.natsConnection
-}
-
 // Sources Returns a slice of all known sources
 func (e *Engine) Sources() []Source {
 	e.sourceMapMutex.RLock()
