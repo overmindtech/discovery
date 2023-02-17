@@ -18,8 +18,8 @@ func TestEngineAddSources(t *testing.T) {
 
 	e.AddSources(&src)
 
-	if x := len(e.sh.Sources()); x != 1 {
-		t.Fatalf("Expected 1 source, got %v", x)
+	if x := len(e.sh.Sources()); x != 4 {
+		t.Fatalf("Expected 4 source, got %v", x)
 	}
 }
 

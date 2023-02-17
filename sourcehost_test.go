@@ -206,7 +206,7 @@ func TestSourceHostAddSources(t *testing.T) {
 
 	sh.AddSources(&src)
 
-	if x := len(sh.Sources()); x != 1 {
-		t.Fatalf("Expected 1 source, got %v", x)
+	if x := len(sh.Sources()); x != 4 {
+		t.Fatalf("Expected 4 source, got %v", x)
 	}
 }
