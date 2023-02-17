@@ -213,10 +213,10 @@ func (e *Engine) Sources() []Source {
 	return sources
 }
 
-// NonHiddenSources Returns a slice of all known sources excluding hidden ones
-func (e *Engine) NonHiddenSources() []Source {
+// VisibleSources Returns a slice of all known sources excluding hidden ones
+func (e *Engine) VisibleSources() []Source {
 	allSources := e.Sources()
-	nonHiddenSources := make([]Source, 0)
+	result := make([]Source, 0)
 
 	// Add all sources unless they are hidden
 	for _, source := range allSources {
@@ -227,10 +227,10 @@ func (e *Engine) NonHiddenSources() []Source {
 			}
 		}
 
-		nonHiddenSources = append(nonHiddenSources, source)
+		result = append(result, source)
 	}
 
-	return nonHiddenSources
+	return result
 }
 
 // Connect Connects to NATS

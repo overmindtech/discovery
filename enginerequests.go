@@ -283,7 +283,7 @@ func (e *Engine) ExpandRequest(request *sdp.ItemRequest) map[*sdp.ItemRequest][]
 	if IsWildcard(request.Type) {
 		// If the request has a wildcard type, all non-hidden sources might try
 		// to respond
-		checkSources = e.NonHiddenSources()
+		checkSources = e.VisibleSources()
 	} else {
 		// If the type is specific, pull just sources for that type
 		checkSources = e.sourceMap[request.Type]
