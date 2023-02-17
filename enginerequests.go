@@ -49,7 +49,7 @@ func (e *Engine) HandleItemRequest(ctx context.Context, itemRequest *sdp.ItemReq
 	ctx, span := tracer.Start(ctx, "HandleItemRequest")
 	defer span.End()
 
-	if len(e.ExpandRequest(itemRequest)) == 0 {
+	if len(e.sh.ExpandRequest(itemRequest)) == 0 {
 		// If we don't have any relevant sources, exit
 		span.AddEvent("no relevant sources, nothing to do")
 		return
@@ -169,7 +169,7 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items
 
 	wg := sync.WaitGroup{}
 
-	expanded := e.ExpandRequest(req)
+	expanded := e.sh.ExpandRequest(req)
 
 	if len(expanded) == 0 {
 		errs <- &sdp.ItemRequestError{
@@ -257,103 +257,6 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items
 	}
 
 	return nil
-}
-
-// ExpandRequest Expands requests with wildcards to no longer contain wildcards.
-// Meaning that if we support 5 types, and a request comes in with a wildcard
-// type, this function will expand that request into 5 requests, one for each
-// type.
-//
-// The same goes for scopes, if we have a request with a wildcard scope, and
-// a single source that supports 5 scopes, we will end up with 5 requests. The
-// exception to this is if we have a source that supports all scopes, but is
-// unable to list them. In this case there will still be some requests with
-// wildcard scopes as they can't be expanded
-//
-// This functions returns a map of requests with the sources that they should be
-// run against
-func (e *Engine) ExpandRequest(request *sdp.ItemRequest) map[*sdp.ItemRequest][]Source {
-	requests := make(map[string]*struct {
-		Request *sdp.ItemRequest
-		Sources []Source
-	})
-
-	var checkSources []Source
-
-	if IsWildcard(request.Type) {
-		// If the request has a wildcard type, all non-hidden sources might try
-		// to respond
-		checkSources = e.sh.VisibleSources()
-	} else {
-		// If the type is specific, pull just sources for that type
-		checkSources = e.sh.SourcesByType(request.Type)
-	}
-
-	for _, src := range checkSources {
-		// Calculate if the source is hidden
-		var isHidden bool
-
-		if hs, ok := src.(HiddenSource); ok {
-			isHidden = hs.Hidden()
-		}
-
-		for _, sourceScope := range src.Scopes() {
-			// Create a new request if:
-			//
-			// * The source supports all scopes, or
-			// * The request scope is a wildcard (and the source is not hidden), or
-			// * The request scope matches source scope
-			if IsWildcard(sourceScope) || (IsWildcard(request.Scope) && !isHidden) || sourceScope == request.Scope {
-				var scope string
-
-				// Choose the more specific scope
-				if IsWildcard(sourceScope) {
-					scope = request.Scope
-				} else {
-					scope = sourceScope
-				}
-
-				request := sdp.ItemRequest{
-					Type:            src.Type(),
-					Method:          request.Method,
-					Query:           request.Query,
-					Scope:           scope,
-					ItemSubject:     request.ItemSubject,
-					ResponseSubject: request.ResponseSubject,
-					LinkDepth:       request.LinkDepth,
-					IgnoreCache:     request.IgnoreCache,
-					UUID:            request.UUID,
-					Timeout:         request.Timeout,
-				}
-
-				hash, err := requestHash(&request)
-
-				if err == nil {
-					if existing, ok := requests[hash]; ok {
-						existing.Sources = append(existing.Sources, src)
-					} else {
-						requests[hash] = &struct {
-							Request *sdp.ItemRequest
-							Sources []Source
-						}{
-							Request: &request,
-							Sources: []Source{
-								src,
-							},
-						}
-					}
-				}
-			}
-		}
-	}
-
-	// Convert back to final map
-	finalMap := make(map[*sdp.ItemRequest][]Source)
-	for _, expanded := range requests {
-		finalMap[expanded.Request] = expanded.Sources
-	}
-
-	return finalMap
 }
 
 // requestHash Calculates a hash for a given request which can be used to
