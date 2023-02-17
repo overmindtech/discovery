@@ -202,7 +202,7 @@ func TestSourceAdd(t *testing.T) {
 
 	e.AddSources(&src)
 
-	if x := len(e.Sources()); x != 1 {
+	if x := len(e.sh.Sources()); x != 1 {
 		t.Fatalf("Expected 1 source, got %v", x)
 	}
 }

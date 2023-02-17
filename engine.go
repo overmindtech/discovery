@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
-	"sort"
 	"sync"
 	"time"
 
@@ -63,9 +62,8 @@ type Engine struct {
 	// List of all current subscriptions
 	subscriptions []*nats.Subscription
 
-	// Map of types to all sources for that type
-	sourceMap      map[string][]Source
-	sourceMapMutex sync.RWMutex
+	// All Sources managed by this Engine
+	sh *SourceHost
 
 	// Storage for triggers
 	triggers      []*Trigger
@@ -94,7 +92,7 @@ func NewEngine() Engine {
 		MaxRequestTimeout:       DefaultMaxRequestTimeout,
 		ConnectionWatchInterval: DefaultConnectionWatchInterval,
 		cache:                   sdpcache.NewCache(),
-		sourceMap:               make(map[string][]Source),
+		sh:                      NewSourceHost(),
 		triggers:                make([]*Trigger, 0),
 		trackedRequests:         make(map[uuid.UUID]*RequestTracker),
 	}
@@ -131,22 +129,7 @@ func (e *Engine) DeleteTrackedRequest(uuid [16]byte) {
 
 // AddSources Adds a source to this engine
 func (e *Engine) AddSources(sources ...Source) {
-	e.sourceMapMutex.Lock()
-	defer e.sourceMapMutex.Unlock()
-
-	for _, src := range sources {
-		allSources := append(e.sourceMap[src.Type()], src)
-
-		sort.Slice(allSources, func(i, j int) bool {
-			iSource := allSources[i]
-			jSource := allSources[j]
-
-			// Sort by weight, highest first
-			return iSource.Weight() > jSource.Weight()
-		})
-
-		e.sourceMap[src.Type()] = allSources
-	}
+	e.sh.AddSources(sources...)
 }
 
 // AddTriggers Adds a trigger to this engine. Triggers cause the engine to
@@ -197,40 +180,6 @@ func (e *Engine) ProcessTriggers(ctx context.Context, item *sdp.Item) {
 
 	// Wait for all to complete so that we know what we have running
 	wg.Wait()
-}
-
-// Sources Returns a slice of all known sources
-func (e *Engine) Sources() []Source {
-	e.sourceMapMutex.RLock()
-	defer e.sourceMapMutex.RUnlock()
-
-	sources := make([]Source, 0)
-
-	for _, typeSources := range e.sourceMap {
-		sources = append(sources, typeSources...)
-	}
-
-	return sources
-}
-
-// VisibleSources Returns a slice of all known sources excluding hidden ones
-func (e *Engine) VisibleSources() []Source {
-	allSources := e.Sources()
-	result := make([]Source, 0)
-
-	// Add all sources unless they are hidden
-	for _, source := range allSources {
-		if hs, ok := source.(HiddenSource); ok {
-			if hs.Hidden() {
-				// If the source is hidden, continue without adding it
-				continue
-			}
-		}
-
-		result = append(result, source)
-	}
-
-	return result
 }
 
 // Connect Connects to NATS
@@ -312,7 +261,7 @@ func (e *Engine) connect() error {
 		// should just be making the one
 		var wildcardExists bool
 
-		for _, src := range e.Sources() {
+		for _, src := range e.sh.Sources() {
 			for _, itemScope := range src.Scopes() {
 				if itemScope == sdp.WILDCARD {
 					wildcardExists = true
@@ -406,19 +355,19 @@ func (e *Engine) Start() error {
 
 	// Add meta-sources so that we can respond to requests for `overmind-type`,
 	// `overmind-scope` and `overmind-source` resources
-	typeSource, err = NewMetaSource(e, Type)
+	typeSource, err = NewMetaSource(e.sh, Type)
 
 	if err != nil {
 		return err
 	}
 
-	scopeSource, err = NewMetaSource(e, Scope)
+	scopeSource, err = NewMetaSource(e.sh, Scope)
 
 	if err != nil {
 		return err
 	}
 
-	ms, err = NewMetaSource(e, Type)
+	ms, err = NewMetaSource(e.sh, Type)
 
 	if err != nil {
 		return err

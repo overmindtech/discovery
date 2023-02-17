@@ -366,7 +366,7 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with a single source with a single scope", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sourceMap = make(map[string][]Source)
+			e.sh = NewSourceHost()
 			e.ClearCache()
 		})
 
@@ -392,7 +392,7 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with a single source with many scopes", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sourceMap = make(map[string][]Source)
+			e.sh = NewSourceHost()
 			e.ClearCache()
 		})
 
@@ -421,7 +421,7 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with many sources with single scopes", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sourceMap = make(map[string][]Source)
+			e.sh = NewSourceHost()
 			e.ClearCache()
 		})
 
@@ -460,7 +460,7 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with many sources with many scopes", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sourceMap = make(map[string][]Source)
+			e.sh = NewSourceHost()
 			e.ClearCache()
 		})
 
@@ -503,7 +503,7 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with many sources with many scopes which overlap GET", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sourceMap = make(map[string][]Source)
+			e.sh = NewSourceHost()
 			e.ClearCache()
 		})
 
@@ -548,7 +548,7 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with many sources with many scopes which overlap LIST", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sourceMap = make(map[string][]Source)
+			e.sh = NewSourceHost()
 			e.ClearCache()
 		})
 
@@ -591,7 +591,7 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with a single wildcard source", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sourceMap = make(map[string][]Source)
+			e.sh = NewSourceHost()
 			e.ClearCache()
 		})
 
@@ -618,7 +618,7 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with a many wildcard sources", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sourceMap = make(map[string][]Source)
+			e.sh = NewSourceHost()
 			e.ClearCache()
 		})
 
@@ -669,7 +669,7 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with a many wildcard sources and static sources", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sourceMap = make(map[string][]Source)
+			e.sh = NewSourceHost()
 			e.ClearCache()
 		})
 

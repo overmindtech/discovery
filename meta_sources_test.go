@@ -17,7 +17,7 @@ func TestSourcesSource(t *testing.T) {
 }
 
 func TestMetaSourceSearchType(t *testing.T) {
-	s, err := NewMetaSource(newTestEngine(), Type)
+	s, err := NewMetaSource(newTestSourceHost(), Type)
 
 	if err != nil {
 		t.Fatal(err)
@@ -97,7 +97,7 @@ func TestMetaSourceSearchType(t *testing.T) {
 }
 
 func TestMetaSourceSearchScope(t *testing.T) {
-	s, err := NewMetaSource(newTestEngine(), Type)
+	s, err := NewMetaSource(newTestSourceHost(), Type)
 
 	if err != nil {
 		t.Fatal(err)
@@ -154,7 +154,7 @@ func TestMetaSourceSearchScope(t *testing.T) {
 }
 
 func TestTypeSource(t *testing.T) {
-	s, err := NewMetaSource(newTestEngine(), Type)
+	s, err := NewMetaSource(newTestSourceHost(), Type)
 
 	if err != nil {
 		t.Fatal(err)
@@ -200,8 +200,8 @@ func TestTypeSource(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if len(s.engine.Sources()) != len(items) {
-				t.Errorf("expected %v sources, got %v", len(s.engine.Sources()), len(items))
+			if len(s.sh.Sources()) != len(items) {
+				t.Errorf("expected %v sources, got %v", len(s.sh.Sources()), len(items))
 			}
 		})
 
@@ -242,7 +242,7 @@ func TestTypeSource(t *testing.T) {
 }
 
 func TestScopeSource(t *testing.T) {
-	s, err := NewMetaSource(newTestEngine(), Scope)
+	s, err := NewMetaSource(newTestSourceHost(), Scope)
 
 	if err != nil {
 		t.Fatal(err)
@@ -329,10 +329,10 @@ func TestScopeSource(t *testing.T) {
 	})
 }
 
-func newTestEngine() *Engine {
-	e := NewEngine()
+func newTestSourceHost() *SourceHost {
+	sh := NewSourceHost()
 
-	e.AddSources(
+	sh.AddSources(
 		&TestSource{
 			ReturnType: "aws-ec2instance",
 			ReturnScopes: []string{
@@ -360,5 +360,5 @@ func newTestEngine() *Engine {
 		},
 	)
 
-	return &e
+	return sh
 }
