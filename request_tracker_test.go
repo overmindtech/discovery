@@ -86,9 +86,12 @@ func (s *SpeedTestSource) Weight() int {
 }
 
 func TestExecute(t *testing.T) {
-	engine := NewEngine()
-	engine.Name = "test"
-	engine.MaxParallelExecutions = 1
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
+	e.Name = "test"
+	e.MaxParallelExecutions = 1
 
 	src := TestSource{
 		ReturnType: "person",
@@ -97,13 +100,13 @@ func TestExecute(t *testing.T) {
 		},
 	}
 
-	engine.AddSources(&src)
+	e.AddSources(&src)
 
 	t.Run("Without linking", func(t *testing.T) {
 		t.Parallel()
 
 		rt := RequestTracker{
-			Engine: &engine,
+			Engine: e,
 			Request: &sdp.ItemRequest{
 				Type:      "person",
 				Method:    sdp.RequestMethod_GET,
@@ -132,7 +135,7 @@ func TestExecute(t *testing.T) {
 		t.Parallel()
 
 		rt := RequestTracker{
-			Engine: &engine,
+			Engine: e,
 			Request: &sdp.ItemRequest{
 				Type:      "person",
 				Method:    sdp.RequestMethod_GET,
@@ -182,7 +185,7 @@ func TestExecute(t *testing.T) {
 		t.Parallel()
 
 		rt := RequestTracker{
-			Engine: &engine,
+			Engine: e,
 		}
 
 		_, _, err := rt.Execute(context.Background())
@@ -195,21 +198,24 @@ func TestExecute(t *testing.T) {
 }
 
 func TestTimeout(t *testing.T) {
-	engine := NewEngine()
-	engine.Name = "test"
-	engine.MaxParallelExecutions = 1
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
+	e.Name = "test"
+	e.MaxParallelExecutions = 1
 
 	src := SpeedTestSource{
 		QueryDelay: 100 * time.Millisecond,
 	}
 
-	engine.AddSources(&src)
+	e.AddSources(&src)
 
 	t.Run("With a timeout, but not exceeding it", func(t *testing.T) {
 		t.Parallel()
 
 		rt := RequestTracker{
-			Engine: &engine,
+			Engine: e,
 			Request: &sdp.ItemRequest{
 				Type:      "person",
 				Method:    sdp.RequestMethod_GET,
@@ -239,7 +245,7 @@ func TestTimeout(t *testing.T) {
 		t.Parallel()
 
 		rt := RequestTracker{
-			Engine: &engine,
+			Engine: e,
 			Request: &sdp.ItemRequest{
 				Type:      "person",
 				Method:    sdp.RequestMethod_GET,
@@ -259,7 +265,7 @@ func TestTimeout(t *testing.T) {
 
 	t.Run("With linking that exceeds the timout", func(t *testing.T) {
 		rt := RequestTracker{
-			Engine: &engine,
+			Engine: e,
 			Request: &sdp.ItemRequest{
 				Type:      "person",
 				Method:    sdp.RequestMethod_GET,
@@ -287,20 +293,23 @@ func TestTimeout(t *testing.T) {
 }
 
 func TestCancel(t *testing.T) {
-	engine := NewEngine()
-	engine.Name = "test"
-	engine.MaxParallelExecutions = 1
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
+	e.Name = "test"
+	e.MaxParallelExecutions = 1
 
 	src := SpeedTestSource{
 		QueryDelay: 1 * time.Second,
 	}
 
-	engine.AddSources(&src)
+	e.AddSources(&src)
 
 	u := uuid.New()
 
 	rt := RequestTracker{
-		Engine: &engine,
+		Engine: e,
 		Request: &sdp.ItemRequest{
 			Type:      "person",
 			Method:    sdp.RequestMethod_GET,
@@ -312,7 +321,6 @@ func TestCancel(t *testing.T) {
 	}
 
 	items := make([]*sdp.Item, 0)
-	var err error
 	var wg sync.WaitGroup
 
 	wg.Add(1)

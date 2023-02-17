@@ -9,7 +9,10 @@ import (
 )
 
 func TestFilterSources(t *testing.T) {
-	e := NewEngine()
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
 
 	e.AddSources(
 		&TestSource{
@@ -196,7 +199,10 @@ func (e *ExpectExpand) Validate(t *testing.T, m map[*sdp.ItemRequest][]Source) {
 }
 
 func TestSourceAdd(t *testing.T) {
-	e := NewEngine()
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
 
 	src := TestSource{}
 
@@ -208,7 +214,10 @@ func TestSourceAdd(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	e := NewEngine()
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
 	e.Name = "testEngine"
 
 	src := TestSource{
@@ -418,7 +427,10 @@ func TestGet(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	e := NewEngine()
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
 
 	src := TestSource{}
 
@@ -442,7 +454,10 @@ func TestList(t *testing.T) {
 }
 
 func TestSearch(t *testing.T) {
-	e := NewEngine()
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
 
 	src := TestSource{}
 
@@ -467,7 +482,10 @@ func TestSearch(t *testing.T) {
 }
 
 func TestListSearchCaching(t *testing.T) {
-	e := NewEngine()
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
 
 	src := TestSource{
 		ReturnScopes: []string{
@@ -724,7 +742,10 @@ func TestListSearchCaching(t *testing.T) {
 func TestSearchGetCaching(t *testing.T) {
 	// We want to be sure that if an item has been found via a search and
 	// cached, the cache will be hit if a Get is run for that particular item
-	e := NewEngine()
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
 
 	src := TestSource{
 		ReturnScopes: []string{

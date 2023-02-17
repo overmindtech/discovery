@@ -17,7 +17,7 @@ func TestSourcesSource(t *testing.T) {
 }
 
 func TestMetaSourceSearchType(t *testing.T) {
-	s, err := NewMetaSource(newTestSourceHost(), Type)
+	s, err := NewMetaSource(newTestSourceHost(t), Type)
 
 	if err != nil {
 		t.Fatal(err)
@@ -97,7 +97,7 @@ func TestMetaSourceSearchType(t *testing.T) {
 }
 
 func TestMetaSourceSearchScope(t *testing.T) {
-	s, err := NewMetaSource(newTestSourceHost(), Type)
+	s, err := NewMetaSource(newTestSourceHost(t), Type)
 
 	if err != nil {
 		t.Fatal(err)
@@ -154,7 +154,7 @@ func TestMetaSourceSearchScope(t *testing.T) {
 }
 
 func TestTypeSource(t *testing.T) {
-	s, err := NewMetaSource(newTestSourceHost(), Type)
+	s, err := NewMetaSource(newTestSourceHost(t), Type)
 
 	if err != nil {
 		t.Fatal(err)
@@ -242,7 +242,7 @@ func TestTypeSource(t *testing.T) {
 }
 
 func TestScopeSource(t *testing.T) {
-	s, err := NewMetaSource(newTestSourceHost(), Scope)
+	s, err := NewMetaSource(newTestSourceHost(t), Scope)
 
 	if err != nil {
 		t.Fatal(err)
@@ -329,9 +329,11 @@ func TestScopeSource(t *testing.T) {
 	})
 }
 
-func newTestSourceHost() *SourceHost {
-	sh := NewSourceHost()
-
+func newTestSourceHost(t *testing.T) *SourceHost {
+	sh, err := NewSourceHost()
+	if err != nil {
+		t.Fatalf("Error initializing SourceHost: %v", err)
+	}
 	sh.AddSources(
 		&TestSource{
 			ReturnType: "aws-ec2instance",

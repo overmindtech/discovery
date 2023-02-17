@@ -12,7 +12,10 @@ import (
 )
 
 func TestExecuteRequest(t *testing.T) {
-	e := NewEngine()
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
 	e.Name = "test"
 
 	src := TestSource{
@@ -84,7 +87,7 @@ func TestExecuteRequest(t *testing.T) {
 		_, errs, err := e.ExecuteRequestSync(context.Background(), request)
 
 		if err == nil {
-			t.Error("expected erro but got nil")
+			t.Error("expected error but got nil")
 		}
 
 		if len(errs) == 1 {
@@ -171,7 +174,10 @@ func TestExecuteRequest(t *testing.T) {
 }
 
 func TestHandleItemRequest(t *testing.T) {
-	e := NewEngine()
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
 	e.Name = "test"
 
 	personSource := TestSource{
@@ -249,7 +255,10 @@ func TestHandleItemRequest(t *testing.T) {
 }
 
 func TestWildcardSourceExpansion(t *testing.T) {
-	e := NewEngine()
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
 	e.Name = "test"
 
 	personSource := TestSource{
@@ -292,7 +301,10 @@ func TestWildcardSourceExpansion(t *testing.T) {
 func TestSendRequestSync(t *testing.T) {
 	SkipWithoutNats(t)
 
-	e := NewEngine()
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
 	e.Name = "nats-test-srs"
 	e.NATSOptions = &connect.NATSOptions{
 		Servers:           NatsTestURLs,
@@ -312,8 +324,7 @@ func TestSendRequestSync(t *testing.T) {
 
 	e.AddSources(&src)
 
-	err := e.Start()
-
+	err = e.Start()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -362,11 +373,17 @@ func TestSendRequestSync(t *testing.T) {
 }
 
 func TestExpandRequest(t *testing.T) {
-	e := NewEngine()
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
 
 	t.Run("with a single source with a single scope", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sh = NewSourceHost()
+			e.sh, err = NewSourceHost()
+			if err != nil {
+				t.Fatalf("Error initializing SourceHost: %v", err)
+			}
 			e.ClearCache()
 		})
 
@@ -392,7 +409,10 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with a single source with many scopes", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sh = NewSourceHost()
+			e.sh, err = NewSourceHost()
+			if err != nil {
+				t.Fatalf("Error initializing SourceHost: %v", err)
+			}
 			e.ClearCache()
 		})
 
@@ -421,7 +441,10 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with many sources with single scopes", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sh = NewSourceHost()
+			e.sh, err = NewSourceHost()
+			if err != nil {
+				t.Fatalf("Error initializing SourceHost: %v", err)
+			}
 			e.ClearCache()
 		})
 
@@ -460,7 +483,10 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with many sources with many scopes", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sh = NewSourceHost()
+			e.sh, err = NewSourceHost()
+			if err != nil {
+				t.Fatalf("Error initializing SourceHost: %v", err)
+			}
 			e.ClearCache()
 		})
 
@@ -503,7 +529,10 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with many sources with many scopes which overlap GET", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sh = NewSourceHost()
+			e.sh, err = NewSourceHost()
+			if err != nil {
+				t.Fatalf("Error initializing SourceHost: %v", err)
+			}
 			e.ClearCache()
 		})
 
@@ -548,7 +577,10 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with many sources with many scopes which overlap LIST", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sh = NewSourceHost()
+			e.sh, err = NewSourceHost()
+			if err != nil {
+				t.Fatalf("Error initializing SourceHost: %v", err)
+			}
 			e.ClearCache()
 		})
 
@@ -591,7 +623,10 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with a single wildcard source", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sh = NewSourceHost()
+			e.sh, err = NewSourceHost()
+			if err != nil {
+				t.Fatalf("Error initializing SourceHost: %v", err)
+			}
 			e.ClearCache()
 		})
 
@@ -618,7 +653,10 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with a many wildcard sources", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sh = NewSourceHost()
+			e.sh, err = NewSourceHost()
+			if err != nil {
+				t.Fatalf("Error initializing SourceHost: %v", err)
+			}
 			e.ClearCache()
 		})
 
@@ -669,7 +707,10 @@ func TestExpandRequest(t *testing.T) {
 
 	t.Run("with a many wildcard sources and static sources", func(t *testing.T) {
 		t.Cleanup(func() {
-			e.sh = NewSourceHost()
+			e.sh, err = NewSourceHost()
+			if err != nil {
+				t.Fatalf("Error initializing SourceHost: %v", err)
+			}
 			e.ClearCache()
 		})
 

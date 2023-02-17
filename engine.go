@@ -86,16 +86,20 @@ type Engine struct {
 	cacheCancel context.CancelFunc
 }
 
-func NewEngine() Engine {
-	return Engine{
+func NewEngine() (*Engine, error) {
+	sh, err := NewSourceHost()
+	if err != nil {
+		return nil, err
+	}
+	return &Engine{
 		MaxParallelExecutions:   runtime.NumCPU(),
 		MaxRequestTimeout:       DefaultMaxRequestTimeout,
 		ConnectionWatchInterval: DefaultConnectionWatchInterval,
 		cache:                   sdpcache.NewCache(),
-		sh:                      NewSourceHost(),
+		sh:                      sh,
 		triggers:                make([]*Trigger, 0),
 		trackedRequests:         make(map[uuid.UUID]*RequestTracker),
-	}
+	}, nil
 }
 
 // TrackRequest Stores a RequestTracker in the engine so that it can be looked
@@ -346,38 +350,6 @@ func (e *Engine) disconnect() error {
 // any effect until the engine is restarted
 func (e *Engine) Start() error {
 	e.throttle = NewThrottle(e.MaxParallelExecutions)
-
-	var typeSource Source
-	var scopeSource Source
-	var sourceSource Source
-	var ms *MetaSource
-	var err error
-
-	// Add meta-sources so that we can respond to requests for `overmind-type`,
-	// `overmind-scope` and `overmind-source` resources
-	typeSource, err = NewMetaSource(e.sh, Type)
-
-	if err != nil {
-		return err
-	}
-
-	scopeSource, err = NewMetaSource(e.sh, Scope)
-
-	if err != nil {
-		return err
-	}
-
-	ms, err = NewMetaSource(e.sh, Type)
-
-	if err != nil {
-		return err
-	}
-
-	sourceSource = &SourcesSource{
-		MetaSource: *ms,
-	}
-
-	e.AddSources(typeSource, scopeSource, sourceSource)
 
 	e.cacheContext, e.cacheCancel = context.WithCancel(context.Background())
 

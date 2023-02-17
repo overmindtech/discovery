@@ -219,12 +219,15 @@ func TestStandaloneTriggers(t *testing.T) {
 func TestNATSTriggers(t *testing.T) {
 	SkipWithoutNats(t)
 
-	engine := NewEngine()
-	engine.Name = "trigger-testing"
-	engine.NATSOptions = &connect.NATSOptions{
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
+	e.Name = "trigger-testing"
+	e.NATSOptions = &connect.NATSOptions{
 		Servers: NatsTestURLs,
 	}
-	engine.MaxParallelExecutions = 1
+	e.MaxParallelExecutions = 1
 
 	source := TestSource{
 		ReturnType: "dog",
@@ -234,7 +237,7 @@ func TestNATSTriggers(t *testing.T) {
 		},
 	}
 
-	engine.AddSources(&source)
+	e.AddSources(&source)
 
 	for _, tt := range tests {
 		if tt.ExpectError {
@@ -246,16 +249,16 @@ func TestNATSTriggers(t *testing.T) {
 			t.Cleanup(source.ClearCalls)
 
 			// Start the engine so that it subscribes to the correct subjects
-			engine.AddTriggers(tt.Trigger)
-			err := engine.Start()
+			e.AddTriggers(tt.Trigger)
+			err := e.Start()
 
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			t.Cleanup(func() {
-				engine.ClearTriggers()
-				err := engine.Stop()
+				e.ClearTriggers()
+				err := e.Stop()
 
 				if err != nil {
 					t.Error(err)
@@ -265,7 +268,7 @@ func TestNATSTriggers(t *testing.T) {
 			// Track progress. Note that this engine should be sending responses on
 			// the same subject that the original request was sent on
 			progress := sdp.NewRequestProgress(tt.Item.Metadata.SourceRequest)
-			_, err = engine.natsConnection.Subscribe(
+			_, err = e.natsConnection.Subscribe(
 				tt.Item.Metadata.SourceRequest.ResponseSubject,
 				sdp.NewResponseHandler("ProcessResponse", progress.ProcessResponse),
 			)
@@ -275,7 +278,7 @@ func TestNATSTriggers(t *testing.T) {
 			}
 
 			// Send the test item as if it was the result of some other query
-			err = engine.natsConnection.Publish(
+			err = e.natsConnection.Publish(
 				context.Background(),
 				"return.item."+nats.NewInbox(),
 				tt.Item,
@@ -288,7 +291,7 @@ func TestNATSTriggers(t *testing.T) {
 			items := make(chan *sdp.Item, 1000)
 			errs := make(chan *sdp.ItemRequestError, 1000)
 
-			progress.Start(context.Background(), engine.natsConnection, items, errs)
+			progress.Start(context.Background(), e.natsConnection, items, errs)
 
 			for range items {
 				// Do nothing

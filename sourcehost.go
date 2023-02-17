@@ -14,10 +14,34 @@ type SourceHost struct {
 	sourceMapMutex sync.RWMutex
 }
 
-func NewSourceHost() *SourceHost {
-	return &SourceHost{
+func NewSourceHost() (*SourceHost, error) {
+	sh := &SourceHost{
 		sourceMap: make(map[string][]Source),
 	}
+
+	// Add meta-sources so that we can respond to requests for `overmind-type`,
+	// `overmind-scope` and `overmind-source` resources
+	typeSource, err := NewMetaSource(sh, Type)
+	if err != nil {
+		return nil, err
+	}
+
+	scopeSource, err := NewMetaSource(sh, Scope)
+	if err != nil {
+		return nil, err
+	}
+
+	ms, err := NewMetaSource(sh, Type)
+	if err != nil {
+		return nil, err
+	}
+
+	sourceSource := &SourcesSource{
+		MetaSource: *ms,
+	}
+	sh.AddSources(typeSource, scopeSource, sourceSource)
+
+	return sh, nil
 }
 
 // AddSources Adds a source to this engine

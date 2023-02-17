@@ -41,7 +41,10 @@ func TestDeleteItemRequest(t *testing.T) {
 }
 
 func TestTrackRequest(t *testing.T) {
-	e := NewEngine()
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
 
 	t.Run("With normal request", func(t *testing.T) {
 		t.Parallel()
@@ -49,7 +52,7 @@ func TestTrackRequest(t *testing.T) {
 		u := uuid.New()
 
 		rt := RequestTracker{
-			Engine: &e,
+			Engine: e,
 			Request: &sdp.ItemRequest{
 				Type:      "person",
 				Method:    sdp.RequestMethod_LIST,
@@ -81,7 +84,7 @@ func TestTrackRequest(t *testing.T) {
 				u := uuid.New()
 
 				rt := RequestTracker{
-					Engine: &e,
+					Engine: e,
 					Request: &sdp.ItemRequest{
 						Type:      "person",
 						Query:     fmt.Sprintf("person-%v", i),
@@ -106,7 +109,10 @@ func TestTrackRequest(t *testing.T) {
 func TestDeleteTrackedRequest(t *testing.T) {
 	t.Parallel()
 
-	e := NewEngine()
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
 
 	var wg sync.WaitGroup
 
@@ -118,7 +124,7 @@ func TestDeleteTrackedRequest(t *testing.T) {
 			u := uuid.New()
 
 			rt := RequestTracker{
-				Engine: &e,
+				Engine: e,
 				Request: &sdp.ItemRequest{
 					Type:      "person",
 					Query:     fmt.Sprintf("person-%v", i),
@@ -147,7 +153,10 @@ func TestDeleteTrackedRequest(t *testing.T) {
 func TestNats(t *testing.T) {
 	SkipWithoutNats(t)
 
-	e := NewEngine()
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
 	e.Name = "nats-test"
 	e.NATSOptions = &connect.NATSOptions{
 		NumRetries:        5,
@@ -249,8 +258,10 @@ func TestNats(t *testing.T) {
 func TestNatsCancel(t *testing.T) {
 	SkipWithoutNats(t)
 
-	e := NewEngine()
-
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
 	e.Name = "nats-test"
 	e.NATSOptions = &connect.NATSOptions{
 		NumRetries:        5,
@@ -331,7 +342,10 @@ func TestNatsCancel(t *testing.T) {
 
 func TestNatsConnections(t *testing.T) {
 	t.Run("with a bad hostname", func(t *testing.T) {
-		e := NewEngine()
+		e, err := NewEngine()
+		if err != nil {
+			t.Fatalf("Error initializing Engine: %v", err)
+		}
 		e.Name = "nats-test"
 		e.NATSOptions = &connect.NATSOptions{
 			Servers:           []string{"nats://bad.server"},
@@ -342,7 +356,7 @@ func TestNatsConnections(t *testing.T) {
 		e.NATSQueueName = "test"
 		e.MaxParallelExecutions = 1
 
-		err := e.Start()
+		err = e.Start()
 
 		if err == nil {
 			t.Error("expected error but got nil")
@@ -366,7 +380,10 @@ func TestNatsConnections(t *testing.T) {
 			}
 		})
 
-		e := NewEngine()
+		e, err := NewEngine()
+		if err != nil {
+			t.Fatalf("Error initializing Engine: %v", err)
+		}
 		e.Name = "nats-test"
 		e.NATSOptions = &connect.NATSOptions{
 			NumRetries:        5,
@@ -381,7 +398,7 @@ func TestNatsConnections(t *testing.T) {
 		e.NATSQueueName = "test"
 		e.MaxParallelExecutions = 1
 
-		err := e.Start()
+		err = e.Start()
 
 		if err != nil {
 			t.Fatal(err)
@@ -428,7 +445,10 @@ func TestNatsConnections(t *testing.T) {
 		// Need to change this to avoid port clashes in github actions
 		opts.Port = 4112
 
-		e := NewEngine()
+		e, err := NewEngine()
+		if err != nil {
+			t.Fatalf("Error initializing Engine: %v", err)
+		}
 		e.Name = "nats-test"
 		e.NATSOptions = &connect.NATSOptions{
 			NumRetries:        10,
@@ -459,7 +479,7 @@ func TestNatsConnections(t *testing.T) {
 			})
 		}()
 
-		err := e.Start()
+		err = e.Start()
 
 		if err != nil {
 			t.Fatal(err)
@@ -478,7 +498,10 @@ func TestNATSFailureRestart(t *testing.T) {
 		t.Fatal("Could not start goroutine NATS server")
 	}
 
-	e := NewEngine()
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
 	e.Name = "nats-test"
 	e.NATSOptions = &connect.NATSOptions{
 		NumRetries:        10,
@@ -495,7 +518,7 @@ func TestNATSFailureRestart(t *testing.T) {
 	e.ConnectionWatchInterval = 1 * time.Second
 
 	// Connect successfully
-	err := e.Start()
+	err = e.Start()
 
 	if err != nil {
 		t.Fatal(err)
@@ -535,7 +558,10 @@ func TestNATSFailureRestart(t *testing.T) {
 func TestNatsAuth(t *testing.T) {
 	SkipWithoutNatsAuth(t)
 
-	e := NewEngine()
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
 	e.Name = "nats-test"
 	e.NATSOptions = &connect.NATSOptions{
 		NumRetries:        5,
@@ -634,7 +660,10 @@ func TestNatsAuth(t *testing.T) {
 
 func TestSetupMaxRequestTimeout(t *testing.T) {
 	t.Run("with no value", func(t *testing.T) {
-		e := NewEngine()
+		e, err := NewEngine()
+		if err != nil {
+			t.Fatalf("Error initializing Engine: %v", err)
+		}
 
 		if e.MaxRequestTimeout != DefaultMaxRequestTimeout {
 			t.Errorf("max request timeout did not default. Got %v expected %v", e.MaxRequestTimeout.String(), DefaultMaxRequestTimeout.String())
@@ -642,7 +671,10 @@ func TestSetupMaxRequestTimeout(t *testing.T) {
 	})
 
 	t.Run("with a value", func(t *testing.T) {
-		e := NewEngine()
+		e, err := NewEngine()
+		if err != nil {
+			t.Fatalf("Error initializing Engine: %v", err)
+		}
 		e.MaxRequestTimeout = 1 * time.Second
 
 		if e.MaxRequestTimeout != 1*time.Second {
