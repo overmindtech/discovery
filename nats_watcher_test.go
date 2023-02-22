@@ -82,7 +82,7 @@ func TestNATSWatcher(t *testing.T) {
 		t.Errorf("FailureHandler not called in %v", (interval * 2).String())
 	case <-fail:
 		// The fail handler has been called!
-		t.Log("Fail handler called suucesfully 🥳")
+		t.Log("Fail handler called successfully 🥳")
 	}
 }
 
