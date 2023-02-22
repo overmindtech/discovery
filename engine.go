@@ -65,10 +65,6 @@ type Engine struct {
 	// All Sources managed by this Engine
 	sh *SourceHost
 
-	// Storage for triggers
-	triggers      []*Trigger
-	triggersMutex sync.RWMutex
-
 	// GetListMutex used for locking out Get requests when there's a List happening
 	gfm GetListMutex
 
@@ -97,7 +93,6 @@ func NewEngine() (*Engine, error) {
 		ConnectionWatchInterval: DefaultConnectionWatchInterval,
 		cache:                   sdpcache.NewCache(),
 		sh:                      sh,
-		triggers:                make([]*Trigger, 0),
 		trackedRequests:         make(map[uuid.UUID]*RequestTracker),
 	}, nil
 }
@@ -134,56 +129,6 @@ func (e *Engine) DeleteTrackedRequest(uuid [16]byte) {
 // AddSources Adds a source to this engine
 func (e *Engine) AddSources(sources ...Source) {
 	e.sh.AddSources(sources...)
-}
-
-// AddTriggers Adds a trigger to this engine. Triggers cause the engine to
-// listen for items from other scopes and will fire a custom ItemRequest if
-// they match
-func (e *Engine) AddTriggers(triggers ...Trigger) {
-	e.triggersMutex.Lock()
-	defer e.triggersMutex.Unlock()
-
-	for _, trigger := range triggers {
-		e.triggers = append(e.triggers, &trigger)
-	}
-}
-
-// ClearTriggers removes all triggers from the engine
-func (e *Engine) ClearTriggers() {
-	e.triggersMutex.Lock()
-	defer e.triggersMutex.Unlock()
-
-	e.triggers = make([]*Trigger, 0)
-}
-
-// ProcessTriggers Checks all triggers against a given item and fires them if
-// required
-func (e *Engine) ProcessTriggers(ctx context.Context, item *sdp.Item) {
-	e.triggersMutex.RLock()
-	defer e.triggersMutex.RUnlock()
-
-	wg := sync.WaitGroup{}
-
-	wg.Add(len(e.triggers))
-
-	for _, trigger := range e.triggers {
-		go func(t *Trigger) {
-			defer wg.Done()
-
-			// Check to see if the trigger should fire
-			req, err := t.ProcessItem(item)
-
-			if err != nil {
-				return
-			}
-
-			// Fire the trigger and send the request to the engine
-			go e.HandleItemRequest(ctx, req)
-		}(trigger)
-	}
-
-	// Wait for all to complete so that we know what we have running
-	wg.Wait()
 }
 
 // Connect Connects to NATS
@@ -242,16 +187,6 @@ func (e *Engine) connect() error {
 
 		if err != nil {
 			return err
-		}
-
-		if len(e.triggers) > 0 {
-			err = e.subscribe("return.item.>", sdp.NewAsyncRawItemHandler("ProcessTriggers", func(ctx context.Context, m *nats.Msg, i *sdp.Item) {
-				e.ProcessTriggers(ctx, i)
-			}))
-
-			if err != nil {
-				return err
-			}
 		}
 
 		// Loop over all sources and work out what subscriptions we need to make
