@@ -73,7 +73,7 @@ jobs:
         OVERMIND_NTE_ALLPERMS_CLIENT_ID: ${{ secrets.OVERMIND_NTE_ALLPERMS_CLIENT_ID }}
         OVERMIND_NTE_ALLPERMS_CLIENT_SECRET: ${{ secrets.OVERMIND_NTE_ALLPERMS_CLIENT_SECRET }}
         OVERMIND_NTE_ALLPERMS_DOMAIN: ${{ secrets.OVERMIND_NTE_ALLPERMS_DOMAIN }}
-      run: go test -v -timeout 5m ./... -race
+      run: go test -v -timeout 3m ./... -race
 
   release:
     name: Release
