@@ -24,12 +24,6 @@ func TestEngineAddSources(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	e, err := NewEngine()
-	if err != nil {
-		t.Fatalf("Error initializing Engine: %v", err)
-	}
-	e.Name = "testEngine"
-
 	src := TestSource{
 		ReturnName: "orange",
 		ReturnScopes: []string{
@@ -38,7 +32,7 @@ func TestGet(t *testing.T) {
 		},
 	}
 
-	e.AddSources(&src)
+	e := newStartedEngine(t, "TestGet", nil, &src)
 
 	t.Run("Basic test", func(t *testing.T) {
 		t.Cleanup(func() {
@@ -95,8 +89,8 @@ func TestGet(t *testing.T) {
 			if errs[0].ItemType != "person" {
 				t.Errorf("expected ItemType to be %v, got %v", "person", errs[0].ItemType)
 			}
-			if errs[0].ResponderName != "testEngine" {
-				t.Errorf("expected ResponderName to be %v, got %v", "testEngine", errs[0].ResponderName)
+			if errs[0].ResponderName != "TestGet" {
+				t.Errorf("expected ResponderName to be %v, got %v", "TestGet", errs[0].ResponderName)
 			}
 		} else {
 			t.Errorf("expected 1 error, got %v", len(errs))
@@ -237,14 +231,9 @@ func TestGet(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	e, err := NewEngine()
-	if err != nil {
-		t.Fatalf("Error initializing Engine: %v", err)
-	}
-
 	src := TestSource{}
 
-	e.AddSources(&src)
+	e := newStartedEngine(t, "TestList", nil, &src)
 
 	e.ExecuteRequestSync(context.Background(), &sdp.ItemRequest{
 		Type:   "person",
@@ -264,14 +253,9 @@ func TestList(t *testing.T) {
 }
 
 func TestSearch(t *testing.T) {
-	e, err := NewEngine()
-	if err != nil {
-		t.Fatalf("Error initializing Engine: %v", err)
-	}
-
 	src := TestSource{}
 
-	e.AddSources(&src)
+	e := newStartedEngine(t, "TestSearch", nil, &src)
 
 	e.ExecuteRequestSync(context.Background(), &sdp.ItemRequest{
 		Type:   "person",
@@ -292,11 +276,6 @@ func TestSearch(t *testing.T) {
 }
 
 func TestListSearchCaching(t *testing.T) {
-	e, err := NewEngine()
-	if err != nil {
-		t.Fatalf("Error initializing Engine: %v", err)
-	}
-
 	src := TestSource{
 		ReturnScopes: []string{
 			"test",
@@ -305,7 +284,8 @@ func TestListSearchCaching(t *testing.T) {
 		},
 	}
 
-	e.AddSources(&src)
+	e := newStartedEngine(t, "TestListSearchCaching", nil, &src)
+
 	e.cache.MinWaitTime = (10 * time.Millisecond)
 	e.cache.StartPurger(context.Background())
 
@@ -382,7 +362,7 @@ func TestListSearchCaching(t *testing.T) {
 		}
 
 		if l := len(src.ListCalls); l != 1 {
-			t.Errorf("Exected only 1 find call, got %v, cache not working", l)
+			t.Errorf("Expected only 1 find call, got %v, cache not working", l)
 		}
 
 		time.Sleep(200 * time.Millisecond)
@@ -394,7 +374,7 @@ func TestListSearchCaching(t *testing.T) {
 		}
 
 		if l := len(src.ListCalls); l != 2 {
-			t.Errorf("Exected 2 find calls, got %v, cache not clearing", l)
+			t.Errorf("Expected 2 find calls, got %v, cache not clearing", l)
 		}
 	})
 
@@ -473,7 +453,7 @@ func TestListSearchCaching(t *testing.T) {
 		}
 
 		if l := len(src.SearchCalls); l != 1 {
-			t.Errorf("Exected only 1 find call, got %v, cache not working", l)
+			t.Errorf("Expected only 1 find call, got %v, cache not working", l)
 		}
 
 		time.Sleep(200 * time.Millisecond)
@@ -485,7 +465,7 @@ func TestListSearchCaching(t *testing.T) {
 		}
 
 		if l := len(src.SearchCalls); l != 2 {
-			t.Errorf("Exected 2 find calls, got %v, cache not clearing", l)
+			t.Errorf("Expected 2 find calls, got %v, cache not clearing", l)
 		}
 	})
 
@@ -505,7 +485,7 @@ func TestListSearchCaching(t *testing.T) {
 		e.ExecuteRequestSync(context.Background(), &req)
 
 		if l := len(src.GetCalls); l != 2 {
-			t.Errorf("Exected 2 get calls, got %v, OTHER errors should not be cached", l)
+			t.Errorf("Expected 2 get calls, got %v, OTHER errors should not be cached", l)
 		}
 	})
 
@@ -551,10 +531,6 @@ func TestListSearchCaching(t *testing.T) {
 func TestSearchGetCaching(t *testing.T) {
 	// We want to be sure that if an item has been found via a search and
 	// cached, the cache will be hit if a Get is run for that particular item
-	e, err := NewEngine()
-	if err != nil {
-		t.Fatalf("Error initializing Engine: %v", err)
-	}
 
 	src := TestSource{
 		ReturnScopes: []string{
@@ -562,7 +538,7 @@ func TestSearchGetCaching(t *testing.T) {
 		},
 	}
 
-	e.AddSources(&src)
+	e := newStartedEngine(t, "TestSearchGetCaching", nil, &src)
 	e.cache.MinWaitTime = (10 * time.Millisecond)
 	e.cache.StartPurger(context.Background())
 

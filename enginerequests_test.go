@@ -12,34 +12,20 @@ import (
 )
 
 func TestExecuteRequest(t *testing.T) {
-	e, err := NewEngine()
-	if err != nil {
-		t.Fatalf("Error initializing Engine: %v", err)
-	}
-	e.Name = "test"
-	e.NATSOptions = &connect.NATSOptions{
-		Servers:           NatsTestURLs,
-		ConnectionName:    "test-connection",
-		ConnectionTimeout: time.Second,
-		MaxReconnects:     5,
-	}
-	e.NATSQueueName = "test"
-	e.MaxParallelExecutions = 10
-
 	src := TestSource{
 		ReturnType:   "person",
 		ReturnScopes: []string{"test"},
 	}
 
-	e.AddSources(&src)
-	err = e.Start()
-	if err != nil {
-		t.Fatalf("Error initializing Engine: %v", err)
-	}
-
-	t.Cleanup(func() {
-		e.Stop()
-	})
+	e := newStartedEngine(t, "TestExecuteRequest",
+		&connect.NATSOptions{
+			Servers:           NatsTestURLs,
+			ConnectionName:    "test-connection",
+			ConnectionTimeout: time.Second,
+			MaxReconnects:     5,
+		},
+		&src,
+	)
 
 	t.Run("Basic happy-path Get request", func(t *testing.T) {
 		request := &sdp.ItemRequest{
@@ -190,12 +176,6 @@ func TestExecuteRequest(t *testing.T) {
 }
 
 func TestHandleItemRequest(t *testing.T) {
-	e, err := NewEngine()
-	if err != nil {
-		t.Fatalf("Error initializing Engine: %v", err)
-	}
-	e.Name = "test"
-
 	personSource := TestSource{
 		ReturnType: "person",
 		ReturnScopes: []string{
@@ -213,7 +193,7 @@ func TestHandleItemRequest(t *testing.T) {
 		},
 	}
 
-	e.AddSources(&personSource, &dogSource)
+	e := newStartedEngine(t, "TestHandleItemRequest", nil, &personSource, &dogSource)
 
 	t.Run("Wildcard type should be expanded", func(t *testing.T) {
 		t.Cleanup(func() {
@@ -271,11 +251,6 @@ func TestHandleItemRequest(t *testing.T) {
 }
 
 func TestWildcardSourceExpansion(t *testing.T) {
-	e, err := NewEngine()
-	if err != nil {
-		t.Fatalf("Error initializing Engine: %v", err)
-	}
-	e.Name = "test"
 
 	personSource := TestSource{
 		ReturnType: "person",
@@ -284,7 +259,7 @@ func TestWildcardSourceExpansion(t *testing.T) {
 		},
 	}
 
-	e.AddSources(&personSource)
+	e := newStartedEngine(t, "TestWildcardSourceExpansion", nil, &personSource)
 
 	t.Run("request scope should be preserved", func(t *testing.T) {
 		req := sdp.ItemRequest{
@@ -317,20 +292,6 @@ func TestWildcardSourceExpansion(t *testing.T) {
 func TestSendRequestSync(t *testing.T) {
 	SkipWithoutNats(t)
 
-	e, err := NewEngine()
-	if err != nil {
-		t.Fatalf("Error initializing Engine: %v", err)
-	}
-	e.Name = "nats-test-srs"
-	e.NATSOptions = &connect.NATSOptions{
-		Servers:           NatsTestURLs,
-		ConnectionName:    "test-connection",
-		ConnectionTimeout: time.Second,
-		MaxReconnects:     5,
-	}
-	e.NATSQueueName = "test"
-	e.MaxParallelExecutions = 10
-
 	src := TestSource{
 		ReturnType: "person",
 		ReturnScopes: []string{
@@ -338,16 +299,7 @@ func TestSendRequestSync(t *testing.T) {
 		},
 	}
 
-	e.AddSources(&src)
-
-	err = e.Start()
-	if err != nil {
-		t.Fatalf("Error initializing Engine: %v", err)
-	}
-
-	t.Cleanup(func() {
-		e.Stop()
-	})
+	e := newStartedEngine(t, "TestSendRequestSync", nil, &src)
 
 	for i := 0; i < 250; i++ {
 		u := uuid.New()
@@ -393,27 +345,13 @@ func TestSendRequestSync(t *testing.T) {
 }
 
 func TestExpandRequest(t *testing.T) {
-	e, err := NewEngine()
-	if err != nil {
-		t.Fatalf("Error initializing Engine: %v", err)
-	}
-
 	t.Run("with a single source with a single scope", func(t *testing.T) {
-		t.Cleanup(func() {
-			e.sh, err = NewSourceHost()
-			if err != nil {
-				t.Fatalf("Error initializing SourceHost: %v", err)
-			}
-			e.ClearCache()
-		})
-
 		simple := TestSource{
 			ReturnScopes: []string{
 				"test1",
 			},
 		}
-
-		e.AddSources(&simple)
+		e := newStartedEngine(t, "TestExpandRequest", nil, &simple)
 
 		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
 			Type:   "person",
@@ -428,14 +366,6 @@ func TestExpandRequest(t *testing.T) {
 	})
 
 	t.Run("with a single source with many scopes", func(t *testing.T) {
-		t.Cleanup(func() {
-			e.sh, err = NewSourceHost()
-			if err != nil {
-				t.Fatalf("Error initializing SourceHost: %v", err)
-			}
-			e.ClearCache()
-		})
-
 		many := TestSource{
 			ReturnName: "many",
 			ReturnScopes: []string{
@@ -444,8 +374,7 @@ func TestExpandRequest(t *testing.T) {
 				"test3",
 			},
 		}
-
-		e.AddSources(&many)
+		e := newStartedEngine(t, "TestExpandRequest", nil, &many)
 
 		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
 			Type:   "person",
@@ -460,14 +389,6 @@ func TestExpandRequest(t *testing.T) {
 	})
 
 	t.Run("with many sources with single scopes", func(t *testing.T) {
-		t.Cleanup(func() {
-			e.sh, err = NewSourceHost()
-			if err != nil {
-				t.Fatalf("Error initializing SourceHost: %v", err)
-			}
-			e.ClearCache()
-		})
-
 		sx := TestSource{
 			ReturnName: "sx",
 			ReturnScopes: []string{
@@ -481,9 +402,7 @@ func TestExpandRequest(t *testing.T) {
 				"test2",
 			},
 		}
-
-		e.AddSources(&sx)
-		e.AddSources(&sy)
+		e := newStartedEngine(t, "TestExpandRequest", nil, &sx, &sy)
 
 		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
 			Type:   "person",
@@ -502,14 +421,6 @@ func TestExpandRequest(t *testing.T) {
 	})
 
 	t.Run("with many sources with many scopes", func(t *testing.T) {
-		t.Cleanup(func() {
-			e.sh, err = NewSourceHost()
-			if err != nil {
-				t.Fatalf("Error initializing SourceHost: %v", err)
-			}
-			e.ClearCache()
-		})
-
 		sx := TestSource{
 			ReturnName: "sx",
 			ReturnScopes: []string{
@@ -528,8 +439,7 @@ func TestExpandRequest(t *testing.T) {
 			},
 		}
 
-		e.AddSources(&sx)
-		e.AddSources(&sy)
+		e := newStartedEngine(t, "TestExpandRequest", nil, &sx, &sy)
 
 		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
 			Type:   "person",
@@ -548,14 +458,6 @@ func TestExpandRequest(t *testing.T) {
 	})
 
 	t.Run("with many sources with many scopes which overlap GET", func(t *testing.T) {
-		t.Cleanup(func() {
-			e.sh, err = NewSourceHost()
-			if err != nil {
-				t.Fatalf("Error initializing SourceHost: %v", err)
-			}
-			e.ClearCache()
-		})
-
 		sx := TestSource{
 			ReturnName: "sx",
 			ReturnScopes: []string{
@@ -576,8 +478,7 @@ func TestExpandRequest(t *testing.T) {
 			ReturnWeight: 11,
 		}
 
-		e.AddSources(&sx)
-		e.AddSources(&sy)
+		e := newStartedEngine(t, "TestExpandRequest", nil, &sx, &sy)
 
 		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
 			Type:   "person",
@@ -596,14 +497,6 @@ func TestExpandRequest(t *testing.T) {
 	})
 
 	t.Run("with many sources with many scopes which overlap LIST", func(t *testing.T) {
-		t.Cleanup(func() {
-			e.sh, err = NewSourceHost()
-			if err != nil {
-				t.Fatalf("Error initializing SourceHost: %v", err)
-			}
-			e.ClearCache()
-		})
-
 		sx := TestSource{
 			ReturnName: "sx",
 			ReturnScopes: []string{
@@ -622,8 +515,7 @@ func TestExpandRequest(t *testing.T) {
 			},
 		}
 
-		e.AddSources(&sx)
-		e.AddSources(&sy)
+		e := newStartedEngine(t, "TestExpandRequest", nil, &sx, &sy)
 
 		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
 			Type:   "person",
@@ -642,14 +534,6 @@ func TestExpandRequest(t *testing.T) {
 	})
 
 	t.Run("with a single wildcard source", func(t *testing.T) {
-		t.Cleanup(func() {
-			e.sh, err = NewSourceHost()
-			if err != nil {
-				t.Fatalf("Error initializing SourceHost: %v", err)
-			}
-			e.ClearCache()
-		})
-
 		sx := TestSource{
 			ReturnName: "sx",
 			ReturnScopes: []string{
@@ -657,7 +541,7 @@ func TestExpandRequest(t *testing.T) {
 			},
 		}
 
-		e.AddSources(&sx)
+		e := newStartedEngine(t, "TestExpandRequest", nil, &sx)
 
 		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
 			Type:   "person",
@@ -672,14 +556,6 @@ func TestExpandRequest(t *testing.T) {
 	})
 
 	t.Run("with a many wildcard sources", func(t *testing.T) {
-		t.Cleanup(func() {
-			e.sh, err = NewSourceHost()
-			if err != nil {
-				t.Fatalf("Error initializing SourceHost: %v", err)
-			}
-			e.ClearCache()
-		})
-
 		sx := TestSource{
 			ReturnName: "sx",
 			ReturnScopes: []string{
@@ -701,9 +577,7 @@ func TestExpandRequest(t *testing.T) {
 			},
 		}
 
-		e.AddSources(&sx)
-		e.AddSources(&sy)
-		e.AddSources(&sz)
+		e := newStartedEngine(t, "TestExpandRequest", nil, &sx, &sy, &sz)
 
 		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
 			Type:   "person",
@@ -726,14 +600,6 @@ func TestExpandRequest(t *testing.T) {
 	})
 
 	t.Run("with a many wildcard sources and static sources", func(t *testing.T) {
-		t.Cleanup(func() {
-			e.sh, err = NewSourceHost()
-			if err != nil {
-				t.Fatalf("Error initializing SourceHost: %v", err)
-			}
-			e.ClearCache()
-		})
-
 		sx := TestSource{
 			ReturnName: "sx",
 			ReturnScopes: []string{
@@ -756,9 +622,7 @@ func TestExpandRequest(t *testing.T) {
 			},
 		}
 
-		e.AddSources(&sx)
-		e.AddSources(&sy)
-		e.AddSources(&sz)
+		e := newStartedEngine(t, "TestExpandRequest", nil, &sx, &sy, &sz)
 
 		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
 			Type:   "person",

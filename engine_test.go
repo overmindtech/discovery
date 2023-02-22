@@ -17,6 +17,42 @@ import (
 	"github.com/overmindtech/sdp-go"
 )
 
+func newStartedEngine(t *testing.T, name string, no *connect.NATSOptions, sources ...Source) *Engine {
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
+	e.Name = name
+	if no != nil {
+		e.NATSOptions = no
+	} else {
+		e.NATSOptions = &connect.NATSOptions{
+			NumRetries:        5,
+			RetryDelay:        time.Second,
+			Servers:           NatsTestURLs,
+			ConnectionName:    "test-connection",
+			ConnectionTimeout: time.Second,
+			MaxReconnects:     5,
+			TokenClient:       GetTestOAuthTokenClient(t),
+		}
+	}
+	e.NATSQueueName = "test"
+	e.MaxParallelExecutions = 10
+
+	e.AddSources(sources...)
+
+	err = e.Start()
+	if err != nil {
+		t.Fatalf("Error starting Engine: %v", err)
+	}
+
+	t.Cleanup(func() {
+		e.Stop()
+	})
+
+	return e
+}
+
 func TestDeleteItemRequest(t *testing.T) {
 	one := &sdp.ItemRequest{
 		Scope:  "one",
@@ -41,10 +77,7 @@ func TestDeleteItemRequest(t *testing.T) {
 }
 
 func TestTrackRequest(t *testing.T) {
-	e, err := NewEngine()
-	if err != nil {
-		t.Fatalf("Error initializing Engine: %v", err)
-	}
+	e := newStartedEngine(t, "TestTrackRequest", nil)
 
 	t.Run("With normal request", func(t *testing.T) {
 		t.Parallel()
@@ -108,11 +141,7 @@ func TestTrackRequest(t *testing.T) {
 
 func TestDeleteTrackedRequest(t *testing.T) {
 	t.Parallel()
-
-	e, err := NewEngine()
-	if err != nil {
-		t.Fatalf("Error initializing Engine: %v", err)
-	}
+	e := newStartedEngine(t, "TestDeleteTrackedRequest", nil)
 
 	var wg sync.WaitGroup
 

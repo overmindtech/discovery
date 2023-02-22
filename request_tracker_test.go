@@ -86,13 +86,6 @@ func (s *SpeedTestSource) Weight() int {
 }
 
 func TestExecute(t *testing.T) {
-	e, err := NewEngine()
-	if err != nil {
-		t.Fatalf("Error initializing Engine: %v", err)
-	}
-	e.Name = "test"
-	e.MaxParallelExecutions = 1
-
 	src := TestSource{
 		ReturnType: "person",
 		ReturnScopes: []string{
@@ -100,7 +93,7 @@ func TestExecute(t *testing.T) {
 		},
 	}
 
-	e.AddSources(&src)
+	e := newStartedEngine(t, "TestExecute", nil, &src)
 
 	t.Run("Without linking", func(t *testing.T) {
 		t.Parallel()
@@ -198,18 +191,10 @@ func TestExecute(t *testing.T) {
 }
 
 func TestTimeout(t *testing.T) {
-	e, err := NewEngine()
-	if err != nil {
-		t.Fatalf("Error initializing Engine: %v", err)
-	}
-	e.Name = "test"
-	e.MaxParallelExecutions = 1
-
 	src := SpeedTestSource{
 		QueryDelay: 100 * time.Millisecond,
 	}
-
-	e.AddSources(&src)
+	e := newStartedEngine(t, "TestTimeout", nil, &src)
 
 	t.Run("With a timeout, but not exceeding it", func(t *testing.T) {
 		t.Parallel()
@@ -293,18 +278,7 @@ func TestTimeout(t *testing.T) {
 }
 
 func TestCancel(t *testing.T) {
-	e, err := NewEngine()
-	if err != nil {
-		t.Fatalf("Error initializing Engine: %v", err)
-	}
-	e.Name = "test"
-	e.MaxParallelExecutions = 1
-
-	src := SpeedTestSource{
-		QueryDelay: 1 * time.Second,
-	}
-
-	e.AddSources(&src)
+	e := newStartedEngine(t, "TestCancel", nil)
 
 	u := uuid.New()
 
@@ -323,6 +297,7 @@ func TestCancel(t *testing.T) {
 	items := make([]*sdp.Item, 0)
 	var wg sync.WaitGroup
 
+	var err error
 	wg.Add(1)
 	go func() {
 		items, _, err = rt.Execute(context.Background())
