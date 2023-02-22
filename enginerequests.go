@@ -2,8 +2,6 @@ package discovery
 
 import (
 	"context"
-	"crypto/sha1"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"sync"
@@ -17,7 +15,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -257,21 +254,6 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items
 	}
 
 	return nil
-}
-
-// requestHash Calculates a hash for a given request which can be used to
-// determine if two requests are identical
-func requestHash(req *sdp.ItemRequest) (string, error) {
-	hash := sha1.New()
-
-	// Marshall to bytes so that we can use sha1 to compare the raw binary
-	b, err := proto.Marshal(req)
-
-	if err != nil {
-		return "", err
-	}
-
-	return base64.URLEncoding.EncodeToString(hash.Sum(b)), nil
 }
 
 // Get Runs a get query against known sources in priority order. If nothing was

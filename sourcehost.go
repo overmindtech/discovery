@@ -1,10 +1,13 @@
 package discovery
 
 import (
+	"crypto/sha1"
+	"encoding/base64"
 	"sort"
 	"sync"
 
 	"github.com/overmindtech/sdp-go"
+	"google.golang.org/protobuf/proto"
 )
 
 // SourceHost This struct holds references to all Sources in a process
@@ -209,4 +212,19 @@ func (sh *SourceHost) ExpandRequest(request *sdp.ItemRequest) map[*sdp.ItemReque
 	}
 
 	return finalMap
+}
+
+// requestHash Calculates a hash for a given request which can be used to
+// determine if two requests are identical
+func requestHash(req *sdp.ItemRequest) (string, error) {
+	hash := sha1.New()
+
+	// Marshall to bytes so that we can use sha1 to compare the raw binary
+	b, err := proto.Marshal(req)
+
+	if err != nil {
+		return "", err
+	}
+
+	return base64.URLEncoding.EncodeToString(hash.Sum(b)), nil
 }
