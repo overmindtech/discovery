@@ -19,8 +19,11 @@ import (
 const DefaultSearchResultsLimit = 5
 
 // NewMetaSource Creates a new meta source, including creation of the index
-func NewMetaSource(engine *Engine, mode Field) (*MetaSource, error) {
+func NewMetaSource(sh *SourceHost, mode Field) (*MetaSource, error) {
 	var err error
+	if sh == nil {
+		return nil, errors.New("no SourceHost specified, cannot index sources")
+	}
 
 	mapping := bleve.NewIndexMapping()
 
@@ -51,7 +54,7 @@ func NewMetaSource(engine *Engine, mode Field) (*MetaSource, error) {
 
 	var ms MetaSource
 
-	ms.engine = engine
+	ms.sh = sh
 	ms.itemType = itemType
 	ms.field = mode
 	ms.scopeMap = make(map[string][]Source)
@@ -106,8 +109,8 @@ type MetaSource struct {
 	field    Field  // The field that we should search
 	itemType string // The name of the types of items to returns
 
-	// The engine to query sources from
-	engine *Engine
+	// The SourceHost to query sources from
+	sh *SourceHost
 
 	// The actual Bleve indexes
 	scopeIndex bleve.Index
@@ -302,13 +305,9 @@ func (m *MetaSource) SearchField(field Field, query string) ([]SearchResult, err
 // rebuildIndex Reindexes all sources. Since sources can't be deleted we aren't
 // handling that use case
 func (m *MetaSource) rebuildIndex() error {
-	if m.engine == nil {
-		return errors.New("no engine specified, cannot index sources")
-	}
-
 	var err error
 
-	sources := m.engine.Sources()
+	sources := m.sh.Sources()
 
 	for _, src := range sources {
 		err = m.indexField(Type, src.Type(), src)
@@ -366,11 +365,7 @@ func (m *MetaSource) indexField(field Field, value string, src Source) error {
 
 // indexOutdated Returns whether or not the index is outdated and needs to be rebuilt
 func (m *MetaSource) indexOutdated() bool {
-	var l int
-
-	if m.engine != nil {
-		l = len(m.engine.Sources())
-	}
+	l := len(m.sh.Sources())
 
 	return l != m.numSourcesIndexed
 }
@@ -418,14 +413,7 @@ func (s *SourcesSource) Name() string {
 }
 
 func (s *SourcesSource) Get(ctx context.Context, scope string, query string) (*sdp.Item, error) {
-	if s.engine == nil {
-		return nil, &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_OTHER,
-			ErrorString: "engine not set",
-		}
-	}
-
-	for _, src := range s.engine.Sources() {
+	for _, src := range s.sh.Sources() {
 		if src.Name() == query {
 			return s.sourceToItem(src)
 		}
@@ -437,14 +425,7 @@ func (s *SourcesSource) Get(ctx context.Context, scope string, query string) (*s
 }
 
 func (s *SourcesSource) List(ctx context.Context, scope string) ([]*sdp.Item, error) {
-	if s.engine == nil {
-		return nil, &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_OTHER,
-			ErrorString: "engine not set",
-		}
-	}
-
-	sources := s.engine.Sources()
+	sources := s.sh.Sources()
 	items := make([]*sdp.Item, len(sources))
 
 	var item *sdp.Item

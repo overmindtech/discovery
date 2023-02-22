@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/overmindtech/sdp-go"
 	log "github.com/sirupsen/logrus"
 )
 
-// RequestTracker is used for tracking the progress of a single requestt. This
+// RequestTracker is used for tracking the progress of a single request. This
 // is used because a single request could have a link depth that results in many
 // requests being executed meaning that we need to not only track the first
 // request, but also all other requests and items that result from linking
@@ -28,7 +29,7 @@ type RequestTracker struct {
 	// channel
 	unlinkedItemsWG sync.WaitGroup
 
-	// Items that have begin link processing. Note that items in this map mey
+	// Items that have begin link processing. Note that items in this map may
 	// still be being modified if the linker is still running. Call
 	// `stopLinking()` before accessing this map to avoid race conditions
 	//
@@ -36,7 +37,7 @@ type RequestTracker struct {
 	linkedItems      map[string]*sdp.Item
 	linkedItemsMutex sync.RWMutex
 
-	// cancelFunc A cuntion that will cancel all requests when called
+	// cancelFunc A function that will cancel all requests when called
 	cancelFunc      context.CancelFunc
 	cancelFuncMutex sync.Mutex
 }
@@ -56,7 +57,7 @@ func (r *RequestTracker) LinkedItems() []*sdp.Item {
 	return items
 }
 
-// registerLinkedItem Registers aqn item in the database of linked items,
+// registerLinkedItem Registers an item in the database of linked items,
 // returns an error if the item is already present
 func (r *RequestTracker) registerLinkedItem(i *sdp.Item) error {
 	r.linkedItemsMutex.Lock()
@@ -182,6 +183,7 @@ func (r *RequestTracker) linkItem(ctx context.Context, parent *sdp.Item) {
 			var shouldRemove bool
 
 			go func(e chan error) {
+				defer sentry.RecoverWithContext(ctx)
 				e <- r.Engine.ExecuteRequest(ctx, req, items, errs)
 			}(requestErr)
 
@@ -277,9 +279,10 @@ func (r *RequestTracker) Execute(ctx context.Context) ([]*sdp.Item, []*sdp.ItemR
 	r.startLinking(ctx)
 
 	// Run the request
-	go func() {
-		errChan <- r.Engine.ExecuteRequest(ctx, r.Request, items, errs)
-	}()
+	go func(e chan error) {
+		defer sentry.RecoverWithContext(ctx)
+		e <- r.Engine.ExecuteRequest(ctx, r.Request, items, errs)
+	}(errChan)
 
 	// Process the items and errors as they come in
 	for {
@@ -332,7 +335,7 @@ func (r *RequestTracker) Execute(ctx context.Context) ([]*sdp.Item, []*sdp.ItemR
 	return r.LinkedItems(), sdpErrs, ctx.Err()
 }
 
-// Cancel Cancells the currently running request
+// Cancel Cancels the currently running request
 func (r *RequestTracker) Cancel() {
 	r.cancelFuncMutex.Lock()
 	defer r.cancelFuncMutex.Unlock()

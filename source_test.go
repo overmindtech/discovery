@@ -8,209 +8,22 @@ import (
 	"github.com/overmindtech/sdp-go"
 )
 
-func TestFilterSources(t *testing.T) {
-	e := NewEngine()
-
-	e.AddSources(
-		&TestSource{
-			ReturnScopes: []string{"test"},
-			ReturnType:   "person",
-		},
-		&TestSource{
-			ReturnScopes: []string{"test"},
-			ReturnType:   "fish",
-		},
-		&TestSource{
-			ReturnScopes: []string{sdp.WILDCARD},
-			ReturnType:   "person",
-		},
-		&TestSource{
-			ReturnScopes: []string{
-				"testA",
-				"testB",
-			},
-			ReturnType: "chair",
-		},
-		&TestSource{
-			ReturnScopes: []string{"test"},
-			ReturnType:   "hidden_person",
-			IsHidden:     true,
-		},
-	)
-
-	t.Run("Right type wrong scope", func(t *testing.T) {
-		req := sdp.ItemRequest{
-			Type:  "person",
-			Scope: "wrong",
-		}
-
-		ee := ExpectExpand{
-			NumRequests: 1,
-			NumSources:  1,
-		}
-
-		ee.Validate(t, e.ExpandRequest(&req))
-	})
-
-	t.Run("Right scope wrong type", func(t *testing.T) {
-		req := sdp.ItemRequest{
-			Type:  "wrong",
-			Scope: "test",
-		}
-
-		ee := ExpectExpand{
-			NumRequests: 0,
-			NumSources:  0,
-		}
-
-		ee.Validate(t, e.ExpandRequest(&req))
-	})
-
-	t.Run("Right both", func(t *testing.T) {
-		req := sdp.ItemRequest{
-			Type:  "person",
-			Scope: "test",
-		}
-
-		ee := ExpectExpand{
-			NumRequests: 1,
-			NumSources:  2,
-		}
-
-		ee.Validate(t, e.ExpandRequest(&req))
-	})
-
-	t.Run("Multi-scope", func(t *testing.T) {
-		req := sdp.ItemRequest{
-			Type:  "chair",
-			Scope: "testB",
-		}
-
-		ee := ExpectExpand{
-			NumRequests: 1,
-			NumSources:  1,
-		}
-
-		ee.Validate(t, e.ExpandRequest(&req))
-	})
-
-	t.Run("Wildcard scope", func(t *testing.T) {
-		req := sdp.ItemRequest{
-			Type:  "person",
-			Scope: sdp.WILDCARD,
-		}
-
-		ee := ExpectExpand{
-			NumRequests: 2,
-			NumSources:  2,
-		}
-
-		ee.Validate(t, e.ExpandRequest(&req))
-
-		req = sdp.ItemRequest{
-			Type:  "chair",
-			Scope: sdp.WILDCARD,
-		}
-
-		ee = ExpectExpand{
-			NumRequests: 2,
-			NumSources:  2,
-		}
-
-		ee.Validate(t, e.ExpandRequest(&req))
-	})
-
-	t.Run("Wildcard type", func(t *testing.T) {
-		req := sdp.ItemRequest{
-			Type:  sdp.WILDCARD,
-			Scope: "test",
-		}
-
-		ee := ExpectExpand{
-			NumRequests: 2,
-			NumSources:  3,
-		}
-
-		ee.Validate(t, e.ExpandRequest(&req))
-	})
-
-	t.Run("Wildcard both", func(t *testing.T) {
-		req := sdp.ItemRequest{
-			Type:  sdp.WILDCARD,
-			Scope: sdp.WILDCARD,
-		}
-
-		ee := ExpectExpand{
-			NumRequests: 5,
-			NumSources:  5,
-		}
-
-		ee.Validate(t, e.ExpandRequest(&req))
-	})
-
-	t.Run("Listing hidden source with wildcard scope", func(t *testing.T) {
-		req := sdp.ItemRequest{
-			Type:  "hidden_person",
-			Scope: sdp.WILDCARD,
-		}
-		if x := len(e.ExpandRequest(&req)); x != 0 {
-			t.Errorf("expected to find 0 sources, found %v", x)
-		}
-
-		req = sdp.ItemRequest{
-			Type:  "hidden_person",
-			Scope: "test",
-		}
-		if x := len(e.ExpandRequest(&req)); x != 1 {
-			t.Errorf("expected to find 1 sources, found %v", x)
-		}
-	})
-}
-
-type ExpectExpand struct {
-	NumRequests int
-
-	// Note that this is not the number of unique sources, but teh number of
-	// sources total. So if a source would be hit twice this will be 2
-	NumSources int
-}
-
-func (e *ExpectExpand) Validate(t *testing.T, m map[*sdp.ItemRequest][]Source) {
-	t.Helper()
-
-	numSources := 0
-	numRequests := 0
-
-	for _, v := range m {
-		numRequests++
-		numSources = numSources + len(v)
+func TestEngineAddSources(t *testing.T) {
+	e, err := NewEngine()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
 	}
-
-	if e.NumRequests != numRequests {
-		t.Errorf("Expected %v requests, got %v", e.NumRequests, numRequests)
-	}
-
-	if e.NumSources != numSources {
-		t.Errorf("Expected %v sources, got %v", e.NumSources, numSources)
-	}
-}
-
-func TestSourceAdd(t *testing.T) {
-	e := NewEngine()
 
 	src := TestSource{}
 
 	e.AddSources(&src)
 
-	if x := len(e.Sources()); x != 1 {
-		t.Fatalf("Expected 1 source, got %v", x)
+	if x := len(e.sh.Sources()); x != 4 {
+		t.Fatalf("Expected 4 source, got %v", x)
 	}
 }
 
 func TestGet(t *testing.T) {
-	e := NewEngine()
-	e.Name = "testEngine"
-
 	src := TestSource{
 		ReturnName: "orange",
 		ReturnScopes: []string{
@@ -219,7 +32,7 @@ func TestGet(t *testing.T) {
 		},
 	}
 
-	e.AddSources(&src)
+	e := newStartedEngine(t, "TestGet", nil, &src)
 
 	t.Run("Basic test", func(t *testing.T) {
 		t.Cleanup(func() {
@@ -257,7 +70,7 @@ func TestGet(t *testing.T) {
 		})
 
 		if err == nil {
-			t.Error("execpected all sources failed")
+			t.Error("expected all sources failed")
 		}
 
 		if len(errs) == 1 {
@@ -276,8 +89,8 @@ func TestGet(t *testing.T) {
 			if errs[0].ItemType != "person" {
 				t.Errorf("expected ItemType to be %v, got %v", "person", errs[0].ItemType)
 			}
-			if errs[0].ResponderName != "testEngine" {
-				t.Errorf("expected ResponderName to be %v, got %v", "testEngine", errs[0].ResponderName)
+			if errs[0].ResponderName != "TestGet" {
+				t.Errorf("expected ResponderName to be %v, got %v", "TestGet", errs[0].ResponderName)
 			}
 		} else {
 			t.Errorf("expected 1 error, got %v", len(errs))
@@ -418,11 +231,9 @@ func TestGet(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	e := NewEngine()
-
 	src := TestSource{}
 
-	e.AddSources(&src)
+	e := newStartedEngine(t, "TestList", nil, &src)
 
 	e.ExecuteRequestSync(context.Background(), &sdp.ItemRequest{
 		Type:   "person",
@@ -442,11 +253,9 @@ func TestList(t *testing.T) {
 }
 
 func TestSearch(t *testing.T) {
-	e := NewEngine()
-
 	src := TestSource{}
 
-	e.AddSources(&src)
+	e := newStartedEngine(t, "TestSearch", nil, &src)
 
 	e.ExecuteRequestSync(context.Background(), &sdp.ItemRequest{
 		Type:   "person",
@@ -467,8 +276,6 @@ func TestSearch(t *testing.T) {
 }
 
 func TestListSearchCaching(t *testing.T) {
-	e := NewEngine()
-
 	src := TestSource{
 		ReturnScopes: []string{
 			"test",
@@ -477,7 +284,8 @@ func TestListSearchCaching(t *testing.T) {
 		},
 	}
 
-	e.AddSources(&src)
+	e := newStartedEngine(t, "TestListSearchCaching", nil, &src)
+
 	e.cache.MinWaitTime = (10 * time.Millisecond)
 	e.cache.StartPurger(context.Background())
 
@@ -554,7 +362,7 @@ func TestListSearchCaching(t *testing.T) {
 		}
 
 		if l := len(src.ListCalls); l != 1 {
-			t.Errorf("Exected only 1 find call, got %v, cache not working", l)
+			t.Errorf("Expected only 1 find call, got %v, cache not working", l)
 		}
 
 		time.Sleep(200 * time.Millisecond)
@@ -566,7 +374,7 @@ func TestListSearchCaching(t *testing.T) {
 		}
 
 		if l := len(src.ListCalls); l != 2 {
-			t.Errorf("Exected 2 find calls, got %v, cache not clearing", l)
+			t.Errorf("Expected 2 find calls, got %v, cache not clearing", l)
 		}
 	})
 
@@ -645,7 +453,7 @@ func TestListSearchCaching(t *testing.T) {
 		}
 
 		if l := len(src.SearchCalls); l != 1 {
-			t.Errorf("Exected only 1 find call, got %v, cache not working", l)
+			t.Errorf("Expected only 1 find call, got %v, cache not working", l)
 		}
 
 		time.Sleep(200 * time.Millisecond)
@@ -657,7 +465,7 @@ func TestListSearchCaching(t *testing.T) {
 		}
 
 		if l := len(src.SearchCalls); l != 2 {
-			t.Errorf("Exected 2 find calls, got %v, cache not clearing", l)
+			t.Errorf("Expected 2 find calls, got %v, cache not clearing", l)
 		}
 	})
 
@@ -677,7 +485,7 @@ func TestListSearchCaching(t *testing.T) {
 		e.ExecuteRequestSync(context.Background(), &req)
 
 		if l := len(src.GetCalls); l != 2 {
-			t.Errorf("Exected 2 get calls, got %v, OTHER errors should not be cached", l)
+			t.Errorf("Expected 2 get calls, got %v, OTHER errors should not be cached", l)
 		}
 	})
 
@@ -718,13 +526,11 @@ func TestListSearchCaching(t *testing.T) {
 			t.Errorf("Exected 2 Search calls, got %v", l)
 		}
 	})
-
 }
 
 func TestSearchGetCaching(t *testing.T) {
 	// We want to be sure that if an item has been found via a search and
 	// cached, the cache will be hit if a Get is run for that particular item
-	e := NewEngine()
 
 	src := TestSource{
 		ReturnScopes: []string{
@@ -732,7 +538,7 @@ func TestSearchGetCaching(t *testing.T) {
 		},
 	}
 
-	e.AddSources(&src)
+	e := newStartedEngine(t, "TestSearchGetCaching", nil, &src)
 	e.cache.MinWaitTime = (10 * time.Millisecond)
 	e.cache.StartPurger(context.Background())
 

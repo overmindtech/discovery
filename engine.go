@@ -5,18 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
-	"sort"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/nats-io/nats.go"
 	"github.com/overmindtech/connect"
 	"github.com/overmindtech/sdp-go"
 	"github.com/overmindtech/sdpcache"
-
-	"github.com/nats-io/nats.go"
-
 	log "github.com/sirupsen/logrus"
+	"github.com/sourcegraph/conc/pool"
 )
 
 const DefaultMaxRequestTimeout = 1 * time.Minute
@@ -41,7 +39,7 @@ type Engine struct {
 
 	// The maximum request timeout. Defaults to `DefaultMaxRequestTimeout` if
 	// set to zero. If a client does not send a timeout, it will default to this
-	// value. Requests with timouts larger than this value will have their
+	// value. Requests with timeouts larger than this value will have their
 	// timeouts overridden
 	MaxRequestTimeout time.Duration
 
@@ -51,7 +49,7 @@ type Engine struct {
 
 	// Internal throttle used to limit MaxParallelExecutions. This reads
 	// MaxParallelExecutions and is populated when the engine is started
-	throttle *Throttle
+	executionPool *pool.Pool
 
 	// Cache that is used for storing SDP items in memory
 	cache *sdpcache.Cache
@@ -63,15 +61,10 @@ type Engine struct {
 	// List of all current subscriptions
 	subscriptions []*nats.Subscription
 
-	// Map of types to all sources for that type
-	sourceMap      map[string][]Source
-	sourceMapMutex sync.RWMutex
+	// All Sources managed by this Engine
+	sh *SourceHost
 
-	// Storage for triggers
-	triggers      []*Trigger
-	triggersMutex sync.RWMutex
-
-	// GetListMutex used for locking
+	// GetListMutex used for locking out Get requests when there's a List happening
 	gfm GetListMutex
 
 	// trackedRequests is used for storing requests that have a UUID so they can
@@ -88,16 +81,19 @@ type Engine struct {
 	cacheCancel context.CancelFunc
 }
 
-func NewEngine() Engine {
-	return Engine{
+func NewEngine() (*Engine, error) {
+	sh, err := NewSourceHost()
+	if err != nil {
+		return nil, err
+	}
+	return &Engine{
 		MaxParallelExecutions:   runtime.NumCPU(),
 		MaxRequestTimeout:       DefaultMaxRequestTimeout,
 		ConnectionWatchInterval: DefaultConnectionWatchInterval,
 		cache:                   sdpcache.NewCache(),
-		sourceMap:               make(map[string][]Source),
-		triggers:                make([]*Trigger, 0),
+		sh:                      sh,
 		trackedRequests:         make(map[uuid.UUID]*RequestTracker),
-	}
+	}, nil
 }
 
 // TrackRequest Stores a RequestTracker in the engine so that it can be looked
@@ -131,115 +127,7 @@ func (e *Engine) DeleteTrackedRequest(uuid [16]byte) {
 
 // AddSources Adds a source to this engine
 func (e *Engine) AddSources(sources ...Source) {
-	e.sourceMapMutex.Lock()
-	defer e.sourceMapMutex.Unlock()
-
-	for _, src := range sources {
-		allSources := append(e.sourceMap[src.Type()], src)
-
-		sort.Slice(allSources, func(i, j int) bool {
-			iSource := allSources[i]
-			jSource := allSources[j]
-
-			// Sort by weight, highest first
-			return iSource.Weight() > jSource.Weight()
-		})
-
-		e.sourceMap[src.Type()] = allSources
-	}
-}
-
-// AddTriggers Adds a trigger to this engine. Triggers cause the engine to
-// listen for items from other scopes and will fire a custom ItemRequest if
-// they match
-func (e *Engine) AddTriggers(triggers ...Trigger) {
-	e.triggersMutex.Lock()
-	defer e.triggersMutex.Unlock()
-
-	for _, trigger := range triggers {
-		e.triggers = append(e.triggers, &trigger)
-	}
-}
-
-// ClearTriggers removes all triggers from the engine
-func (e *Engine) ClearTriggers() {
-	e.triggersMutex.Lock()
-	defer e.triggersMutex.Unlock()
-
-	e.triggers = make([]*Trigger, 0)
-}
-
-// ProcessTriggers Checks all triggers against a given item and fires them if
-// required
-func (e *Engine) ProcessTriggers(ctx context.Context, item *sdp.Item) {
-	e.triggersMutex.RLock()
-	defer e.triggersMutex.RUnlock()
-
-	wg := sync.WaitGroup{}
-
-	wg.Add(len(e.triggers))
-
-	for _, trigger := range e.triggers {
-		go func(t *Trigger) {
-			defer wg.Done()
-
-			// Check to see if the trigger should fire
-			req, err := t.ProcessItem(item)
-
-			if err != nil {
-				return
-			}
-
-			// Fire the trigger and send the request to the engine
-			go e.HandleItemRequest(ctx, req)
-		}(trigger)
-	}
-
-	// Wait for all to complete so that we know what we have running
-	wg.Wait()
-}
-
-// ManagedConnection Returns the connection that the engine is using. Note that
-// the lifecycle of this connection is managed by the engine, causing it to
-// disconnect will cause issues with the engine. Use Engine.Stop() instead
-func (e *Engine) ManagedConnection() sdp.EncodedConnection {
-	e.natsConnectionMutex.Lock()
-	defer e.natsConnectionMutex.Unlock()
-	return e.natsConnection
-}
-
-// Sources Returns a slice of all known sources
-func (e *Engine) Sources() []Source {
-	e.sourceMapMutex.RLock()
-	defer e.sourceMapMutex.RUnlock()
-
-	sources := make([]Source, 0)
-
-	for _, typeSources := range e.sourceMap {
-		sources = append(sources, typeSources...)
-	}
-
-	return sources
-}
-
-// NonHiddenSources Returns a slice of all known sources excliding hidden ones
-func (e *Engine) NonHiddenSources() []Source {
-	allSources := e.Sources()
-	nonHiddenSources := make([]Source, 0)
-
-	// Add all sources unless they are hidden
-	for _, source := range allSources {
-		if hs, ok := source.(HiddenSource); ok {
-			if hs.Hidden() {
-				// If the source is hidden, continue without adding it
-				continue
-			}
-		}
-
-		nonHiddenSources = append(nonHiddenSources, source)
-	}
-
-	return nonHiddenSources
+	e.sh.AddSources(sources...)
 }
 
 // Connect Connects to NATS
@@ -300,16 +188,6 @@ func (e *Engine) connect() error {
 			return err
 		}
 
-		if len(e.triggers) > 0 {
-			err = e.subscribe("return.item.>", sdp.NewAsyncRawItemHandler("ProcessTriggers", func(ctx context.Context, m *nats.Msg, i *sdp.Item) {
-				e.ProcessTriggers(ctx, i)
-			}))
-
-			if err != nil {
-				return err
-			}
-		}
-
 		// Loop over all sources and work out what subscriptions we need to make
 		// depending on what scopes they support. These scope names are then
 		// stored in a map for de-duplication before being subscribed to
@@ -321,7 +199,7 @@ func (e *Engine) connect() error {
 		// should just be making the one
 		var wildcardExists bool
 
-		for _, src := range e.Sources() {
+		for _, src := range e.sh.Sources() {
 			for _, itemScope := range src.Scopes() {
 				if itemScope == sdp.WILDCARD {
 					wildcardExists = true
@@ -405,39 +283,7 @@ func (e *Engine) disconnect() error {
 // modifying the Sources value after an engine has been started will not have
 // any effect until the engine is restarted
 func (e *Engine) Start() error {
-	e.throttle = NewThrottle(e.MaxParallelExecutions)
-
-	var typeSource Source
-	var scopeSource Source
-	var sourceSource Source
-	var ms *MetaSource
-	var err error
-
-	// Add meta-sources so that we can respond to requests for `overmind-type`,
-	// `overmind-scope` and `overmind-source` resources
-	typeSource, err = NewMetaSource(e, Type)
-
-	if err != nil {
-		return err
-	}
-
-	scopeSource, err = NewMetaSource(e, Scope)
-
-	if err != nil {
-		return err
-	}
-
-	ms, err = NewMetaSource(e, Type)
-
-	if err != nil {
-		return err
-	}
-
-	sourceSource = &SourcesSource{
-		MetaSource: *ms,
-	}
-
-	e.AddSources(typeSource, scopeSource, sourceSource)
+	e.executionPool = pool.New().WithMaxGoroutines(e.MaxParallelExecutions)
 
 	e.cacheContext, e.cacheCancel = context.WithCancel(context.Background())
 
@@ -538,9 +384,7 @@ func (e *Engine) HandleCancelItemRequest(ctx context.Context, cancelRequest *sdp
 		return
 	}
 
-	var rt *RequestTracker
-
-	rt, err = e.GetTrackedRequest(u)
+	rt, err := e.GetTrackedRequest(u)
 
 	if err != nil {
 		log.Debugf("Could not find tracked request %v. Possibly is has already finished", u.String())

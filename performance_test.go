@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"os"
 	"sync"
@@ -123,13 +124,16 @@ type TimedResults struct {
 }
 
 func TimeRequests(numRequests int, linkDepth int, numParallel int) TimedResults {
-	engine := NewEngine()
-	engine.MaxParallelExecutions = numParallel
-	engine.AddSources(&SlowSource{
+	e, err := NewEngine()
+	if err != nil {
+		panic(fmt.Sprintf("Error initializing Engine: %v", err))
+	}
+	e.MaxParallelExecutions = numParallel
+	e.AddSources(&SlowSource{
 		RequestDuration: 100 * time.Millisecond,
 	})
-	engine.Start()
-	defer engine.Stop()
+	e.Start()
+	defer e.Stop()
 
 	// Calculate how many items to expect and the expected duration
 	var expectedItems int
@@ -159,7 +163,7 @@ func TimeRequests(numRequests int, linkDepth int, numParallel int) TimedResults 
 				Scope:     "test",
 				LinkDepth: uint32(linkDepth),
 			},
-			Engine: &engine,
+			Engine: e,
 		}
 
 		wg.Add(1)
