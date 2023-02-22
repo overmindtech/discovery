@@ -9,13 +9,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/nats-io/nats.go"
 	"github.com/overmindtech/connect"
 	"github.com/overmindtech/sdp-go"
 	"github.com/overmindtech/sdpcache"
-
-	"github.com/nats-io/nats.go"
-
 	log "github.com/sirupsen/logrus"
+	"github.com/sourcegraph/conc/pool"
 )
 
 const DefaultMaxRequestTimeout = 1 * time.Minute
@@ -50,7 +49,7 @@ type Engine struct {
 
 	// Internal throttle used to limit MaxParallelExecutions. This reads
 	// MaxParallelExecutions and is populated when the engine is started
-	throttle *Throttle
+	executionPool *pool.Pool
 
 	// Cache that is used for storing SDP items in memory
 	cache *sdpcache.Cache
@@ -284,7 +283,7 @@ func (e *Engine) disconnect() error {
 // modifying the Sources value after an engine has been started will not have
 // any effect until the engine is restarted
 func (e *Engine) Start() error {
-	e.throttle = NewThrottle(e.MaxParallelExecutions)
+	e.executionPool = pool.New().WithMaxGoroutines(e.MaxParallelExecutions)
 
 	e.cacheContext, e.cacheCancel = context.WithCancel(context.Background())
 

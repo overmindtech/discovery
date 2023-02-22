@@ -5,6 +5,7 @@ go 1.20
 // Direct dependencies of my codebase
 require (
 	github.com/blevesearch/bleve/v2 v2.3.6
+	github.com/getsentry/sentry-go v0.18.0
 	github.com/google/uuid v1.3.0
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats-server/v2 v2.9.14
@@ -13,6 +14,7 @@ require (
 	github.com/overmindtech/sdp-go v0.16.0
 	github.com/overmindtech/sdpcache v1.2.1
 	github.com/sirupsen/logrus v1.9.0
+	github.com/sourcegraph/conc v0.2.1-0.20230221121046-14c5081d40d6 // use latest `main` to avoid heavy dependency chain
 	go.opentelemetry.io/otel v1.13.0
 	go.opentelemetry.io/otel/trace v1.13.0
 	google.golang.org/protobuf v1.28.1
@@ -38,7 +40,6 @@ require (
 	github.com/blevesearch/zapx/v14 v14.3.7 // indirect
 	github.com/blevesearch/zapx/v15 v15.3.8 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
-	github.com/getsentry/sentry-go v0.18.0 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/geo v0.0.0-20210211234256-740aa86cb551 // indirect
@@ -58,6 +59,8 @@ require (
 	go.etcd.io/bbolt v1.3.7 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.39.0 // indirect
 	go.opentelemetry.io/otel/metric v0.36.0 // indirect
+	go.uber.org/atomic v1.10.0 // indirect
+	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/crypto v0.6.0 // indirect
 	golang.org/x/net v0.7.0 // indirect
 	golang.org/x/oauth2 v0.5.0 // indirect

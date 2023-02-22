@@ -17,6 +17,14 @@ func TestExecuteRequest(t *testing.T) {
 		t.Fatalf("Error initializing Engine: %v", err)
 	}
 	e.Name = "test"
+	e.NATSOptions = &connect.NATSOptions{
+		Servers:           NatsTestURLs,
+		ConnectionName:    "test-connection",
+		ConnectionTimeout: time.Second,
+		MaxReconnects:     5,
+	}
+	e.NATSQueueName = "test"
+	e.MaxParallelExecutions = 10
 
 	src := TestSource{
 		ReturnType:   "person",
@@ -24,6 +32,14 @@ func TestExecuteRequest(t *testing.T) {
 	}
 
 	e.AddSources(&src)
+	err = e.Start()
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
+
+	t.Cleanup(func() {
+		e.Stop()
+	})
 
 	t.Run("Basic happy-path Get request", func(t *testing.T) {
 		request := &sdp.ItemRequest{
@@ -326,8 +342,12 @@ func TestSendRequestSync(t *testing.T) {
 
 	err = e.Start()
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Error initializing Engine: %v", err)
 	}
+
+	t.Cleanup(func() {
+		e.Stop()
+	})
 
 	for i := 0; i < 250; i++ {
 		u := uuid.New()

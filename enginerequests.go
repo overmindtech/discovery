@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/overmindtech/sdp-go"
@@ -166,8 +167,6 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items
 		return ctx.Err()
 	}
 
-	wg := sync.WaitGroup{}
-
 	expanded := e.sh.ExpandRequest(req)
 
 	if len(expanded) == 0 {
@@ -184,68 +183,73 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items
 	var numSources atomic.Int32
 	var numErrs int
 
+	// Since we need to wait for only the processing of this request's executions, we need a separate WaitGroup here
+	// Overall MaxParallelExecutions evaluation is handled by e.executionPool
+	wg := sync.WaitGroup{}
 	for request, sources := range expanded {
 		wg.Add(1)
+		// localize values for the closure below
+		request, sources := request, sources
+		go func() {
+			// queue everything into the execution pool
+			defer sentry.Recover()
+			e.executionPool.Go(func() {
+				defer sentry.Recover()
+				defer wg.Done()
+				var requestItems []*sdp.Item
+				var requestErrors []*sdp.ItemRequestError
+				numSources.Add(1)
 
-		e.throttle.Lock()
+				// Make the request of all sources
+				switch req.GetMethod() {
+				case sdp.RequestMethod_GET:
+					requestItems, requestErrors = e.Get(ctx, request, sources)
+				case sdp.RequestMethod_LIST:
+					requestItems, requestErrors = e.List(ctx, request, sources)
+				case sdp.RequestMethod_SEARCH:
+					requestItems, requestErrors = e.Search(ctx, request, sources)
+				}
 
-		go func(ctx context.Context, r *sdp.ItemRequest, sources []Source) {
-			defer wg.Done()
-			defer e.throttle.Unlock()
-			var requestItems []*sdp.Item
-			var requestErrors []*sdp.ItemRequestError
-			numSources.Add(1)
+				for _, i := range requestItems {
+					// If the main request had a linkDepth of greater than zero it means we
+					// need to keep linking, this means that we need to pass down all of the
+					// subject info along with the number of remaining links. If the link
+					// depth is zero then we just pass then back in their normal form as we
+					// won't be executing them
+					if req.GetLinkDepth() > 0 {
+						for _, lir := range i.LinkedItemRequests {
+							lir.LinkDepth = req.LinkDepth - 1
+							lir.ItemSubject = req.ItemSubject
+							lir.ResponseSubject = req.ResponseSubject
+							lir.IgnoreCache = req.IgnoreCache
+							lir.Timeout = req.Timeout
+							lir.UUID = req.UUID
+						}
+					}
 
-			// Make the request of all sources
-			switch req.GetMethod() {
-			case sdp.RequestMethod_GET:
-				requestItems, requestErrors = e.Get(ctx, r, sources)
-			case sdp.RequestMethod_LIST:
-				requestItems, requestErrors = e.List(ctx, r, sources)
-			case sdp.RequestMethod_SEARCH:
-				requestItems, requestErrors = e.Search(ctx, r, sources)
-			}
+					// Assign the item request
+					if i.Metadata != nil {
+						i.Metadata.SourceRequest = req
+					}
 
-			for _, i := range requestItems {
-				// If the main request had a linkDepth of greater than zero it means we
-				// need to keep linking, this means that we need to pass down all of the
-				// subject info along with the number of remaining links. If the link
-				// depth is zero then we just pass then back in their normal form as we
-				// won't be executing them
-				if req.GetLinkDepth() > 0 {
-					for _, lir := range i.LinkedItemRequests {
-						lir.LinkDepth = req.LinkDepth - 1
-						lir.ItemSubject = req.ItemSubject
-						lir.ResponseSubject = req.ResponseSubject
-						lir.IgnoreCache = req.IgnoreCache
-						lir.Timeout = req.Timeout
-						lir.UUID = req.UUID
+					if items != nil {
+						items <- i
 					}
 				}
 
-				// Assign the item request
-				if i.Metadata != nil {
-					i.Metadata.SourceRequest = req
-				}
+				for _, e := range requestErrors {
+					if request != nil {
+						numErrs++
 
-				if items != nil {
-					items <- i
-				}
-			}
-
-			for _, e := range requestErrors {
-				if r != nil {
-					numErrs++
-
-					if errs != nil {
-						errs <- e
+						if errs != nil {
+							errs <- e
+						}
 					}
 				}
-			}
-		}(ctx, request, sources)
+			})
+		}()
 	}
 
-	// Wait for all requests to complete
 	wg.Wait()
 
 	// If all failed then return first error
