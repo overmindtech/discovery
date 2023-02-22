@@ -6,6 +6,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/overmindtech/sdp-go"
 	"google.golang.org/protobuf/proto"
 )
@@ -223,6 +224,7 @@ func requestHash(req *sdp.ItemRequest) (string, error) {
 	b, err := proto.Marshal(req)
 
 	if err != nil {
+		sentry.CaptureException(err)
 		return "", err
 	}
 
