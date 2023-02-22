@@ -46,9 +46,11 @@ func (e *Engine) HandleItemRequest(ctx context.Context, itemRequest *sdp.ItemReq
 	ctx, span := tracer.Start(ctx, "HandleItemRequest")
 	defer span.End()
 
-	if len(e.sh.ExpandRequest(itemRequest)) == 0 {
+	numExpandedRequests := len(e.sh.ExpandRequest(itemRequest))
+	span.SetAttributes(attribute.Int("om.discovery.numExpandedRequests", numExpandedRequests))
+
+	if numExpandedRequests == 0 {
 		// If we don't have any relevant sources, exit
-		span.AddEvent("no relevant sources, nothing to do")
 		return
 	}
 
@@ -292,8 +294,8 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 	))
 	defer span.End()
 
-	errs := make([]*sdp.ItemRequestError, 0)
 	items := make([]*sdp.Item, 0)
+	errs := make([]*sdp.ItemRequestError, 0)
 
 	// We want to avoid having a Get and a List running at the same time, we'd
 	// rather run the List first, populate the cache, then have the Get just
@@ -352,7 +354,7 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 				if err != nil {
 					var ire *sdp.ItemRequestError
 					if errors.Is(err, sdpcache.ErrCacheNotFound) {
-						// If nothing was found then continue with execution
+						// If nothing was found then execute the search against the sources
 					} else if errors.As(err, &ire) {
 						// Add relevant info
 						ire.Scope = r.Scope

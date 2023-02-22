@@ -450,9 +450,7 @@ func (e *Engine) HandleCancelItemRequest(ctx context.Context, cancelRequest *sdp
 		return
 	}
 
-	var rt *RequestTracker
-
-	rt, err = e.GetTrackedRequest(u)
+	rt, err := e.GetTrackedRequest(u)
 
 	if err != nil {
 		log.Debugf("Could not find tracked request %v. Possibly is has already finished", u.String())

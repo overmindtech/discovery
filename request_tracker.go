@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/overmindtech/sdp-go"
 	log "github.com/sirupsen/logrus"
 )
@@ -28,7 +29,7 @@ type RequestTracker struct {
 	// channel
 	unlinkedItemsWG sync.WaitGroup
 
-	// Items that have begin link processing. Note that items in this map mey
+	// Items that have begin link processing. Note that items in this map may
 	// still be being modified if the linker is still running. Call
 	// `stopLinking()` before accessing this map to avoid race conditions
 	//
@@ -182,6 +183,7 @@ func (r *RequestTracker) linkItem(ctx context.Context, parent *sdp.Item) {
 			var shouldRemove bool
 
 			go func(e chan error) {
+				defer sentry.RecoverWithContext(ctx)
 				e <- r.Engine.ExecuteRequest(ctx, req, items, errs)
 			}(requestErr)
 
@@ -277,9 +279,10 @@ func (r *RequestTracker) Execute(ctx context.Context) ([]*sdp.Item, []*sdp.ItemR
 	r.startLinking(ctx)
 
 	// Run the request
-	go func() {
-		errChan <- r.Engine.ExecuteRequest(ctx, r.Request, items, errs)
-	}()
+	go func(e chan error) {
+		defer sentry.RecoverWithContext(ctx)
+		e <- r.Engine.ExecuteRequest(ctx, r.Request, items, errs)
+	}(errChan)
 
 	// Process the items and errors as they come in
 	for {

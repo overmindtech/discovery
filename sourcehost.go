@@ -150,8 +150,7 @@ func (sh *SourceHost) ExpandRequest(request *sdp.ItemRequest) map[*sdp.ItemReque
 
 	for _, src := range checkSources {
 		// Calculate if the source is hidden
-		var isHidden bool
-
+		isHidden := false
 		if hs, ok := src.(HiddenSource); ok {
 			isHidden = hs.Hidden()
 		}
@@ -185,6 +184,7 @@ func (sh *SourceHost) ExpandRequest(request *sdp.ItemRequest) map[*sdp.ItemReque
 					Timeout:         request.Timeout,
 				}
 
+				// deal with duplicate requests after expansion
 				hash, err := requestHash(&request)
 
 				if err == nil {
