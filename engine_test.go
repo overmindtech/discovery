@@ -84,20 +84,15 @@ func TestTrackRequest(t *testing.T) {
 
 		u := uuid.New()
 
-		rt := RequestTracker{
-			Engine: e,
-			Request: &sdp.ItemRequest{
-				Type:      "person",
-				Method:    sdp.RequestMethod_LIST,
-				LinkDepth: 10,
-				UUID:      u[:],
-			},
-		}
-
-		e.TrackRequest(u, &rt)
+		rt := e.TrackRequest(&sdp.ItemRequest{
+			Type:      "person",
+			Method:    sdp.RequestMethod_LIST,
+			LinkDepth: 10,
+			UUID:      u[:],
+		})
 
 		if got, err := e.GetTrackedRequest(u); err == nil {
-			if got != &rt {
+			if got != rt {
 				t.Errorf("Got mismatched RequestTracker objects %v and %v", got, &rt)
 			}
 		} else {
@@ -116,18 +111,13 @@ func TestTrackRequest(t *testing.T) {
 				defer wg.Done()
 				u := uuid.New()
 
-				rt := RequestTracker{
-					Engine: e,
-					Request: &sdp.ItemRequest{
-						Type:      "person",
-						Query:     fmt.Sprintf("person-%v", i),
-						Method:    sdp.RequestMethod_GET,
-						LinkDepth: 10,
-						UUID:      u[:],
-					},
-				}
-
-				e.TrackRequest(u, &rt)
+				e.TrackRequest(&sdp.ItemRequest{
+					Type:      "person",
+					Query:     fmt.Sprintf("person-%v", i),
+					Method:    sdp.RequestMethod_GET,
+					LinkDepth: 10,
+					UUID:      u[:],
+				})
 			}(i)
 		}
 
@@ -152,18 +142,13 @@ func TestDeleteTrackedRequest(t *testing.T) {
 			defer wg.Done()
 			u := uuid.New()
 
-			rt := RequestTracker{
-				Engine: e,
-				Request: &sdp.ItemRequest{
-					Type:      "person",
-					Query:     fmt.Sprintf("person-%v", i),
-					Method:    sdp.RequestMethod_GET,
-					LinkDepth: 10,
-					UUID:      u[:],
-				},
-			}
-
-			e.TrackRequest(u, &rt)
+			e.TrackRequest(&sdp.ItemRequest{
+				Type:      "person",
+				Query:     fmt.Sprintf("person-%v", i),
+				Method:    sdp.RequestMethod_GET,
+				LinkDepth: 10,
+				UUID:      u[:],
+			})
 			wg.Add(1)
 			go func(u uuid.UUID) {
 				defer wg.Done()

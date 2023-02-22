@@ -96,13 +96,22 @@ func NewEngine() (*Engine, error) {
 	}, nil
 }
 
-// TrackRequest Stores a RequestTracker in the engine so that it can be looked
-// up later and cancelled if required. The UUID should be supplied as part of
-// the request itself
-func (e *Engine) TrackRequest(uuid uuid.UUID, request *RequestTracker) {
+// TrackRequest Register an ItemRequest with this Engine. Returns a tracker to keep tabs on what's happening.
+func (e *Engine) TrackRequest(itemRequest *sdp.ItemRequest) *RequestTracker {
+	// Extract and parse the UUID
+	reqUUID := itemRequest.ParseUuid()
+
+	tracker := &RequestTracker{
+		Request: itemRequest,
+		Engine:  e,
+	}
+
 	e.trackedRequestsMutex.Lock()
 	defer e.trackedRequestsMutex.Unlock()
-	e.trackedRequests[uuid] = request
+
+	e.trackedRequests[reqUUID] = tracker
+
+	return tracker
 }
 
 // GetTrackedRequest Returns the RequestTracked object for a given UUID. This

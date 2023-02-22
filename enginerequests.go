@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/overmindtech/sdp-go"
 	"github.com/overmindtech/sdpcache"
@@ -82,9 +81,6 @@ func (e *Engine) HandleItemRequest(ctx context.Context, itemRequest *sdp.ItemReq
 		e.Name,
 	)
 
-	// Extract and parse the UUID
-	reqUUID, uuidErr := uuid.FromBytes(itemRequest.UUID)
-
 	span.SetAttributes(
 		attribute.String("om.sdp.requestType", itemRequest.Type),
 		attribute.String("om.sdp.requestMethod", itemRequest.Method.String()),
@@ -93,20 +89,11 @@ func (e *Engine) HandleItemRequest(ctx context.Context, itemRequest *sdp.ItemReq
 		attribute.String("om.sdp.requestScope", itemRequest.Scope),
 		attribute.String("om.sdp.requestTimeout", itemRequest.Timeout.AsDuration().String()),
 		attribute.Bool("om.sdp.requestTimeoutOverridden", timeoutOverride),
-		attribute.String("om.sdp.requestUUID", reqUUID.String()),
+		attribute.String("om.sdp.requestUUID", itemRequest.ParseUuid().String()),
 		attribute.Bool("om.sdp.requestIgnoreCache", itemRequest.IgnoreCache),
 	)
 
-	requestTracker := RequestTracker{
-		Request: itemRequest,
-		Engine:  e,
-	}
-
-	if uuidErr == nil {
-		e.TrackRequest(reqUUID, &requestTracker)
-	}
-
-	_, _, err := requestTracker.Execute(ctx)
+	_, _, err := e.TrackRequest(itemRequest).Execute(ctx)
 
 	// If all failed then return an error
 	if err != nil {
