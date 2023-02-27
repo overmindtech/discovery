@@ -77,10 +77,10 @@ func TestDeleteItemRequest(t *testing.T) {
 }
 
 func TestTrackRequest(t *testing.T) {
-	e := newStartedEngine(t, "TestTrackRequest", nil)
-
 	t.Run("With normal request", func(t *testing.T) {
 		t.Parallel()
+
+		e := newStartedEngine(t, "TestTrackRequest_normal", nil)
 
 		u := uuid.New()
 
@@ -107,6 +107,8 @@ func TestTrackRequest(t *testing.T) {
 
 	t.Run("With many requests", func(t *testing.T) {
 		t.Parallel()
+
+		e := newStartedEngine(t, "TestTrackRequest_many", nil)
 
 		var wg sync.WaitGroup
 
