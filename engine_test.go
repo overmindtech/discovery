@@ -112,7 +112,7 @@ func TestTrackRequest(t *testing.T) {
 
 		var wg sync.WaitGroup
 
-		for i := 1; i < 1000; i++ {
+		for i := 0; i < 1000; i++ {
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
