@@ -53,40 +53,40 @@ func newStartedEngine(t *testing.T, name string, no *connect.NATSOptions, source
 	return e
 }
 
-func TestDeleteItemRequest(t *testing.T) {
-	one := &sdp.ItemRequest{
+func TestDeleteQuery(t *testing.T) {
+	one := &sdp.Query{
 		Scope:  "one",
 		Method: sdp.RequestMethod_LIST,
 		Query:  "",
 	}
-	two := &sdp.ItemRequest{
+	two := &sdp.Query{
 		Scope:  "two",
 		Method: sdp.RequestMethod_SEARCH,
 		Query:  "2",
 	}
-	irs := []*sdp.ItemRequest{
+	irs := []*sdp.Query{
 		one,
 		two,
 	}
 
-	deleted := deleteItemRequest(irs, two)
+	deleted := deleteQuery(irs, two)
 
 	if len(deleted) > 1 {
 		t.Errorf("Item not successfully deleted: %v", irs)
 	}
 }
 
-func TestTrackRequest(t *testing.T) {
-	t.Run("With normal request", func(t *testing.T) {
+func TestTrackQuery(t *testing.T) {
+	t.Run("With normal query", func(t *testing.T) {
 		t.Parallel()
 
-		e := newStartedEngine(t, "TestTrackRequest_normal", nil)
+		e := newStartedEngine(t, "TestTrackQuery_normal", nil)
 
 		u := uuid.New()
 
-		rt := RequestTracker{
+		qt := QueryTracker{
 			Engine: e,
-			Request: &sdp.ItemRequest{
+			Query: &sdp.Query{
 				Type:      "person",
 				Method:    sdp.RequestMethod_LIST,
 				LinkDepth: 10,
@@ -94,21 +94,21 @@ func TestTrackRequest(t *testing.T) {
 			},
 		}
 
-		e.TrackRequest(u, &rt)
+		e.TrackQuery(u, &qt)
 
-		if got, err := e.GetTrackedRequest(u); err == nil {
-			if got != &rt {
-				t.Errorf("Got mismatched RequestTracker objects %v and %v", got, &rt)
+		if got, err := e.GetTrackedQuery(u); err == nil {
+			if got != &qt {
+				t.Errorf("Got mismatched QueryTracker objects %v and %v", got, &qt)
 			}
 		} else {
 			t.Error(err)
 		}
 	})
 
-	t.Run("With many requests", func(t *testing.T) {
+	t.Run("With many querys", func(t *testing.T) {
 		t.Parallel()
 
-		e := newStartedEngine(t, "TestTrackRequest_many", nil)
+		e := newStartedEngine(t, "TestTrackQuery_many", nil)
 
 		var wg sync.WaitGroup
 
@@ -118,9 +118,9 @@ func TestTrackRequest(t *testing.T) {
 				defer wg.Done()
 				u := uuid.New()
 
-				rt := RequestTracker{
+				qt := QueryTracker{
 					Engine: e,
-					Request: &sdp.ItemRequest{
+					Query: &sdp.Query{
 						Type:      "person",
 						Query:     fmt.Sprintf("person-%v", i),
 						Method:    sdp.RequestMethod_GET,
@@ -129,34 +129,34 @@ func TestTrackRequest(t *testing.T) {
 					},
 				}
 
-				e.TrackRequest(u, &rt)
+				e.TrackQuery(u, &qt)
 			}(i)
 		}
 
 		wg.Wait()
 
-		if len(e.trackedRequests) != 1000 {
-			t.Errorf("Expected 1000 tracked requests, got %v", len(e.trackedRequests))
+		if len(e.trackedQueries) != 1000 {
+			t.Errorf("Expected 1000 tracked querys, got %v", len(e.trackedQueries))
 		}
 	})
 }
 
-func TestDeleteTrackedRequest(t *testing.T) {
+func TestDeleteTrackedQuery(t *testing.T) {
 	t.Parallel()
-	e := newStartedEngine(t, "TestDeleteTrackedRequest", nil)
+	e := newStartedEngine(t, "TestDeleteTrackedQuery", nil)
 
 	var wg sync.WaitGroup
 
-	// Add and delete many request in parallel
+	// Add and delete many query in parallel
 	for i := 1; i < 1000; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
 			u := uuid.New()
 
-			rt := RequestTracker{
+			qt := QueryTracker{
 				Engine: e,
-				Request: &sdp.ItemRequest{
+				Query: &sdp.Query{
 					Type:      "person",
 					Query:     fmt.Sprintf("person-%v", i),
 					Method:    sdp.RequestMethod_GET,
@@ -165,19 +165,19 @@ func TestDeleteTrackedRequest(t *testing.T) {
 				},
 			}
 
-			e.TrackRequest(u, &rt)
+			e.TrackQuery(u, &qt)
 			wg.Add(1)
 			go func(u uuid.UUID) {
 				defer wg.Done()
-				e.DeleteTrackedRequest(u)
+				e.DeleteTrackedQuery(u)
 			}(u)
 		}(i)
 	}
 
 	wg.Wait()
 
-	if len(e.trackedRequests) != 0 {
-		t.Errorf("Expected 0 tracked requests, got %v", len(e.trackedRequests))
+	if len(e.trackedQueries) != 0 {
+		t.Errorf("Expected 0 tracked querys, got %v", len(e.trackedQueries))
 	}
 }
 
@@ -223,13 +223,13 @@ func TestNats(t *testing.T) {
 		}
 	})
 
-	t.Run("Handling a basic request", func(t *testing.T) {
+	t.Run("Handling a basic query", func(t *testing.T) {
 		t.Cleanup(func() {
 			src.ClearCalls()
 			e.ClearCache()
 		})
 
-		req := sdp.NewRequestProgress(&sdp.ItemRequest{
+		req := sdp.NewQueryProgress(&sdp.Query{
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
 			Query:           "basic",
@@ -250,13 +250,13 @@ func TestNats(t *testing.T) {
 		}
 	})
 
-	t.Run("Handling a deeply linking request", func(t *testing.T) {
+	t.Run("Handling a deeply linking query", func(t *testing.T) {
 		t.Cleanup(func() {
 			src.ClearCalls()
 			e.ClearCache()
 		})
 
-		req := sdp.NewRequestProgress(&sdp.ItemRequest{
+		req := sdp.NewQueryProgress(&sdp.Query{
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
 			Query:           "deeplink",
@@ -321,11 +321,11 @@ func TestNatsCancel(t *testing.T) {
 		}
 	})
 
-	t.Run("Cancelling requests", func(t *testing.T) {
+	t.Run("Cancelling querys", func(t *testing.T) {
 		conn := e.natsConnection
 		u := uuid.New()
 
-		progress := sdp.NewRequestProgress(&sdp.ItemRequest{
+		progress := sdp.NewQueryProgress(&sdp.Query{
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
 			Query:           "foo",
@@ -337,7 +337,7 @@ func TestNatsCancel(t *testing.T) {
 		})
 
 		items := make(chan *sdp.Item, 1000)
-		errs := make(chan *sdp.ItemRequestError, 1000)
+		errs := make(chan *sdp.QueryError, 1000)
 
 		err := progress.Start(context.Background(), conn, items, errs)
 
@@ -347,7 +347,7 @@ func TestNatsCancel(t *testing.T) {
 
 		time.Sleep(1 * time.Second)
 
-		conn.Publish(context.Background(), "cancel.all", &sdp.CancelItemRequest{
+		conn.Publish(context.Background(), "cancel.all", &sdp.CancelQuery{
 			UUID: u[:],
 		})
 
@@ -629,13 +629,13 @@ func TestNatsAuth(t *testing.T) {
 		}
 	})
 
-	t.Run("Handling a basic request", func(t *testing.T) {
+	t.Run("Handling a basic query", func(t *testing.T) {
 		t.Cleanup(func() {
 			src.ClearCalls()
 			e.ClearCache()
 		})
 
-		_, _, err := sdp.NewRequestProgress(&sdp.ItemRequest{
+		_, _, err := sdp.NewQueryProgress(&sdp.Query{
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
 			Query:           "basic",
@@ -654,13 +654,13 @@ func TestNatsAuth(t *testing.T) {
 		}
 	})
 
-	t.Run("Handling a deeply linking request", func(t *testing.T) {
+	t.Run("Handling a deeply linking query", func(t *testing.T) {
 		t.Cleanup(func() {
 			src.ClearCalls()
 			e.ClearCache()
 		})
 
-		_, _, err := sdp.NewRequestProgress(&sdp.ItemRequest{
+		_, _, err := sdp.NewQueryProgress(&sdp.Query{
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
 			Query:           "deeplink",
@@ -689,7 +689,7 @@ func TestNatsAuth(t *testing.T) {
 
 }
 
-func TestSetupMaxRequestTimeout(t *testing.T) {
+func TestSetupMaxQueryTimeout(t *testing.T) {
 	t.Run("with no value", func(t *testing.T) {
 		e, err := NewEngine()
 		if err != nil {

@@ -25,7 +25,7 @@ func NewSourceHost() (*SourceHost, error) {
 		sourceMap: make(map[string][]Source),
 	}
 
-	// Add meta-sources so that we can respond to requests for `overmind-type`,
+	// Add meta-sources so that we can respond to queries for `overmind-type`,
 	// `overmind-scope` and `overmind-source` resources
 	typeSource, err := NewMetaSource(sh, Type)
 	if err != nil {
@@ -118,34 +118,34 @@ func (sh *SourceHost) SourcesByType(typ string) []Source {
 	return make([]Source, 0)
 }
 
-// ExpandRequest Expands requests with wildcards to no longer contain wildcards.
-// Meaning that if we support 5 types, and a request comes in with a wildcard
-// type, this function will expand that request into 5 requests, one for each
+// ExpandQuery Expands queries with wildcards to no longer contain wildcards.
+// Meaning that if we support 5 types, and a query comes in with a wildcard
+// type, this function will expand that query into 5 queries, one for each
 // type.
 //
-// The same goes for scopes, if we have a request with a wildcard scope, and
-// a single source that supports 5 scopes, we will end up with 5 requests. The
+// The same goes for scopes, if we have a query with a wildcard scope, and
+// a single source that supports 5 scopes, we will end up with 5 queries. The
 // exception to this is if we have a source that supports all scopes, but is
-// unable to list them. In this case there will still be some requests with
+// unable to list them. In this case there will still be some queries with
 // wildcard scopes as they can't be expanded
 //
-// This functions returns a map of requests with the sources that they should be
+// This functions returns a map of queries with the sources that they should be
 // run against
-func (sh *SourceHost) ExpandRequest(request *sdp.ItemRequest) map[*sdp.ItemRequest][]Source {
-	requests := make(map[string]*struct {
-		Request *sdp.ItemRequest
+func (sh *SourceHost) ExpandQuery(q *sdp.Query) map[*sdp.Query][]Source {
+	queries := make(map[string]*struct {
+		Query   *sdp.Query
 		Sources []Source
 	})
 
 	var checkSources []Source
 
-	if IsWildcard(request.Type) {
-		// If the request has a wildcard type, all non-hidden sources might try
+	if IsWildcard(q.Type) {
+		// If the query has a wildcard type, all non-hidden sources might try
 		// to respond
 		checkSources = sh.VisibleSources()
 	} else {
 		// If the type is specific, pull just sources for that type
-		checkSources = sh.SourcesByType(request.Type)
+		checkSources = sh.SourcesByType(q.Type)
 	}
 
 	for _, src := range checkSources {
@@ -156,46 +156,46 @@ func (sh *SourceHost) ExpandRequest(request *sdp.ItemRequest) map[*sdp.ItemReque
 		}
 
 		for _, sourceScope := range src.Scopes() {
-			// Create a new request if:
+			// Create a new query if:
 			//
 			// * The source supports all scopes, or
-			// * The request scope is a wildcard (and the source is not hidden), or
-			// * The request scope matches source scope
-			if IsWildcard(sourceScope) || (IsWildcard(request.Scope) && !isHidden) || sourceScope == request.Scope {
+			// * The query scope is a wildcard (and the source is not hidden), or
+			// * The query scope matches source scope
+			if IsWildcard(sourceScope) || (IsWildcard(q.Scope) && !isHidden) || sourceScope == q.Scope {
 				var scope string
 
 				// Choose the more specific scope
 				if IsWildcard(sourceScope) {
-					scope = request.Scope
+					scope = q.Scope
 				} else {
 					scope = sourceScope
 				}
 
-				request := sdp.ItemRequest{
+				q := sdp.Query{
 					Type:            src.Type(),
-					Method:          request.Method,
-					Query:           request.Query,
+					Method:          q.Method,
+					Query:           q.Query,
 					Scope:           scope,
-					ItemSubject:     request.ItemSubject,
-					ResponseSubject: request.ResponseSubject,
-					LinkDepth:       request.LinkDepth,
-					IgnoreCache:     request.IgnoreCache,
-					UUID:            request.UUID,
-					Timeout:         request.Timeout,
+					ItemSubject:     q.ItemSubject,
+					ResponseSubject: q.ResponseSubject,
+					LinkDepth:       q.LinkDepth,
+					IgnoreCache:     q.IgnoreCache,
+					UUID:            q.UUID,
+					Timeout:         q.Timeout,
 				}
 
-				// deal with duplicate requests after expansion
-				hash, err := requestHash(&request)
+				// deal with duplicate queries after expansion
+				hash, err := queryHash(&q)
 
 				if err == nil {
-					if existing, ok := requests[hash]; ok {
+					if existing, ok := queries[hash]; ok {
 						existing.Sources = append(existing.Sources, src)
 					} else {
-						requests[hash] = &struct {
-							Request *sdp.ItemRequest
+						queries[hash] = &struct {
+							Query   *sdp.Query
 							Sources []Source
 						}{
-							Request: &request,
+							Query: &q,
 							Sources: []Source{
 								src,
 							},
@@ -207,17 +207,17 @@ func (sh *SourceHost) ExpandRequest(request *sdp.ItemRequest) map[*sdp.ItemReque
 	}
 
 	// Convert back to final map
-	finalMap := make(map[*sdp.ItemRequest][]Source)
-	for _, expanded := range requests {
-		finalMap[expanded.Request] = expanded.Sources
+	finalMap := make(map[*sdp.Query][]Source)
+	for _, expanded := range queries {
+		finalMap[expanded.Query] = expanded.Sources
 	}
 
 	return finalMap
 }
 
-// requestHash Calculates a hash for a given request which can be used to
-// determine if two requests are identical
-func requestHash(req *sdp.ItemRequest) (string, error) {
+// queryHash Calculates a hash for a given query which can be used to
+// determine if two queries are identical
+func queryHash(req *sdp.Query) (string, error) {
 	hash := sha1.New()
 
 	// Marshall to bytes so that we can use sha1 to compare the raw binary

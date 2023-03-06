@@ -13,7 +13,7 @@ import (
 )
 
 type SlowSource struct {
-	RequestDuration time.Duration
+	QueryDuration time.Duration
 }
 
 func (s *SlowSource) Type() string {
@@ -37,21 +37,21 @@ func (s *SlowSource) Hidden() bool {
 }
 
 func (s *SlowSource) Get(ctx context.Context, scope string, query string) (*sdp.Item, error) {
-	end := time.Now().Add(s.RequestDuration)
+	end := time.Now().Add(s.QueryDuration)
 	attributes, _ := sdp.ToAttributes(map[string]interface{}{
 		"name": query,
 	})
 
 	item := sdp.Item{
-		Type:               "person",
-		UniqueAttribute:    "name",
-		Attributes:         attributes,
-		Scope:              "test",
-		LinkedItemRequests: []*sdp.ItemRequest{},
+		Type:              "person",
+		UniqueAttribute:   "name",
+		Attributes:        attributes,
+		Scope:             "test",
+		LinkedItemQueries: []*sdp.Query{},
 	}
 
 	for i := 0; i != 2; i++ {
-		item.LinkedItemRequests = append(item.LinkedItemRequests, &sdp.ItemRequest{
+		item.LinkedItemQueries = append(item.LinkedItemQueries, &sdp.Query{
 			Type:   "person",
 			Method: sdp.RequestMethod_GET,
 			Query:  RandomName(),
@@ -72,45 +72,45 @@ func (s *SlowSource) Weight() int {
 	return 100
 }
 
-func TestParallelRequestPerformance(t *testing.T) {
+func TestParallelQueryPerformance(t *testing.T) {
 	if os.Getenv("GITHUB_ACTIONS") != "" {
 		t.Skip("Performance tests under github actions are too unreliable")
 	}
 
-	// This test is designed to ensure that request duration is linear up to a
+	// This test is designed to ensure that query duration is linear up to a
 	// certain point. Above that point the overhead caused by having so many
 	// goroutines running will start to make the response times non-linear which
 	// maybe isn't ideal but given realistic loads we probably don't care.
 	t.Run("Without linking", func(t *testing.T) {
-		RunLinearPerformanceTest(t, "10 requests", 10, 0, 1)
-		RunLinearPerformanceTest(t, "100 requests", 100, 0, 10)
-		RunLinearPerformanceTest(t, "1,000 requests", 1000, 0, 100)
+		RunLinearPerformanceTest(t, "10 queries", 10, 0, 1)
+		RunLinearPerformanceTest(t, "100 queries", 100, 0, 10)
+		RunLinearPerformanceTest(t, "1,000 queries", 1000, 0, 100)
 	})
 
 	t.Run("With linking", func(t *testing.T) {
-		RunLinearPerformanceTest(t, "1 request 3 depth", 1, 3, 1)
-		RunLinearPerformanceTest(t, "1 request 3 depth", 1, 3, 100)
-		RunLinearPerformanceTest(t, "1 request 5 depth", 1, 5, 100)
-		RunLinearPerformanceTest(t, "10 requests 5 depth", 10, 5, 100)
+		RunLinearPerformanceTest(t, "1 query 3 depth", 1, 3, 1)
+		RunLinearPerformanceTest(t, "1 query 3 depth", 1, 3, 100)
+		RunLinearPerformanceTest(t, "1 query 5 depth", 1, 5, 100)
+		RunLinearPerformanceTest(t, "10 queries 5 depth", 10, 5, 100)
 	})
 }
 
-// RunLinearPerformanceTest Runs a test with a given number in input requests,
+// RunLinearPerformanceTest Runs a test with a given number in input queries,
 // link depth and parallelization limit. Expected results and expected duration
 // are determined automatically meaning all this is testing for is the fact that
 // the performance continues to be linear and predictable
-func RunLinearPerformanceTest(t *testing.T, name string, numRequests int, linkDepth int, numParallel int) {
+func RunLinearPerformanceTest(t *testing.T, name string, numQueries int, linkDepth int, numParallel int) {
 	t.Helper()
 
 	t.Run(name, func(t *testing.T) {
-		result := TimeRequests(numRequests, linkDepth, numParallel)
+		result := TimeQueries(numQueries, linkDepth, numParallel)
 
 		if len(result.Results) != result.ExpectedItems {
 			t.Errorf("Expected %v items, got %v (%v errors)", result.ExpectedItems, len(result.Results), len(result.Errors))
 		}
 
 		if result.TimeTaken > result.MaxTime {
-			t.Errorf("Requests took too long: %v Max: %v", result.TimeTaken.String(), result.MaxTime.String())
+			t.Errorf("Queries took too long: %v Max: %v", result.TimeTaken.String(), result.MaxTime.String())
 		}
 	})
 }
@@ -120,17 +120,17 @@ type TimedResults struct {
 	MaxTime       time.Duration
 	TimeTaken     time.Duration
 	Results       []*sdp.Item
-	Errors        []*sdp.ItemRequestError
+	Errors        []*sdp.QueryError
 }
 
-func TimeRequests(numRequests int, linkDepth int, numParallel int) TimedResults {
+func TimeQueries(numQueries int, linkDepth int, numParallel int) TimedResults {
 	e, err := NewEngine()
 	if err != nil {
 		panic(fmt.Sprintf("Error initializing Engine: %v", err))
 	}
 	e.MaxParallelExecutions = numParallel
 	e.AddSources(&SlowSource{
-		RequestDuration: 100 * time.Millisecond,
+		QueryDuration: 100 * time.Millisecond,
 	})
 	e.Start()
 	defer e.Stop()
@@ -139,7 +139,7 @@ func TimeRequests(numRequests int, linkDepth int, numParallel int) TimedResults 
 	var expectedItems int
 	var expectedDuration time.Duration
 	for i := 0; i <= linkDepth; i++ {
-		thisLayer := int(math.Pow(2, float64(i))) * numRequests
+		thisLayer := int(math.Pow(2, float64(i))) * numQueries
 
 		// Expect that it'll take no longer that 120% of the sleep time.
 		thisDuration := 120 * math.Ceil(float64(thisLayer)/float64(numParallel))
@@ -148,15 +148,15 @@ func TimeRequests(numRequests int, linkDepth int, numParallel int) TimedResults 
 	}
 
 	results := make([]*sdp.Item, 0)
-	errors := make([]*sdp.ItemRequestError, 0)
+	errors := make([]*sdp.QueryError, 0)
 	resultsMutex := sync.Mutex{}
 	wg := sync.WaitGroup{}
 
 	start := time.Now()
 
-	for i := 0; i < numRequests; i++ {
-		rt := RequestTracker{
-			Request: &sdp.ItemRequest{
+	for i := 0; i < numQueries; i++ {
+		qt := QueryTracker{
+			Query: &sdp.Query{
 				Type:      "person",
 				Method:    sdp.RequestMethod_GET,
 				Query:     RandomName(),
@@ -168,16 +168,16 @@ func TimeRequests(numRequests int, linkDepth int, numParallel int) TimedResults 
 
 		wg.Add(1)
 
-		go func(rt *RequestTracker) {
+		go func(qt *QueryTracker) {
 			defer wg.Done()
 
-			items, errs, _ := rt.Execute(context.Background())
+			items, errs, _ := qt.Execute(context.Background())
 
 			resultsMutex.Lock()
 			results = append(results, items...)
 			errors = append(errors, errs...)
 			resultsMutex.Unlock()
-		}(&rt)
+		}(&qt)
 	}
 
 	wg.Wait()

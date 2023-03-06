@@ -41,16 +41,16 @@ func NewResponseSubject() string {
 	return fmt.Sprintf("return.response.%v", nats.NewInbox())
 }
 
-// HandleItemRequest Handles a single request. This includes responses, linking
+// HandleQuery Handles a single query. This includes responses, linking
 // etc.
-func (e *Engine) HandleItemRequest(ctx context.Context, itemRequest *sdp.ItemRequest) {
-	ctx, span := tracer.Start(ctx, "HandleItemRequest")
+func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
+	ctx, span := tracer.Start(ctx, "HandleQuery")
 	defer span.End()
 
-	numExpandedRequests := len(e.sh.ExpandRequest(itemRequest))
-	span.SetAttributes(attribute.Int("om.discovery.numExpandedRequests", numExpandedRequests))
+	numExpandedQueries := len(e.sh.ExpandQuery(query))
+	span.SetAttributes(attribute.Int("om.discovery.numExpandedQueries", numExpandedQueries))
 
-	if numExpandedRequests == 0 {
+	if numExpandedQueries == 0 {
 		// If we don't have any relevant sources, exit
 		return
 	}
@@ -58,14 +58,14 @@ func (e *Engine) HandleItemRequest(ctx context.Context, itemRequest *sdp.ItemReq
 	var timeoutOverride bool
 
 	// If the timeout is infinite OR greater than the max, set it to the max
-	if itemRequest.Timeout.AsDuration() == 0 || itemRequest.Timeout.AsDuration() > e.MaxRequestTimeout {
-		itemRequest.Timeout = durationpb.New(e.MaxRequestTimeout)
+	if query.Timeout.AsDuration() == 0 || query.Timeout.AsDuration() > e.MaxRequestTimeout {
+		query.Timeout = durationpb.New(e.MaxRequestTimeout)
 		timeoutOverride = true
 	}
 
 	// Respond saying we've got it
 	responder := sdp.ResponseSender{
-		ResponseSubject: itemRequest.ResponseSubject,
+		ResponseSubject: query.ResponseSubject,
 	}
 
 	var pub sdp.EncodedConnection
@@ -83,30 +83,30 @@ func (e *Engine) HandleItemRequest(ctx context.Context, itemRequest *sdp.ItemReq
 	)
 
 	// Extract and parse the UUID
-	reqUUID, uuidErr := uuid.FromBytes(itemRequest.UUID)
+	u, uuidErr := uuid.FromBytes(query.UUID)
 
 	span.SetAttributes(
-		attribute.String("om.sdp.requestType", itemRequest.Type),
-		attribute.String("om.sdp.requestMethod", itemRequest.Method.String()),
-		attribute.String("om.sdp.requestQuery", itemRequest.Query),
-		attribute.Int("om.sdp.requestLinkDepth", int(itemRequest.LinkDepth)),
-		attribute.String("om.sdp.requestScope", itemRequest.Scope),
-		attribute.String("om.sdp.requestTimeout", itemRequest.Timeout.AsDuration().String()),
-		attribute.Bool("om.sdp.requestTimeoutOverridden", timeoutOverride),
-		attribute.String("om.sdp.requestUUID", reqUUID.String()),
-		attribute.Bool("om.sdp.requestIgnoreCache", itemRequest.IgnoreCache),
+		attribute.String("om.sdp.query", query.Query),
+		attribute.String("om.sdp.queryType", query.Type),
+		attribute.String("om.sdp.queryMethod", query.Method.String()),
+		attribute.Int("om.sdp.queryLinkDepth", int(query.LinkDepth)),
+		attribute.String("om.sdp.queryScope", query.Scope),
+		attribute.String("om.sdp.queryTimeout", query.Timeout.AsDuration().String()),
+		attribute.Bool("om.sdp.queryTimeoutOverridden", timeoutOverride),
+		attribute.String("om.sdp.queryUUID", u.String()),
+		attribute.Bool("om.sdp.queryIgnoreCache", query.IgnoreCache),
 	)
 
-	requestTracker := RequestTracker{
-		Request: itemRequest,
-		Engine:  e,
+	qt := QueryTracker{
+		Query:  query,
+		Engine: e,
 	}
 
 	if uuidErr == nil {
-		e.TrackRequest(reqUUID, &requestTracker)
+		e.TrackQuery(u, &qt)
 	}
 
-	_, _, err := requestTracker.Execute(ctx)
+	_, _, err := qt.Execute(ctx)
 
 	// If all failed then return an error
 	if err != nil {
@@ -125,15 +125,15 @@ func (e *Engine) HandleItemRequest(ctx context.Context, itemRequest *sdp.ItemReq
 	}
 }
 
-// ExecuteRequestSync Executes a request, waiting for all results, then returns
+// ExecuteQuerySync Executes a Query, waiting for all results, then returns
 // them along with the error, rather than passing the results back along channels
-func (e *Engine) ExecuteRequestSync(ctx context.Context, req *sdp.ItemRequest) ([]*sdp.Item, []*sdp.ItemRequestError, error) {
+func (e *Engine) ExecuteQuerySync(ctx context.Context, q *sdp.Query) ([]*sdp.Item, []*sdp.QueryError, error) {
 	itemsChan := make(chan *sdp.Item, 100_000)
-	errsChan := make(chan *sdp.ItemRequestError, 100_000)
+	errsChan := make(chan *sdp.QueryError, 100_000)
 	items := make([]*sdp.Item, 0)
-	errs := make([]*sdp.ItemRequestError, 0)
+	errs := make([]*sdp.QueryError, 0)
 
-	err := e.ExecuteRequest(ctx, req, itemsChan, errsChan)
+	err := e.ExecuteQuery(ctx, q, itemsChan, errsChan)
 
 	for i := range itemsChan {
 		items = append(items, i)
@@ -146,15 +146,15 @@ func (e *Engine) ExecuteRequestSync(ctx context.Context, req *sdp.ItemRequest) (
 	return items, errs, err
 }
 
-// ExecuteRequest Executes a single request and returns the results without any
-// linking. Will return an error if all sources fail, or the request couldn't be
+// ExecuteQuery Executes a single Query and returns the results without any
+// linking. Will return an error if all sources fail, or the Query couldn't be
 // run.
 //
 // Items and errors will be sent to the supplied channels as they are found.
 // Note that if these channels are not buffered, something will need to be
 // receiving the results or this method will never finish. If results are not
 // required the channels can be nil
-func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items chan<- *sdp.Item, errs chan<- *sdp.ItemRequestError) error {
+func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<- *sdp.Item, errs chan<- *sdp.QueryError) error {
 	// Make sure we close channels once we're done
 	if items != nil {
 		defer close(items)
@@ -167,13 +167,13 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items
 		return ctx.Err()
 	}
 
-	expanded := e.sh.ExpandRequest(req)
+	expanded := e.sh.ExpandQuery(query)
 
 	if len(expanded) == 0 {
-		errs <- &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_NOSCOPE,
+		errs <- &sdp.QueryError{
+			ErrorType:   sdp.QueryError_NOSCOPE,
 			ErrorString: "no matching sources found",
-			Scope:       req.Scope,
+			Scope:       query.Scope,
 		}
 
 		return errors.New("no matching sources found")
@@ -183,53 +183,54 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items
 	var numSources atomic.Int32
 	var numErrs int
 
-	// Since we need to wait for only the processing of this request's executions, we need a separate WaitGroup here
+	// Since we need to wait for only the processing of this query's executions, we need a separate WaitGroup here
 	// Overall MaxParallelExecutions evaluation is handled by e.executionPool
 	wg := sync.WaitGroup{}
-	for request, sources := range expanded {
+	for q, sources := range expanded {
 		wg.Add(1)
 		// localize values for the closure below
-		request, sources := request, sources
+		q, sources := q, sources
 		go func() {
 			// queue everything into the execution pool
 			defer sentry.Recover()
 			e.executionPool.Go(func() {
 				defer sentry.Recover()
 				defer wg.Done()
-				var requestItems []*sdp.Item
-				var requestErrors []*sdp.ItemRequestError
+				var queryItems []*sdp.Item
+				var queryErrors []*sdp.QueryError
 				numSources.Add(1)
 
-				// Make the request of all sources
-				switch req.GetMethod() {
+				// query all sources
+				switch query.GetMethod() {
 				case sdp.RequestMethod_GET:
-					requestItems, requestErrors = e.Get(ctx, request, sources)
+					queryItems, queryErrors = e.Get(ctx, q, sources)
 				case sdp.RequestMethod_LIST:
-					requestItems, requestErrors = e.List(ctx, request, sources)
+					queryItems, queryErrors = e.List(ctx, q, sources)
 				case sdp.RequestMethod_SEARCH:
-					requestItems, requestErrors = e.Search(ctx, request, sources)
+					queryItems, queryErrors = e.Search(ctx, q, sources)
 				}
 
-				for _, i := range requestItems {
-					// If the main request had a linkDepth of greater than zero it means we
+				for _, i := range queryItems {
+					// If the main query had a linkDepth of greater than zero it means we
 					// need to keep linking, this means that we need to pass down all of the
 					// subject info along with the number of remaining links. If the link
 					// depth is zero then we just pass then back in their normal form as we
 					// won't be executing them
-					if req.GetLinkDepth() > 0 {
-						for _, lir := range i.LinkedItemRequests {
-							lir.LinkDepth = req.LinkDepth - 1
-							lir.ItemSubject = req.ItemSubject
-							lir.ResponseSubject = req.ResponseSubject
-							lir.IgnoreCache = req.IgnoreCache
-							lir.Timeout = req.Timeout
-							lir.UUID = req.UUID
+					if query.GetLinkDepth() > 0 {
+						for _, lir := range i.LinkedItemQueries {
+							lir.LinkDepth = query.LinkDepth - 1
+							lir.ItemSubject = query.ItemSubject
+							lir.ResponseSubject = query.ResponseSubject
+							lir.IgnoreCache = query.IgnoreCache
+							lir.Timeout = query.Timeout
+							lir.UUID = query.UUID
 						}
 					}
 
-					// Assign the item request
+					// Assign the source query
 					if i.Metadata != nil {
-						i.Metadata.SourceRequest = req
+						i.Metadata.SourceQuery = query
+						i.Metadata.SourceQueryUUID = query.UUID
 					}
 
 					if items != nil {
@@ -237,8 +238,8 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items
 					}
 				}
 
-				for _, e := range requestErrors {
-					if request != nil {
+				for _, e := range queryErrors {
+					if q != nil {
 						numErrs++
 
 						if errs != nil {
@@ -265,21 +266,21 @@ func (e *Engine) ExecuteRequest(ctx context.Context, req *sdp.ItemRequest, items
 // Get Runs a get query against known sources in priority order. If nothing was
 // found, returns the first error. This returns a slice if items for
 // convenience, but this should always be of length 1 or 0
-func (e *Engine) Get(ctx context.Context, r *sdp.ItemRequest, relevantSources []Source) ([]*sdp.Item, []*sdp.ItemRequestError) {
+func (e *Engine) Get(ctx context.Context, r *sdp.Query, relevantSources []Source) ([]*sdp.Item, []*sdp.QueryError) {
 	return e.callSources(ctx, r, relevantSources, Get)
 }
 
 // List executes List() on all sources for a given type, returning the merged
 // results. Only returns an error if all sources fail, in which case returns the
 // first error
-func (e *Engine) List(ctx context.Context, r *sdp.ItemRequest, relevantSources []Source) ([]*sdp.Item, []*sdp.ItemRequestError) {
+func (e *Engine) List(ctx context.Context, r *sdp.Query, relevantSources []Source) ([]*sdp.Item, []*sdp.QueryError) {
 	return e.callSources(ctx, r, relevantSources, List)
 }
 
 // Search executes Search() on all sources for a given type, returning the merged
 // results. Only returns an error if all sources fail, in which case returns the
 // first error
-func (e *Engine) Search(ctx context.Context, r *sdp.ItemRequest, relevantSources []Source) ([]*sdp.Item, []*sdp.ItemRequestError) {
+func (e *Engine) Search(ctx context.Context, r *sdp.Query, relevantSources []Source) ([]*sdp.Item, []*sdp.QueryError) {
 	searchableSources := make([]Source, 0)
 
 	// Filter further by searchability
@@ -292,19 +293,19 @@ func (e *Engine) Search(ctx context.Context, r *sdp.ItemRequest, relevantSources
 	return e.callSources(ctx, r, searchableSources, Search)
 }
 
-func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSources []Source, method SourceMethod) ([]*sdp.Item, []*sdp.ItemRequestError) {
+func (e *Engine) callSources(ctx context.Context, r *sdp.Query, relevantSources []Source, method SourceMethod) ([]*sdp.Item, []*sdp.QueryError) {
 	ctx, span := tracer.Start(ctx, "CallSources", trace.WithAttributes(
 		attribute.String("om.engine.method", method.String()),
 	))
 	defer span.End()
 
 	items := make([]*sdp.Item, 0)
-	errs := make([]*sdp.ItemRequestError, 0)
+	errs := make([]*sdp.QueryError, 0)
 
 	// We want to avoid having a Get and a List running at the same time, we'd
 	// rather run the List first, populate the cache, then have the Get just
 	// grab the value from the cache. To this end we use a GetListMutex to allow
-	// a List to block all subsequent Get requests until it is done
+	// a List to block all subsequent Get querys until it is done
 	switch method {
 	case Get:
 		e.gfm.GetLock(r.Scope, r.Type)
@@ -314,7 +315,7 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 		defer e.gfm.ListUnlock(r.Scope, r.Type)
 	case Search:
 		// We don't need to lock for a search since they are independent and
-		// will only ever have a cache hit if the request is identical
+		// will only ever have a cache hit if the query is identical
 	}
 
 	for _, src := range relevantSources {
@@ -332,7 +333,7 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 
 			switch method {
 			case Get:
-				// With a Get request we need just the one specific item, so also
+				// With a Get query we need just the one specific item, so also
 				// filter on uniqueAttributeValue
 				query.UniqueAttributeValue = &r.Query
 			case List:
@@ -348,21 +349,21 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 
 			span.SetAttributes(
 				attribute.String("om.source.sourceName", src.Name()),
-				attribute.String("om.source.requestType", r.Type),
-				attribute.String("om.source.requestScope", r.Scope),
+				attribute.String("om.source.queryType", r.Type),
+				attribute.String("om.source.queryScope", r.Scope),
 			)
 
 			if !r.IgnoreCache {
 				cachedItems, err := e.cache.Search(query)
 
 				if err != nil {
-					var ire *sdp.ItemRequestError
+					var ire *sdp.QueryError
 					if errors.Is(err, sdpcache.ErrCacheNotFound) {
 						// If nothing was found then execute the search against the sources
 					} else if errors.As(err, &ire) {
 						// Add relevant info
 						ire.Scope = r.Scope
-						ire.ItemRequestUUID = r.UUID
+						ire.UUID = r.UUID
 						ire.SourceName = src.Name()
 						ire.ItemType = r.Type
 
@@ -370,27 +371,27 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 
 						span.SetAttributes(attribute.String("om.cache.error", err.Error()))
 
-						if ire.ErrorType == sdp.ItemRequestError_NOTFOUND {
+						if ire.ErrorType == sdp.QueryError_NOTFOUND {
 							span.SetStatus(codes.Ok, "cache hit: item not found")
 						} else {
-							span.SetStatus(codes.Ok, "cache hit: ItemRequestError")
+							span.SetStatus(codes.Ok, "cache hit: QueryError")
 						}
 
 						return false
 					} else {
 						// If it's an unknown error, convert it to SDP and skip this source
-						errs = append(errs, &sdp.ItemRequestError{
-							ItemRequestUUID: r.UUID,
-							ErrorType:       sdp.ItemRequestError_OTHER,
-							ErrorString:     err.Error(),
-							Scope:           r.Scope,
-							SourceName:      src.Name(),
-							ItemType:        r.Type,
+						errs = append(errs, &sdp.QueryError{
+							UUID:        r.UUID,
+							ErrorType:   sdp.QueryError_OTHER,
+							ErrorString: err.Error(),
+							Scope:       r.Scope,
+							SourceName:  src.Name(),
+							ItemType:    r.Type,
 						})
 
 						span.SetAttributes(attribute.String("om.cache.error", err.Error()))
 
-						span.SetStatus(codes.Ok, "cache hit: ItemRequestError")
+						span.SetStatus(codes.Ok, "cache hit: QueryError")
 
 						return false
 					}
@@ -442,8 +443,8 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 					if searchableSrc, ok := src.(SearchableSource); ok {
 						resultItems, err = searchableSrc.Search(ctx, r.Scope, r.Query)
 					} else {
-						err = &sdp.ItemRequestError{
-							ErrorType:   sdp.ItemRequestError_NOTFOUND,
+						err = &sdp.QueryError{
+							ErrorType:   sdp.QueryError_NOTFOUND,
 							ErrorString: "source is not searchable",
 						}
 					}
@@ -467,25 +468,25 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 			if err != nil {
 				span.SetAttributes(attribute.String("om.source.error", err.Error()))
 
-				if sdpErr, ok := err.(*sdp.ItemRequestError); ok {
+				if sdpErr, ok := err.(*sdp.QueryError); ok {
 					// Add details if they aren't populated
 					if sdpErr.Scope == "" {
 						sdpErr.Scope = r.Scope
 					}
-					sdpErr.ItemRequestUUID = r.UUID
+					sdpErr.UUID = r.UUID
 					sdpErr.ItemType = src.Type()
 					sdpErr.ResponderName = e.Name
 					sdpErr.SourceName = src.Name()
 
 					errs = append(errs, sdpErr)
 				} else {
-					errs = append(errs, &sdp.ItemRequestError{
-						ItemRequestUUID: r.UUID,
-						ErrorType:       sdp.ItemRequestError_OTHER,
-						ErrorString:     err.Error(),
-						Scope:           r.Scope,
-						SourceName:      src.Name(),
-						ItemType:        r.Type,
+					errs = append(errs, &sdp.QueryError{
+						UUID:        r.UUID,
+						ErrorType:   sdp.QueryError_OTHER,
+						ErrorString: err.Error(),
+						Scope:       r.Scope,
+						SourceName:  src.Name(),
+						ItemType:    r.Type,
 					})
 				}
 			}
@@ -509,7 +510,8 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 					SourceDuration:        durationpb.New(sourceDuration),
 					SourceDurationPerItem: durationpb.New(time.Duration(sourceDuration.Nanoseconds() / int64(len(resultItems)))),
 					SourceName:            src.Name(),
-					SourceRequest:         r,
+					SourceQuery:           r,
+					SourceQueryUUID:       r.UUID,
 				}
 
 				// Mark the item as hidden if the source is a hidden source
@@ -542,14 +544,14 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.ItemRequest, relevantSo
 
 // considerFailed Returns whether or not a given error should be considered as a
 // failure or not. The only error that isn't consider a failure is a
-// *sdp.ItemRequestError with a Type of NOTFOUND, this means that it was queried
+// *sdp.QueryError with a Type of NOTFOUND, this means that it was queried
 // successfully but it simply doesn't exist
 func considerFailed(err error) bool {
 	if err == nil {
 		return false
 	} else {
-		if sdperr, ok := err.(*sdp.ItemRequestError); ok {
-			if sdperr.ErrorType == sdp.ItemRequestError_NOTFOUND {
+		if sdperr, ok := err.(*sdp.QueryError); ok {
+			if sdperr.ErrorType == sdp.QueryError_NOTFOUND {
 				return false
 			} else {
 				return true

@@ -74,7 +74,7 @@ func NewMetaSource(sh *SourceHost, mode Field) (*MetaSource, error) {
 	return &ms, err
 }
 
-func searchRequest(query string, field Field) *bleve.SearchRequest {
+func searchQuery(query string, field Field) *bleve.SearchRequest {
 	// Simple "starts with"
 	prefix := bleve.NewPrefixQuery(query)
 
@@ -133,8 +133,8 @@ func (t *MetaSource) Name() string {
 
 func (t *MetaSource) Get(ctx context.Context, scope string, query string) (*sdp.Item, error) {
 	if scope != "global" {
-		return nil, &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_NOSCOPE,
+		return nil, &sdp.QueryError{
+			ErrorType:   sdp.QueryError_NOSCOPE,
 			ErrorString: fmt.Sprintf("%v only available in global scope", t.Type()),
 		}
 	}
@@ -142,12 +142,12 @@ func (t *MetaSource) Get(ctx context.Context, scope string, query string) (*sdp.
 	results, err := t.SearchField(t.field, query)
 
 	if err != nil {
-		return nil, sdp.NewItemRequestError(err)
+		return nil, sdp.NewQueryError(err)
 	}
 
 	if len(results) == 0 || results[0].Value != query {
-		return nil, &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_NOTFOUND,
+		return nil, &sdp.QueryError{
+			ErrorType:   sdp.QueryError_NOTFOUND,
 			ErrorString: fmt.Sprintf("scope %v not found", query),
 		}
 	}
@@ -157,8 +157,8 @@ func (t *MetaSource) Get(ctx context.Context, scope string, query string) (*sdp.
 
 func (t *MetaSource) List(ctx context.Context, scope string) ([]*sdp.Item, error) {
 	if scope != "global" {
-		return nil, &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_NOSCOPE,
+		return nil, &sdp.QueryError{
+			ErrorType:   sdp.QueryError_NOSCOPE,
 			ErrorString: fmt.Sprintf("%v only available in global scope", t.Type()),
 		}
 	}
@@ -180,8 +180,8 @@ func (t *MetaSource) List(ctx context.Context, scope string) ([]*sdp.Item, error
 // and we execute a search with what they have typed so far.
 func (t *MetaSource) Search(ctx context.Context, scope string, query string) ([]*sdp.Item, error) {
 	if scope != "global" {
-		return nil, &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_NOSCOPE,
+		return nil, &sdp.QueryError{
+			ErrorType:   sdp.QueryError_NOSCOPE,
 			ErrorString: fmt.Sprintf("%v only available in global scope", t.Type()),
 		}
 	}
@@ -189,7 +189,7 @@ func (t *MetaSource) Search(ctx context.Context, scope string, query string) ([]
 	results, err := t.SearchField(t.field, query)
 
 	if err != nil {
-		return nil, sdp.NewItemRequestError(err)
+		return nil, sdp.NewQueryError(err)
 	}
 
 	items := make([]*sdp.Item, len(results))
@@ -270,7 +270,7 @@ func (m *MetaSource) SearchField(field Field, query string) ([]SearchResult, err
 		return nil, errors.New("unsupported field")
 	}
 
-	searchResults, err := index.Search(searchRequest(query, field))
+	searchResults, err := index.Search(searchQuery(query, field))
 
 	if err != nil {
 		return nil, err
@@ -386,7 +386,7 @@ func resultToItem(result SearchResult, itemType string) *sdp.Item {
 	}
 
 	for _, src := range result.RelatedSources {
-		item.LinkedItemRequests = append(item.LinkedItemRequests, &sdp.ItemRequest{
+		item.LinkedItemQueries = append(item.LinkedItemQueries, &sdp.Query{
 			Type:   "overmind-source",
 			Method: sdp.RequestMethod_GET,
 			Query:  src.Name(),
@@ -419,8 +419,8 @@ func (s *SourcesSource) Get(ctx context.Context, scope string, query string) (*s
 		}
 	}
 
-	return nil, &sdp.ItemRequestError{
-		ErrorType: sdp.ItemRequestError_NOTFOUND,
+	return nil, &sdp.QueryError{
+		ErrorType: sdp.QueryError_NOTFOUND,
 	}
 }
 
@@ -435,7 +435,7 @@ func (s *SourcesSource) List(ctx context.Context, scope string) ([]*sdp.Item, er
 		item, err = s.sourceToItem(src)
 
 		if err != nil {
-			return nil, sdp.NewItemRequestError(err)
+			return nil, sdp.NewQueryError(err)
 		}
 
 		items[i] = item
@@ -479,8 +479,8 @@ func (s *SourcesSource) sourceToItem(src Source) (*sdp.Item, error) {
 	attributes, err := sdp.ToAttributes(attrMap)
 
 	if err != nil {
-		return nil, &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_OTHER,
+		return nil, &sdp.QueryError{
+			ErrorType:   sdp.QueryError_OTHER,
 			ErrorString: err.Error(),
 		}
 	}

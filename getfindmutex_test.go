@@ -164,7 +164,7 @@ func TestGetLock(t *testing.T) {
 			actionWG.Wait()
 
 			// The expected order is: Firstly getLock1 since nothing else is waiting
-			// for a lock. While this one is working there is a request for a
+			// for a lock. While this one is working there is a query for a
 			// findlock, then a getlock. The findlock should block the getlock until
 			// it is done
 			if order[0] != "getLock1" {

@@ -11,13 +11,13 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// RequestTracker is used for tracking the progress of a single request. This
-// is used because a single request could have a link depth that results in many
-// requests being executed meaning that we need to not only track the first
-// request, but also all other requests and items that result from linking
-type RequestTracker struct {
-	// The request to track
-	Request *sdp.ItemRequest
+// QueryTracker is used for tracking the progress of a single query. This
+// is used because a single query could have a link depth that results in many
+// additional queries being executed meaning that we need to not only track the first
+// query, but also all other queries and items that result from linking
+type QueryTracker struct {
+	// The query to track
+	Query *sdp.Query
 
 	// The engine that this is connected to, used for sending NATS messages
 	Engine *Engine
@@ -37,19 +37,19 @@ type RequestTracker struct {
 	linkedItems      map[string]*sdp.Item
 	linkedItemsMutex sync.RWMutex
 
-	// cancelFunc A function that will cancel all requests when called
+	// cancelFunc A function that will cancel all queries when called
 	cancelFunc      context.CancelFunc
 	cancelFuncMutex sync.Mutex
 }
 
-func (r *RequestTracker) LinkedItems() []*sdp.Item {
-	r.linkedItemsMutex.RLock()
-	defer r.linkedItemsMutex.RUnlock()
+func (qt *QueryTracker) LinkedItems() []*sdp.Item {
+	qt.linkedItemsMutex.RLock()
+	defer qt.linkedItemsMutex.RUnlock()
 
-	items := make([]*sdp.Item, len(r.linkedItems))
+	items := make([]*sdp.Item, len(qt.linkedItems))
 	i := 0
 
-	for _, item := range r.linkedItems {
+	for _, item := range qt.linkedItems {
 		items[i] = item
 		i++
 	}
@@ -59,48 +59,48 @@ func (r *RequestTracker) LinkedItems() []*sdp.Item {
 
 // registerLinkedItem Registers an item in the database of linked items,
 // returns an error if the item is already present
-func (r *RequestTracker) registerLinkedItem(i *sdp.Item) error {
-	r.linkedItemsMutex.Lock()
-	defer r.linkedItemsMutex.Unlock()
+func (qt *QueryTracker) registerLinkedItem(i *sdp.Item) error {
+	qt.linkedItemsMutex.Lock()
+	defer qt.linkedItemsMutex.Unlock()
 
-	if r.linkedItems == nil {
-		r.linkedItems = make(map[string]*sdp.Item)
+	if qt.linkedItems == nil {
+		qt.linkedItems = make(map[string]*sdp.Item)
 	}
 
-	if _, exists := r.linkedItems[i.GloballyUniqueName()]; exists {
+	if _, exists := qt.linkedItems[i.GloballyUniqueName()]; exists {
 		return fmt.Errorf("item %v has already been registered", i.GloballyUniqueName())
 	}
 
-	r.linkedItems[i.GloballyUniqueName()] = i
+	qt.linkedItems[i.GloballyUniqueName()] = i
 
 	return nil
 }
 
 // queueUnlinkedItem Adds an item to the queue for linking. The engine will then
-// execute the linked item requests and publish the completed item to the
+// execute the linked item queries and publish the completed item to the
 // relevant NATS subject. Linking can be started and stopped using
 // `startLinking()` and `stopLinking()`
-func (r *RequestTracker) queueUnlinkedItem(i *sdp.Item) {
+func (qt *QueryTracker) queueUnlinkedItem(i *sdp.Item) {
 	if i != nil {
-		r.unlinkedItemsWG.Add(1)
-		r.unlinkedItems <- i
+		qt.unlinkedItemsWG.Add(1)
+		qt.unlinkedItems <- i
 	}
 }
 
 // startLinking Starts linking items that have been added to the queue using
 // `queueUnlinkedItem()`. Once an item is fully linked it will be published to
 // NATS
-func (r *RequestTracker) startLinking(ctx context.Context) {
+func (qt *QueryTracker) startLinking(ctx context.Context) {
 	// Link items
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case unlinkedItem := <-r.unlinkedItems:
+			case unlinkedItem := <-qt.unlinkedItems:
 				if unlinkedItem != nil {
 					go func(i *sdp.Item) {
-						defer r.unlinkedItemsWG.Done()
+						defer qt.unlinkedItemsWG.Done()
 
 						// Register the item with the handler to ensure that we aren't being called
 						// in a recursive manner. If this fails it means the item has already been
@@ -110,29 +110,29 @@ func (r *RequestTracker) startLinking(ctx context.Context) {
 						// Note that we are only storing pointers to the items so we can still edit
 						// them in other goroutines as long as we are locking appropriately to avoid
 						// race conditions
-						if err := r.registerLinkedItem(i); err != nil {
+						if err := qt.registerLinkedItem(i); err != nil {
 							// If the item is already registered that's okay. We just don't want
 							// to continue
 							return
 						}
 
-						var hasSourceRequest bool
+						var hasSourceQuery bool
 						var itemSubject string
 
 						if metadata := i.GetMetadata(); metadata != nil {
-							if sourceRequest := metadata.GetSourceRequest(); sourceRequest != nil {
-								hasSourceRequest = true
-								itemSubject = sourceRequest.ItemSubject
+							if sourceQuery := metadata.GetSourceQuery(); sourceQuery != nil {
+								hasSourceQuery = true
+								itemSubject = sourceQuery.ItemSubject
 
-								if sourceRequest.GetLinkDepth() > 0 {
+								if sourceQuery.GetLinkDepth() > 0 {
 									// Resolve links
-									r.linkItem(ctx, i)
+									qt.linkItem(ctx, i)
 								}
 							}
 						}
 
 						// Send the fully linked item back onto the network
-						if e := r.Engine; e != nil && hasSourceRequest {
+						if e := qt.Engine; e != nil && hasSourceQuery {
 							if e.IsNATSConnected() {
 								// Respond with the Item
 								err := e.natsConnection.Publish(ctx, itemSubject, i)
@@ -153,10 +153,10 @@ func (r *RequestTracker) startLinking(ctx context.Context) {
 	}()
 }
 
-// linkItem should run all linkedItemRequests that it can and modify the passed
-// item with the results. Removing any linked item requests that were able to
+// linkItem should run all linkedItemQueries that it can and modify the passed
+// item with the results. Removing any linked item queries that were able to
 // execute
-func (r *RequestTracker) linkItem(ctx context.Context, parent *sdp.Item) {
+func (qt *QueryTracker) linkItem(ctx context.Context, parent *sdp.Item) {
 	if ctx.Err() != nil {
 		return
 	}
@@ -164,28 +164,28 @@ func (r *RequestTracker) linkItem(ctx context.Context, parent *sdp.Item) {
 	var lirWG sync.WaitGroup
 	var itemMutex sync.RWMutex
 
-	// Loop over the linked item requests
+	// Loop over the linked item queries
 	itemMutex.RLock()
 
-	lirWG.Add(len(parent.LinkedItemRequests))
+	lirWG.Add(len(parent.LinkedItemQueries))
 
-	for _, lir := range parent.LinkedItemRequests {
-		go func(p *sdp.Item, req *sdp.ItemRequest) {
+	for _, lir := range parent.LinkedItemQueries {
+		go func(p *sdp.Item, req *sdp.Query) {
 			defer lirWG.Done()
 
-			if r.Engine == nil {
+			if qt.Engine == nil {
 				return
 			}
 
 			items := make(chan *sdp.Item)
-			errs := make(chan *sdp.ItemRequestError)
-			requestErr := make(chan error)
+			errs := make(chan *sdp.QueryError)
+			queryErr := make(chan error)
 			var shouldRemove bool
 
 			go func(e chan error) {
 				defer sentry.RecoverWithContext(ctx)
-				e <- r.Engine.ExecuteRequest(ctx, req, items, errs)
-			}(requestErr)
+				e <- qt.Engine.ExecuteQuery(ctx, req, items, errs)
+			}(queryErr)
 
 			for {
 				select {
@@ -195,7 +195,7 @@ func (r *RequestTracker) linkItem(ctx context.Context, parent *sdp.Item) {
 
 						// Add the new items back into the queue to be linked
 						// further if required
-						r.queueUnlinkedItem(li)
+						qt.queueUnlinkedItem(li)
 
 						// Create a reference to the newly found item and attach
 						// to the parent item
@@ -207,9 +207,9 @@ func (r *RequestTracker) linkItem(ctx context.Context, parent *sdp.Item) {
 					}
 				case err, ok := <-errs:
 					if ok {
-						if err.ErrorType == sdp.ItemRequestError_NOTFOUND {
+						if err.ErrorType == sdp.QueryError_NOTFOUND {
 							// If we looked and didn't find the item then
-							// there is no point keeping the request around.
+							// there is no point keeping the query around.
 							// Mark as true so that it's removed from the
 							// item
 							shouldRemove = true
@@ -224,14 +224,14 @@ func (r *RequestTracker) linkItem(ctx context.Context, parent *sdp.Item) {
 				}
 			}
 
-			err := <-requestErr
+			err := <-queryErr
 
 			if err == nil || shouldRemove {
-				// Delete the item request if we were able to resolve it locally
+				// Delete the item query if we were able to resolve it locally
 				// OR it failed to resolve but because we looked and we know it
 				// doesn't exist
 				itemMutex.Lock()
-				p.LinkedItemRequests = deleteItemRequest(p.LinkedItemRequests, req)
+				p.LinkedItemQueries = deleteQuery(p.LinkedItemQueries, req)
 				itemMutex.Unlock()
 			}
 		}(parent, lir)
@@ -242,46 +242,46 @@ func (r *RequestTracker) linkItem(ctx context.Context, parent *sdp.Item) {
 }
 
 // stopLinking Stop linking items in the queue
-func (r *RequestTracker) stopLinking() {
-	r.unlinkedItemsWG.Wait()
-	close(r.unlinkedItems)
+func (qt *QueryTracker) stopLinking() {
+	qt.unlinkedItemsWG.Wait()
+	close(qt.unlinkedItems)
 }
 
-// Execute Executes a given item request and publishes results and errors on the
+// Execute Executes a given item query and publishes results and errors on the
 // relevant nats subjects. Returns the full list of items, errors, and a final
 // error. The final error will be populated if all sources failed, or some other
-// error was encountered while trying run the request
-func (r *RequestTracker) Execute(ctx context.Context) ([]*sdp.Item, []*sdp.ItemRequestError, error) {
-	if r.unlinkedItems == nil {
-		r.unlinkedItems = make(chan *sdp.Item)
+// error was encountered while trying run the query
+func (qt *QueryTracker) Execute(ctx context.Context) ([]*sdp.Item, []*sdp.QueryError, error) {
+	if qt.unlinkedItems == nil {
+		qt.unlinkedItems = make(chan *sdp.Item)
 	}
 
-	if r.Request == nil {
+	if qt.Query == nil {
 		return nil, nil, nil
 	}
 
-	if r.Engine == nil {
+	if qt.Engine == nil {
 		return nil, nil, errors.New("no engine supplied, cannot execute")
 	}
 
 	items := make(chan *sdp.Item)
-	errs := make(chan *sdp.ItemRequestError)
+	errs := make(chan *sdp.QueryError)
 	errChan := make(chan error)
-	sdpErrs := make([]*sdp.ItemRequestError, 0)
+	sdpErrs := make([]*sdp.QueryError, 0)
 
 	// Create context to enforce timeouts
-	ctx, cancel := r.Request.TimeoutContext(ctx)
-	r.cancelFuncMutex.Lock()
-	r.cancelFunc = cancel
-	r.cancelFuncMutex.Unlock()
+	ctx, cancel := qt.Query.TimeoutContext(ctx)
+	qt.cancelFuncMutex.Lock()
+	qt.cancelFunc = cancel
+	qt.cancelFuncMutex.Unlock()
 	defer cancel()
 
-	r.startLinking(ctx)
+	qt.startLinking(ctx)
 
-	// Run the request
+	// Run the query
 	go func(e chan error) {
 		defer sentry.RecoverWithContext(ctx)
-		e <- r.Engine.ExecuteRequest(ctx, r.Request, items, errs)
+		e <- qt.Engine.ExecuteQuery(ctx, qt.Query, items, errs)
 	}(errChan)
 
 	// Process the items and errors as they come in
@@ -291,7 +291,7 @@ func (r *RequestTracker) Execute(ctx context.Context) ([]*sdp.Item, []*sdp.ItemR
 			if ok {
 				// Add to the queue. This will be picked up by other goroutine,
 				// linked and published to NATS once done
-				r.queueUnlinkedItem(item)
+				qt.queueUnlinkedItem(item)
 			} else {
 				items = nil
 			}
@@ -299,15 +299,15 @@ func (r *RequestTracker) Execute(ctx context.Context) ([]*sdp.Item, []*sdp.ItemR
 			if ok {
 				sdpErrs = append(sdpErrs, err)
 
-				if r.Request.ErrorSubject != "" && r.Engine.natsConnection.Underlying() != nil {
-					pubErr := r.Engine.natsConnection.Publish(ctx, r.Request.ErrorSubject, err)
+				if qt.Query.ErrorSubject != "" && qt.Engine.natsConnection.Underlying() != nil {
+					pubErr := qt.Engine.natsConnection.Publish(ctx, qt.Query.ErrorSubject, err)
 
 					if pubErr != nil {
 						// TODO: I probably shouldn't be logging directly here but I
 						// don't want the error to be lost
 						log.WithFields(log.Fields{
 							"error": err,
-						}).Error("Error publishing item request error")
+						}).Error("Error publishing item query error")
 					}
 				}
 			} else {
@@ -322,36 +322,36 @@ func (r *RequestTracker) Execute(ctx context.Context) ([]*sdp.Item, []*sdp.ItemR
 		}
 	}
 
-	// Wait for all of the initial requests to be done processing
-	r.stopLinking()
+	// Wait for all of the initial queries to be done processing
+	qt.stopLinking()
 
 	// Get the result of the execution
 	err := <-errChan
 
 	if err != nil {
-		return r.LinkedItems(), sdpErrs, err
+		return qt.LinkedItems(), sdpErrs, err
 	}
 
-	return r.LinkedItems(), sdpErrs, ctx.Err()
+	return qt.LinkedItems(), sdpErrs, ctx.Err()
 }
 
-// Cancel Cancels the currently running request
-func (r *RequestTracker) Cancel() {
-	r.cancelFuncMutex.Lock()
-	defer r.cancelFuncMutex.Unlock()
+// Cancel Cancels the currently running query
+func (qt *QueryTracker) Cancel() {
+	qt.cancelFuncMutex.Lock()
+	defer qt.cancelFuncMutex.Unlock()
 
-	if r.cancelFunc != nil {
-		r.cancelFunc()
+	if qt.cancelFunc != nil {
+		qt.cancelFunc()
 	}
 }
 
-// deleteItemRequest Deletes an item request from a slice
-func deleteItemRequest(requests []*sdp.ItemRequest, remove *sdp.ItemRequest) []*sdp.ItemRequest {
-	finalRequests := make([]*sdp.ItemRequest, 0)
-	for _, request := range requests {
-		if request != remove {
-			finalRequests = append(finalRequests, request)
+// deleteQuery Deletes an item query from a slice
+func deleteQuery(queries []*sdp.Query, remove *sdp.Query) []*sdp.Query {
+	finalQueries := make([]*sdp.Query, 0)
+	for _, q := range queries {
+		if q != remove {
+			finalQueries = append(finalQueries, q)
 		}
 	}
-	return finalRequests
+	return finalQueries
 }

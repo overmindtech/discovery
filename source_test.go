@@ -39,7 +39,7 @@ func TestGet(t *testing.T) {
 			src.ClearCalls()
 		})
 
-		e.ExecuteRequest(context.Background(), &sdp.ItemRequest{
+		e.ExecuteQuery(context.Background(), &sdp.Query{
 			Type:   "person",
 			Scope:  "test",
 			Query:  "three",
@@ -62,7 +62,7 @@ func TestGet(t *testing.T) {
 			src.ClearCalls()
 		})
 
-		items, errs, err := e.ExecuteRequestSync(context.Background(), &sdp.ItemRequest{
+		items, errs, err := e.ExecuteQuerySync(context.Background(), &sdp.Query{
 			Type:   "person",
 			Scope:  "empty",
 			Query:  "three",
@@ -74,8 +74,8 @@ func TestGet(t *testing.T) {
 		}
 
 		if len(errs) == 1 {
-			if errs[0].ErrorType != sdp.ItemRequestError_NOTFOUND {
-				t.Errorf("expected ErrorType to be %v, got %v", sdp.ItemRequestError_NOTFOUND, errs[0].ErrorType)
+			if errs[0].ErrorType != sdp.QueryError_NOTFOUND {
+				t.Errorf("expected ErrorType to be %v, got %v", sdp.QueryError_NOTFOUND, errs[0].ErrorType)
 			}
 			if errs[0].ErrorString != "not found (test)" {
 				t.Errorf("expected ErrorString to be %v, got %v", "", errs[0].ErrorString)
@@ -113,14 +113,14 @@ func TestGet(t *testing.T) {
 
 		e.cache.MinWaitTime = (10 * time.Millisecond)
 		e.cache.StartPurger(context.Background())
-		req := sdp.ItemRequest{
+		req := sdp.Query{
 			Type:   "person",
 			Scope:  "test",
 			Query:  "Dylan",
 			Method: sdp.RequestMethod_GET,
 		}
 
-		finds1, _, err = e.ExecuteRequestSync(context.Background(), &req)
+		finds1, _, err = e.ExecuteQuerySync(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
@@ -128,26 +128,26 @@ func TestGet(t *testing.T) {
 
 		time.Sleep(20 * time.Millisecond)
 
-		item2, _, err = e.ExecuteRequestSync(context.Background(), &req)
+		item2, _, err = e.ExecuteQuerySync(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
 		}
 
 		if finds1[0].Metadata.Timestamp.String() != item2[0].Metadata.Timestamp.String() {
-			t.Errorf("Get requests 10ms apart had different timestamps, caching not working. %v != %v", finds1[0].Metadata.Timestamp.String(), item2[0].Metadata.Timestamp.String())
+			t.Errorf("Get queries 10ms apart had different timestamps, caching not working. %v != %v", finds1[0].Metadata.Timestamp.String(), item2[0].Metadata.Timestamp.String())
 		}
 
 		time.Sleep(200 * time.Millisecond)
 
-		item3, _, err = e.ExecuteRequestSync(context.Background(), &req)
+		item3, _, err = e.ExecuteQuerySync(context.Background(), &req)
 
 		if err != nil {
 			t.Error(err)
 		}
 
 		if item2[0].Metadata.Timestamp.String() == item3[0].Metadata.Timestamp.String() {
-			t.Error("Get requests 200ms apart had the same timestamps, cache not expiring")
+			t.Error("Get queries 200ms apart had the same timestamps, cache not expiring")
 		}
 	})
 
@@ -156,15 +156,15 @@ func TestGet(t *testing.T) {
 			src.ClearCalls()
 		})
 
-		req := sdp.ItemRequest{
+		req := sdp.Query{
 			Type:   "person",
 			Scope:  "empty",
 			Query:  "query",
 			Method: sdp.RequestMethod_GET,
 		}
 
-		e.ExecuteRequestSync(context.Background(), &req)
-		e.ExecuteRequestSync(context.Background(), &req)
+		e.ExecuteQuerySync(context.Background(), &req)
+		e.ExecuteQuerySync(context.Background(), &req)
 
 		if l := len(src.GetCalls); l != 1 {
 			t.Errorf("Expected 1 Get call due to caching og NOTFOUND errors, got %v", l)
@@ -179,7 +179,7 @@ func TestGet(t *testing.T) {
 		src.IsHidden = true
 
 		t.Run("Get", func(t *testing.T) {
-			item, _, err := e.ExecuteRequestSync(context.Background(), &sdp.ItemRequest{
+			item, _, err := e.ExecuteQuerySync(context.Background(), &sdp.Query{
 				Type:   "person",
 				Scope:  "test",
 				Query:  "three",
@@ -196,7 +196,7 @@ func TestGet(t *testing.T) {
 		})
 
 		t.Run("List", func(t *testing.T) {
-			items, _, err := e.ExecuteRequestSync(context.Background(), &sdp.ItemRequest{
+			items, _, err := e.ExecuteQuerySync(context.Background(), &sdp.Query{
 				Type:   "person",
 				Scope:  "test",
 				Method: sdp.RequestMethod_LIST,
@@ -212,7 +212,7 @@ func TestGet(t *testing.T) {
 		})
 
 		t.Run("Search", func(t *testing.T) {
-			items, _, err := e.ExecuteRequestSync(context.Background(), &sdp.ItemRequest{
+			items, _, err := e.ExecuteQuerySync(context.Background(), &sdp.Query{
 				Type:   "person",
 				Scope:  "test",
 				Query:  "three",
@@ -235,7 +235,7 @@ func TestList(t *testing.T) {
 
 	e := newStartedEngine(t, "TestList", nil, &src)
 
-	e.ExecuteRequestSync(context.Background(), &sdp.ItemRequest{
+	e.ExecuteQuerySync(context.Background(), &sdp.Query{
 		Type:   "person",
 		Scope:  "test",
 		Method: sdp.RequestMethod_LIST,
@@ -257,7 +257,7 @@ func TestSearch(t *testing.T) {
 
 	e := newStartedEngine(t, "TestSearch", nil, &src)
 
-	e.ExecuteRequestSync(context.Background(), &sdp.ItemRequest{
+	e.ExecuteQuerySync(context.Background(), &sdp.Query{
 		Type:   "person",
 		Scope:  "test",
 		Query:  "query",
@@ -298,13 +298,13 @@ func TestListSearchCaching(t *testing.T) {
 		var finds2 []*sdp.Item
 		var finds3 []*sdp.Item
 		var err error
-		req := sdp.ItemRequest{
+		q := sdp.Query{
 			Type:   "person",
 			Scope:  "test",
 			Method: sdp.RequestMethod_LIST,
 		}
 
-		finds1, _, err = e.ExecuteRequestSync(context.Background(), &req)
+		finds1, _, err = e.ExecuteQuerySync(context.Background(), &q)
 
 		if err != nil {
 			t.Error(err)
@@ -312,26 +312,26 @@ func TestListSearchCaching(t *testing.T) {
 
 		time.Sleep(10 * time.Millisecond)
 
-		finds2, _, err = e.ExecuteRequestSync(context.Background(), &req)
+		finds2, _, err = e.ExecuteQuerySync(context.Background(), &q)
 
 		if err != nil {
 			t.Error(err)
 		}
 
 		if finds1[0].Metadata.Timestamp.String() != finds2[0].Metadata.Timestamp.String() {
-			t.Error("List requests 10ms apart had different timestamps, caching not working")
+			t.Error("List queries 10ms apart had different timestamps, caching not working")
 		}
 
 		time.Sleep(200 * time.Millisecond)
 
-		finds3, _, err = e.ExecuteRequestSync(context.Background(), &req)
+		finds3, _, err = e.ExecuteQuerySync(context.Background(), &q)
 
 		if err != nil {
 			t.Error(err)
 		}
 
 		if finds2[0].Metadata.Timestamp.String() == finds3[0].Metadata.Timestamp.String() {
-			t.Error("List requests 200ms apart had the same timestamps, cache not expiring")
+			t.Error("List queries 200ms apart had the same timestamps, cache not expiring")
 		}
 	})
 
@@ -341,13 +341,13 @@ func TestListSearchCaching(t *testing.T) {
 		})
 
 		var err error
-		req := sdp.ItemRequest{
+		q := sdp.Query{
 			Type:   "person",
 			Scope:  "empty",
 			Method: sdp.RequestMethod_LIST,
 		}
 
-		_, _, err = e.ExecuteRequestSync(context.Background(), &req)
+		_, _, err = e.ExecuteQuerySync(context.Background(), &q)
 
 		if err == nil {
 			t.Error("expected error but got nil")
@@ -355,7 +355,7 @@ func TestListSearchCaching(t *testing.T) {
 
 		time.Sleep(10 * time.Millisecond)
 
-		_, _, err = e.ExecuteRequestSync(context.Background(), &req)
+		_, _, err = e.ExecuteQuerySync(context.Background(), &q)
 
 		if err == nil {
 			t.Error("expected error but got nil")
@@ -367,7 +367,7 @@ func TestListSearchCaching(t *testing.T) {
 
 		time.Sleep(200 * time.Millisecond)
 
-		_, _, err = e.ExecuteRequestSync(context.Background(), &req)
+		_, _, err = e.ExecuteQuerySync(context.Background(), &q)
 
 		if err == nil {
 			t.Error("expected error but got nil")
@@ -387,14 +387,14 @@ func TestListSearchCaching(t *testing.T) {
 		var finds2 []*sdp.Item
 		var finds3 []*sdp.Item
 		var err error
-		req := sdp.ItemRequest{
+		q := sdp.Query{
 			Type:   "person",
 			Scope:  "test",
 			Query:  "query",
 			Method: sdp.RequestMethod_SEARCH,
 		}
 
-		finds1, _, err = e.ExecuteRequestSync(context.Background(), &req)
+		finds1, _, err = e.ExecuteQuerySync(context.Background(), &q)
 
 		if err != nil {
 			t.Error(err)
@@ -402,26 +402,26 @@ func TestListSearchCaching(t *testing.T) {
 
 		time.Sleep(10 * time.Millisecond)
 
-		finds2, _, err = e.ExecuteRequestSync(context.Background(), &req)
+		finds2, _, err = e.ExecuteQuerySync(context.Background(), &q)
 
 		if err != nil {
 			t.Error(err)
 		}
 
 		if finds1[0].Metadata.Timestamp.String() != finds2[0].Metadata.Timestamp.String() {
-			t.Error("List requests 10ms apart had different timestamps, caching not working")
+			t.Error("List queries 10ms apart had different timestamps, caching not working")
 		}
 
 		time.Sleep(200 * time.Millisecond)
 
-		finds3, _, err = e.ExecuteRequestSync(context.Background(), &req)
+		finds3, _, err = e.ExecuteQuerySync(context.Background(), &q)
 
 		if err != nil {
 			t.Error(err)
 		}
 
 		if finds2[0].Metadata.Timestamp.String() == finds3[0].Metadata.Timestamp.String() {
-			t.Error("List requests 200ms apart had the same timestamps, cache not expiring")
+			t.Error("List queries 200ms apart had the same timestamps, cache not expiring")
 		}
 	})
 
@@ -431,14 +431,14 @@ func TestListSearchCaching(t *testing.T) {
 		})
 
 		var err error
-		req := sdp.ItemRequest{
+		q := sdp.Query{
 			Type:   "person",
 			Scope:  "empty",
 			Query:  "query",
 			Method: sdp.RequestMethod_SEARCH,
 		}
 
-		_, _, err = e.ExecuteRequestSync(context.Background(), &req)
+		_, _, err = e.ExecuteQuerySync(context.Background(), &q)
 
 		if err == nil {
 			t.Error("expected error but got nil")
@@ -446,7 +446,7 @@ func TestListSearchCaching(t *testing.T) {
 
 		time.Sleep(10 * time.Millisecond)
 
-		_, _, err = e.ExecuteRequestSync(context.Background(), &req)
+		_, _, err = e.ExecuteQuerySync(context.Background(), &q)
 
 		if err == nil {
 			t.Error("expected error but got nil")
@@ -458,7 +458,7 @@ func TestListSearchCaching(t *testing.T) {
 
 		time.Sleep(200 * time.Millisecond)
 
-		_, _, err = e.ExecuteRequestSync(context.Background(), &req)
+		_, _, err = e.ExecuteQuerySync(context.Background(), &q)
 
 		if err == nil {
 			t.Error("expected error but got nil")
@@ -474,15 +474,15 @@ func TestListSearchCaching(t *testing.T) {
 			src.ClearCalls()
 		})
 
-		req := sdp.ItemRequest{
+		q := sdp.Query{
 			Type:   "person",
 			Scope:  "error",
 			Query:  "query",
 			Method: sdp.RequestMethod_GET,
 		}
 
-		e.ExecuteRequestSync(context.Background(), &req)
-		e.ExecuteRequestSync(context.Background(), &req)
+		e.ExecuteQuerySync(context.Background(), &q)
+		e.ExecuteQuerySync(context.Background(), &q)
 
 		if l := len(src.GetCalls); l != 2 {
 			t.Errorf("Expected 2 get calls, got %v, OTHER errors should not be cached", l)
@@ -494,25 +494,25 @@ func TestListSearchCaching(t *testing.T) {
 			src.ClearCalls()
 		})
 
-		req := sdp.ItemRequest{
+		q := sdp.Query{
 			Type:   "person",
 			Scope:  "error",
 			Query:  "query",
 			Method: sdp.RequestMethod_GET,
 		}
 
-		e.ExecuteRequestSync(context.Background(), &req)
-		e.ExecuteRequestSync(context.Background(), &req)
+		e.ExecuteQuerySync(context.Background(), &q)
+		e.ExecuteQuerySync(context.Background(), &q)
 
-		req.Method = sdp.RequestMethod_LIST
+		q.Method = sdp.RequestMethod_LIST
 
-		e.ExecuteRequestSync(context.Background(), &req)
-		e.ExecuteRequestSync(context.Background(), &req)
+		e.ExecuteQuerySync(context.Background(), &q)
+		e.ExecuteQuerySync(context.Background(), &q)
 
-		req.Method = sdp.RequestMethod_SEARCH
+		q.Method = sdp.RequestMethod_SEARCH
 
-		e.ExecuteRequestSync(context.Background(), &req)
-		e.ExecuteRequestSync(context.Background(), &req)
+		e.ExecuteQuerySync(context.Background(), &q)
+		e.ExecuteQuerySync(context.Background(), &q)
 
 		if l := len(src.GetCalls); l != 2 {
 			t.Errorf("Exected 2 get calls, got %v", l)
@@ -548,18 +548,18 @@ func TestSearchGetCaching(t *testing.T) {
 		})
 
 		var searchResult []*sdp.Item
-		var searchErrors []*sdp.ItemRequestError
+		var searchErrors []*sdp.QueryError
 		var getResult []*sdp.Item
-		var getErrors []*sdp.ItemRequestError
+		var getErrors []*sdp.QueryError
 		var err error
-		req := sdp.ItemRequest{
+		q := sdp.Query{
 			Type:   "person",
 			Scope:  "test",
 			Query:  "Dylan",
 			Method: sdp.RequestMethod_SEARCH,
 		}
 
-		searchResult, searchErrors, err = e.ExecuteRequestSync(context.Background(), &req)
+		searchResult, searchErrors, err = e.ExecuteQuerySync(context.Background(), &q)
 
 		if err != nil {
 			t.Error(err)
@@ -577,11 +577,11 @@ func TestSearchGetCaching(t *testing.T) {
 
 		time.Sleep(10 * time.Millisecond)
 
-		// Do a get request for that same item
-		req.Method = sdp.RequestMethod_GET
-		req.Query = searchResult[0].UniqueAttributeValue()
+		// Do a get query for that same item
+		q.Method = sdp.RequestMethod_GET
+		q.Query = searchResult[0].UniqueAttributeValue()
 
-		getResult, getErrors, err = e.ExecuteRequestSync(context.Background(), &req)
+		getResult, getErrors, err = e.ExecuteQuerySync(context.Background(), &q)
 
 		if err != nil {
 			t.Error(err)

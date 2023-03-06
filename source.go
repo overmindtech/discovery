@@ -36,7 +36,7 @@ type Source interface {
 
 	// Weight Returns the priority weighting of items returned by this source.
 	// This is used to resolve conflicts where two sources of the same type
-	// return an item for a GET request. In this instance only one item can be
+	// return an item for a GET query. In this instance only one item can be
 	// sen on, so the one with the higher weight value will win.
 	Weight() int
 }

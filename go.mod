@@ -10,9 +10,9 @@ require (
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats-server/v2 v2.9.14
 	github.com/nats-io/nats.go v1.24.0
-	github.com/overmindtech/connect v0.8.3
-	github.com/overmindtech/sdp-go v0.17.0
-	github.com/overmindtech/sdpcache v1.2.1
+	github.com/overmindtech/connect v0.8.4
+	github.com/overmindtech/sdp-go v0.18.1
+	github.com/overmindtech/sdpcache v1.2.2
 	github.com/sirupsen/logrus v1.9.0
 	github.com/sourcegraph/conc v0.3.0 // use latest `main` to avoid heavy dependency chain
 	go.opentelemetry.io/otel v1.14.0
