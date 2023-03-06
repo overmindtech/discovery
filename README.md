@@ -11,10 +11,10 @@ This library is currently under development and documentation can be found on [p
 
 ## Engine
 
-The engine is responsible for managing all communication over NATS, handling requests, reporting on progress, caching etc. Authors of sources should only need to do the following in order to have a functional source:
+The engine is responsible for managing all communication over NATS, handling queries, reporting on progress, caching etc. Authors of sources should only need to do the following in order to have a functional source:
 
 * Give the engine a name
-    * Note that this name is used as the `Responder` when responding to requests, this means that this name should be unique as if there are multiple responders with the same name, users will not be able to properly track the progress of their requests
+    * Note that this name is used as the `Responder` when responding to queries, this means that this name should be unique as if there are multiple responders with the same name, users will not be able to properly track the progress of their queries
 * Provide the engine with config
 * Manage the engine's lifecycle (start and stop it)
 
@@ -36,13 +36,13 @@ var trigger = Trigger{
     // UniqueAttributeValueRegex match
     UniqueAttributeValueRegex: regexp.MustCompile(`^[Dd]ylan$`),
     // When both of the above match, the below function will be called, this
-    // function should return the request that should be forwarded to the
+    // function should return the query that should be forwarded to the
     // engine that the trigger is registered with
-    RequestGenerator: func(in *sdp.Item) (*sdp.ItemRequest, error) {
+    QueryGenerator: func(in *sdp.Item) (*sdp.Query, error) {
         if in.GetScope() != "something" {
             return nil, errors.New("only 'something' scope supported")
         } else {
-            return &sdp.ItemRequest{
+            return &sdp.Query{
                 Type:   "dog",
                 Method: sdp.RequestMethod_SEARCH,
                 Query:  "pug",
@@ -52,7 +52,7 @@ var trigger = Trigger{
 }
 ```
 
-When the above trigger fires it will result in the engine that it is assigned to processing a SEARCH request as defined above. Note that while only the `Type`, `Method` and `Query` attributes have been specified, the rest will be filled in automatically with data from the `Metadata.SourceRequest` of the originating item to ensure that the responses are sent to the user that originated the request.
+When the above trigger fires it will result in the engine that it is assigned to processing a SEARCH query as defined above. Note that while only the `Type`, `Method` and `Query` attributes have been specified, the rest will be filled in automatically with data from the `Metadata.SourceQuery` of the originating item to ensure that the responses are sent to the user that originated the query.
 
 ## Default Sources
 

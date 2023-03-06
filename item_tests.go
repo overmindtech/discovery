@@ -30,7 +30,7 @@ Type names should match RFC1123 (lower case). This means the name must:
 	* contain at most 63 characters
 	* contain only lowercase alphanumeric characters or '-'
 	* start with an alphanumeric character
-	* end with an alphanumeric character	
+	* end with an alphanumeric character
 `
 
 		t.Errorf("Item type %v is invalid. %v", i.GetType(), pattern)
@@ -71,19 +71,19 @@ Type names should match RFC1123 (lower case). This means the name must:
 		// it will just inherit the scope of the parent
 	}
 
-	for index, linkedItemRequest := range i.GetLinkedItemRequests() {
-		if linkedItemRequest.GetType() == "" {
-			t.Errorf("LinkedItemRequest %v of item %v has empty type", index, i.GloballyUniqueName())
+	for index, linkedItemQuery := range i.GetLinkedItemQueries() {
+		if linkedItemQuery.GetType() == "" {
+			t.Errorf("LinkedItemQuery %v of item %v has empty type", index, i.GloballyUniqueName())
 		}
 
-		if linkedItemRequest.GetMethod() != sdp.RequestMethod_LIST {
-			if linkedItemRequest.GetQuery() == "" {
-				t.Errorf("LinkedItemRequest %v of item %v has empty query. This is not allowed unless the method is LIST", index, i.GloballyUniqueName())
+		if linkedItemQuery.GetMethod() != sdp.RequestMethod_LIST {
+			if linkedItemQuery.GetQuery() == "" {
+				t.Errorf("LinkedItemQuery %v of item %v has empty query. This is not allowed unless the method is LIST", index, i.GloballyUniqueName())
 			}
 		}
 
-		if linkedItemRequest.GetScope() == "" {
-			t.Errorf("LinkedItemRequest %v of item %v has empty scope", index, i.GloballyUniqueName())
+		if linkedItemQuery.GetScope() == "" {
+			t.Errorf("LinkedItemQuery %v of item %v has empty scope", index, i.GloballyUniqueName())
 		}
 	}
 }

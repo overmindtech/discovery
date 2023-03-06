@@ -55,7 +55,7 @@ func (s *SpeedTestSource) Get(ctx context.Context, scope string, query string) (
 					},
 				},
 			},
-			LinkedItemRequests: []*sdp.ItemRequest{
+			LinkedItemQueries: []*sdp.Query{
 				{
 					Type:   "person",
 					Method: sdp.RequestMethod_GET,
@@ -66,8 +66,8 @@ func (s *SpeedTestSource) Get(ctx context.Context, scope string, query string) (
 			Scope: scope,
 		}, nil
 	case <-ctx.Done():
-		return nil, &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_TIMEOUT,
+		return nil, &sdp.QueryError{
+			ErrorType:   sdp.QueryError_TIMEOUT,
 			ErrorString: ctx.Err().Error(),
 			Scope:       scope,
 		}
@@ -98,9 +98,9 @@ func TestExecute(t *testing.T) {
 	t.Run("Without linking", func(t *testing.T) {
 		t.Parallel()
 
-		rt := RequestTracker{
+		qt := QueryTracker{
 			Engine: e,
-			Request: &sdp.ItemRequest{
+			Query: &sdp.Query{
 				Type:      "person",
 				Method:    sdp.RequestMethod_GET,
 				Query:     "Dylan",
@@ -109,7 +109,7 @@ func TestExecute(t *testing.T) {
 			},
 		}
 
-		items, errs, err := rt.Execute(context.Background())
+		items, errs, err := qt.Execute(context.Background())
 
 		if err != nil {
 			t.Error(err)
@@ -127,9 +127,9 @@ func TestExecute(t *testing.T) {
 	t.Run("With linking", func(t *testing.T) {
 		t.Parallel()
 
-		rt := RequestTracker{
+		qt := QueryTracker{
 			Engine: e,
-			Request: &sdp.ItemRequest{
+			Query: &sdp.Query{
 				Type:      "person",
 				Method:    sdp.RequestMethod_GET,
 				Query:     "Dylan",
@@ -138,7 +138,7 @@ func TestExecute(t *testing.T) {
 			},
 		}
 
-		items, errs, err := rt.Execute(context.Background())
+		items, errs, err := qt.Execute(context.Background())
 
 		if err != nil {
 			t.Error(err)
@@ -156,9 +156,9 @@ func TestExecute(t *testing.T) {
 	t.Run("With no engine", func(t *testing.T) {
 		t.Parallel()
 
-		rt := RequestTracker{
+		qt := QueryTracker{
 			Engine: nil,
-			Request: &sdp.ItemRequest{
+			Query: &sdp.Query{
 				Type:      "person",
 				Method:    sdp.RequestMethod_GET,
 				Query:     "Dylan",
@@ -167,21 +167,21 @@ func TestExecute(t *testing.T) {
 			},
 		}
 
-		_, _, err := rt.Execute(context.Background())
+		_, _, err := qt.Execute(context.Background())
 
 		if err == nil {
 			t.Error("expected error but got nil")
 		}
 	})
 
-	t.Run("With no requests", func(t *testing.T) {
+	t.Run("With no queries", func(t *testing.T) {
 		t.Parallel()
 
-		rt := RequestTracker{
+		qt := QueryTracker{
 			Engine: e,
 		}
 
-		_, _, err := rt.Execute(context.Background())
+		_, _, err := qt.Execute(context.Background())
 
 		if err != nil {
 			t.Error(err)
@@ -199,9 +199,9 @@ func TestTimeout(t *testing.T) {
 	t.Run("With a timeout, but not exceeding it", func(t *testing.T) {
 		t.Parallel()
 
-		rt := RequestTracker{
+		qt := QueryTracker{
 			Engine: e,
-			Request: &sdp.ItemRequest{
+			Query: &sdp.Query{
 				Type:      "person",
 				Method:    sdp.RequestMethod_GET,
 				Query:     "Dylan",
@@ -211,7 +211,7 @@ func TestTimeout(t *testing.T) {
 			},
 		}
 
-		items, errs, err := rt.Execute(context.Background())
+		items, errs, err := qt.Execute(context.Background())
 
 		if err != nil {
 			t.Error(err)
@@ -229,9 +229,9 @@ func TestTimeout(t *testing.T) {
 	t.Run("With a timeout that is exceeded", func(t *testing.T) {
 		t.Parallel()
 
-		rt := RequestTracker{
+		qt := QueryTracker{
 			Engine: e,
-			Request: &sdp.ItemRequest{
+			Query: &sdp.Query{
 				Type:      "person",
 				Method:    sdp.RequestMethod_GET,
 				Query:     "somethingElse",
@@ -241,7 +241,7 @@ func TestTimeout(t *testing.T) {
 			},
 		}
 
-		_, _, err := rt.Execute(context.Background())
+		_, _, err := qt.Execute(context.Background())
 
 		if err == nil {
 			t.Error("Expected timout but got no error")
@@ -249,9 +249,9 @@ func TestTimeout(t *testing.T) {
 	})
 
 	t.Run("With linking that exceeds the timout", func(t *testing.T) {
-		rt := RequestTracker{
+		qt := QueryTracker{
 			Engine: e,
-			Request: &sdp.ItemRequest{
+			Query: &sdp.Query{
 				Type:      "person",
 				Method:    sdp.RequestMethod_GET,
 				Query:     "somethingElse1",
@@ -261,7 +261,7 @@ func TestTimeout(t *testing.T) {
 			},
 		}
 
-		items, errs, err := rt.Execute(context.Background())
+		items, errs, err := qt.Execute(context.Background())
 
 		if err == nil {
 			t.Error("Expected timeout but got no error")
@@ -282,9 +282,9 @@ func TestCancel(t *testing.T) {
 
 	u := uuid.New()
 
-	rt := RequestTracker{
+	qt := QueryTracker{
 		Engine: e,
-		Request: &sdp.ItemRequest{
+		Query: &sdp.Query{
 			Type:      "person",
 			Method:    sdp.RequestMethod_GET,
 			Query:     "somethingElse1",
@@ -300,14 +300,14 @@ func TestCancel(t *testing.T) {
 	var err error
 	wg.Add(1)
 	go func() {
-		items, _, err = rt.Execute(context.Background())
+		items, _, err = qt.Execute(context.Background())
 		wg.Done()
 	}()
 
 	// Give it some time to populate the cancelFunc
 	time.Sleep(100 * time.Millisecond)
 
-	rt.Cancel()
+	qt.Cancel()
 
 	wg.Wait()
 

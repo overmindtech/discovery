@@ -10,9 +10,9 @@ import (
 // if someone is waiting) blocks all other get locks until it unlocks.
 //
 // The intended usage of this is that it will allow a source which is trying to
-// process many requests at once, to process a LIST request before any GET
-// requests, since it's likely that once LIST has been run, subsequent GET
-// requests will be able to be served from cache
+// process many queries at once, to process a LIST query before any GET
+// queries, since it's likely that once LIST has been run, subsequent GET
+// queries will be able to be served from cache
 type GetListMutex struct {
 	mutexMap map[string]*sync.RWMutex
 	mapLock  sync.Mutex

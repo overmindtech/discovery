@@ -45,7 +45,7 @@ func (s *TestSource) NewTestItem(scope string, query string) *sdp.Item {
 				},
 			},
 		},
-		LinkedItemRequests: []*sdp.ItemRequest{
+		LinkedItemQueries: []*sdp.Query{
 			{
 				Type:   "person",
 				Method: sdp.RequestMethod_GET,
@@ -111,14 +111,14 @@ func (s *TestSource) Get(ctx context.Context, scope string, query string) (*sdp.
 
 	switch scope {
 	case "empty":
-		return nil, &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_NOTFOUND,
+		return nil, &sdp.QueryError{
+			ErrorType:   sdp.QueryError_NOTFOUND,
 			ErrorString: "not found (test)",
 			Scope:       scope,
 		}
 	case "error":
-		return nil, &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_OTHER,
+		return nil, &sdp.QueryError{
+			ErrorType:   sdp.QueryError_OTHER,
 			ErrorString: "Error for testing",
 			Scope:       scope,
 		}
@@ -134,14 +134,14 @@ func (s *TestSource) List(ctx context.Context, scope string) ([]*sdp.Item, error
 
 	switch scope {
 	case "empty":
-		return nil, &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_NOTFOUND,
+		return nil, &sdp.QueryError{
+			ErrorType:   sdp.QueryError_NOTFOUND,
 			ErrorString: "no items found",
 			Scope:       scope,
 		}
 	case "error":
-		return nil, &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_OTHER,
+		return nil, &sdp.QueryError{
+			ErrorType:   sdp.QueryError_OTHER,
 			ErrorString: "Error for testing",
 			Scope:       scope,
 		}
@@ -158,14 +158,14 @@ func (s *TestSource) Search(ctx context.Context, scope string, query string) ([]
 
 	switch scope {
 	case "empty":
-		return nil, &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_NOTFOUND,
+		return nil, &sdp.QueryError{
+			ErrorType:   sdp.QueryError_NOTFOUND,
 			ErrorString: "no items found",
 			Scope:       scope,
 		}
 	case "error":
-		return nil, &sdp.ItemRequestError{
-			ErrorType:   sdp.ItemRequestError_OTHER,
+		return nil, &sdp.QueryError{
+			ErrorType:   sdp.QueryError_OTHER,
 			ErrorString: "Error for testing",
 			Scope:       scope,
 		}

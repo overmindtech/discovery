@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -11,13 +12,13 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
-func TestExecuteRequest(t *testing.T) {
+func TestExecuteQuery(t *testing.T) {
 	src := TestSource{
 		ReturnType:   "person",
 		ReturnScopes: []string{"test"},
 	}
 
-	e := newStartedEngine(t, "TestExecuteRequest",
+	e := newStartedEngine(t, "TestExecuteQuery",
 		&connect.NATSOptions{
 			Servers:           NatsTestURLs,
 			ConnectionName:    "test-connection",
@@ -27,8 +28,8 @@ func TestExecuteRequest(t *testing.T) {
 		&src,
 	)
 
-	t.Run("Basic happy-path Get request", func(t *testing.T) {
-		request := &sdp.ItemRequest{
+	t.Run("Basic happy-path Get query", func(t *testing.T) {
+		q := &sdp.Query{
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
 			Query:           "foo",
@@ -38,7 +39,7 @@ func TestExecuteRequest(t *testing.T) {
 			ResponseSubject: "responses",
 		}
 
-		items, errs, err := e.ExecuteRequestSync(context.Background(), request)
+		items, errs, err := e.ExecuteQuerySync(context.Background(), q)
 
 		if err != nil {
 			t.Error(err)
@@ -57,28 +58,31 @@ func TestExecuteRequest(t *testing.T) {
 		}
 
 		item := items[0]
-		itemRequest := item.LinkedItemRequests[0]
+		query := item.LinkedItemQueries[0]
 
-		if ld := itemRequest.LinkDepth; ld != 2 {
+		if ld := query.LinkDepth; ld != 2 {
 			t.Errorf("expected linked item depth to be 1 less than the query (2), got %v", ld)
 		}
 
-		if is := itemRequest.ItemSubject; is != "items" {
-			t.Errorf("expected linked item request itemsubject to be \"items\" got %v", is)
+		if is := query.ItemSubject; is != "items" {
+			t.Errorf("expected linked item query itemsubject to be \"items\" got %v", is)
 		}
 
-		if is := itemRequest.ResponseSubject; is != "responses" {
-			t.Errorf("expected linked item request ResponseSubject to be \"responses\" got %v", is)
+		if is := query.ResponseSubject; is != "responses" {
+			t.Errorf("expected linked item query ResponseSubject to be \"responses\" got %v", is)
 		}
 
-		if item.Metadata.SourceRequest != request {
-			t.Error("source request mismatch")
+		if item.Metadata.SourceQuery != q {
+			t.Error("source query mismatch")
 		}
 
+		if !bytes.Equal(item.Metadata.SourceQueryUUID, q.UUID) {
+			t.Error("source query UUID mismatch")
+		}
 	})
 
-	t.Run("Wrong scope Get request", func(t *testing.T) {
-		request := &sdp.ItemRequest{
+	t.Run("Wrong scope Get query", func(t *testing.T) {
+		q := &sdp.Query{
 			Type:      "person",
 			Method:    sdp.RequestMethod_GET,
 			Query:     "foo",
@@ -86,14 +90,14 @@ func TestExecuteRequest(t *testing.T) {
 			LinkDepth: 0,
 		}
 
-		_, errs, err := e.ExecuteRequestSync(context.Background(), request)
+		_, errs, err := e.ExecuteQuerySync(context.Background(), q)
 
 		if err == nil {
 			t.Error("expected error but got nil")
 		}
 
 		if len(errs) == 1 {
-			if errs[0].ErrorType != sdp.ItemRequestError_NOSCOPE {
+			if errs[0].ErrorType != sdp.QueryError_NOSCOPE {
 				t.Errorf("expected error type to be NOSCOPE, got %v", errs[0].ErrorType)
 			}
 		} else {
@@ -102,8 +106,8 @@ func TestExecuteRequest(t *testing.T) {
 
 	})
 
-	t.Run("Wrong type Get request", func(t *testing.T) {
-		request := &sdp.ItemRequest{
+	t.Run("Wrong type Get query", func(t *testing.T) {
+		q := &sdp.Query{
 			Type:      "house",
 			Method:    sdp.RequestMethod_GET,
 			Query:     "foo",
@@ -111,14 +115,14 @@ func TestExecuteRequest(t *testing.T) {
 			LinkDepth: 0,
 		}
 
-		_, errs, err := e.ExecuteRequestSync(context.Background(), request)
+		_, errs, err := e.ExecuteQuerySync(context.Background(), q)
 
 		if err == nil {
 			t.Error("expected erro but got nil")
 		}
 
 		if len(errs) == 1 {
-			if errs[0].ErrorType != sdp.ItemRequestError_NOSCOPE {
+			if errs[0].ErrorType != sdp.QueryError_NOSCOPE {
 				t.Errorf("expected error type to be NOSCOPE, got %v", errs[0].ErrorType)
 			}
 		} else {
@@ -126,15 +130,15 @@ func TestExecuteRequest(t *testing.T) {
 		}
 	})
 
-	t.Run("Basic List request", func(t *testing.T) {
-		request := &sdp.ItemRequest{
+	t.Run("Basic List query", func(t *testing.T) {
+		q := &sdp.Query{
 			Type:      "person",
 			Method:    sdp.RequestMethod_LIST,
 			Scope:     "test",
 			LinkDepth: 5,
 		}
 
-		items, errs, err := e.ExecuteRequestSync(context.Background(), request)
+		items, errs, err := e.ExecuteQuerySync(context.Background(), q)
 
 		if err != nil {
 			t.Error(err)
@@ -149,8 +153,8 @@ func TestExecuteRequest(t *testing.T) {
 		}
 	})
 
-	t.Run("Basic Search request", func(t *testing.T) {
-		request := &sdp.ItemRequest{
+	t.Run("Basic Search query", func(t *testing.T) {
+		q := &sdp.Query{
 			Type:      "person",
 			Method:    sdp.RequestMethod_SEARCH,
 			Query:     "TEST",
@@ -158,7 +162,7 @@ func TestExecuteRequest(t *testing.T) {
 			LinkDepth: 5,
 		}
 
-		items, errs, err := e.ExecuteRequestSync(context.Background(), request)
+		items, errs, err := e.ExecuteQuerySync(context.Background(), q)
 
 		if err != nil {
 			t.Error(err)
@@ -175,7 +179,7 @@ func TestExecuteRequest(t *testing.T) {
 
 }
 
-func TestHandleItemRequest(t *testing.T) {
+func TestHandleQuery(t *testing.T) {
 	personSource := TestSource{
 		ReturnType: "person",
 		ReturnScopes: []string{
@@ -193,7 +197,7 @@ func TestHandleItemRequest(t *testing.T) {
 		},
 	}
 
-	e := newStartedEngine(t, "TestHandleItemRequest", nil, &personSource, &dogSource)
+	e := newStartedEngine(t, "TestHandleQuery", nil, &personSource, &dogSource)
 
 	t.Run("Wildcard type should be expanded", func(t *testing.T) {
 		t.Cleanup(func() {
@@ -201,7 +205,7 @@ func TestHandleItemRequest(t *testing.T) {
 			dogSource.ClearCalls()
 		})
 
-		req := sdp.ItemRequest{
+		req := sdp.Query{
 			Type:      sdp.WILDCARD,
 			Method:    sdp.RequestMethod_GET,
 			Query:     "Dylan",
@@ -210,9 +214,9 @@ func TestHandleItemRequest(t *testing.T) {
 		}
 
 		// Run the handler
-		e.HandleItemRequest(context.Background(), &req)
+		e.HandleQuery(context.Background(), &req)
 
-		// I'm expecting both sources to get a request since the type was *
+		// I'm expecting both sources to get a query since the type was *
 		if l := len(personSource.GetCalls); l != 1 {
 			t.Errorf("expected person backend to have 1 Get call, got %v", l)
 		}
@@ -228,7 +232,7 @@ func TestHandleItemRequest(t *testing.T) {
 			dogSource.ClearCalls()
 		})
 
-		req := sdp.ItemRequest{
+		req := sdp.Query{
 			Type:      "person",
 			Method:    sdp.RequestMethod_GET,
 			Query:     "Dylan1",
@@ -237,7 +241,7 @@ func TestHandleItemRequest(t *testing.T) {
 		}
 
 		// Run the handler
-		e.HandleItemRequest(context.Background(), &req)
+		e.HandleQuery(context.Background(), &req)
 
 		if l := len(personSource.GetCalls); l != 2 {
 			t.Errorf("expected person backend to have 2 Get calls, got %v", l)
@@ -261,8 +265,8 @@ func TestWildcardSourceExpansion(t *testing.T) {
 
 	e := newStartedEngine(t, "TestWildcardSourceExpansion", nil, &personSource)
 
-	t.Run("request scope should be preserved", func(t *testing.T) {
-		req := sdp.ItemRequest{
+	t.Run("query scope should be preserved", func(t *testing.T) {
+		req := sdp.Query{
 			Type:      "person",
 			Method:    sdp.RequestMethod_GET,
 			Query:     "Dylan1",
@@ -271,7 +275,7 @@ func TestWildcardSourceExpansion(t *testing.T) {
 		}
 
 		// Run the handler
-		e.HandleItemRequest(context.Background(), &req)
+		e.HandleQuery(context.Background(), &req)
 
 		if len(personSource.GetCalls) != 1 {
 			t.Errorf("expected 1 get call got %v", len(personSource.GetCalls))
@@ -289,7 +293,7 @@ func TestWildcardSourceExpansion(t *testing.T) {
 	})
 }
 
-func TestSendRequestSync(t *testing.T) {
+func TestSendQuerySync(t *testing.T) {
 	SkipWithoutNats(t)
 
 	src := TestSource{
@@ -299,15 +303,15 @@ func TestSendRequestSync(t *testing.T) {
 		},
 	}
 
-	e := newStartedEngine(t, "TestSendRequestSync", nil, &src)
+	e := newStartedEngine(t, "TestSendQuerySync", nil, &src)
 
 	for i := 0; i < 250; i++ {
 		u := uuid.New()
 
-		var progress *sdp.RequestProgress
+		var progress *sdp.QueryProgress
 		var items []*sdp.Item
 
-		progress = sdp.NewRequestProgress(&sdp.ItemRequest{
+		progress = sdp.NewQueryProgress(&sdp.Query{
 			Type:            "person",
 			Method:          sdp.RequestMethod_GET,
 			Query:           "Dylan",
@@ -344,16 +348,16 @@ func TestSendRequestSync(t *testing.T) {
 
 }
 
-func TestExpandRequest(t *testing.T) {
+func TestExpandQuery(t *testing.T) {
 	t.Run("with a single source with a single scope", func(t *testing.T) {
 		simple := TestSource{
 			ReturnScopes: []string{
 				"test1",
 			},
 		}
-		e := newStartedEngine(t, "TestExpandRequest", nil, &simple)
+		e := newStartedEngine(t, "TestExpandQuery", nil, &simple)
 
-		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
+		e.HandleQuery(context.Background(), &sdp.Query{
 			Type:   "person",
 			Method: sdp.RequestMethod_GET,
 			Query:  "Debby",
@@ -374,9 +378,9 @@ func TestExpandRequest(t *testing.T) {
 				"test3",
 			},
 		}
-		e := newStartedEngine(t, "TestExpandRequest", nil, &many)
+		e := newStartedEngine(t, "TestExpandQuery", nil, &many)
 
-		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
+		e.HandleQuery(context.Background(), &sdp.Query{
 			Type:   "person",
 			Method: sdp.RequestMethod_GET,
 			Query:  "Debby",
@@ -402,9 +406,9 @@ func TestExpandRequest(t *testing.T) {
 				"test2",
 			},
 		}
-		e := newStartedEngine(t, "TestExpandRequest", nil, &sx, &sy)
+		e := newStartedEngine(t, "TestExpandQuery", nil, &sx, &sy)
 
-		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
+		e.HandleQuery(context.Background(), &sdp.Query{
 			Type:   "person",
 			Method: sdp.RequestMethod_GET,
 			Query:  "Daniel",
@@ -439,9 +443,9 @@ func TestExpandRequest(t *testing.T) {
 			},
 		}
 
-		e := newStartedEngine(t, "TestExpandRequest", nil, &sx, &sy)
+		e := newStartedEngine(t, "TestExpandQuery", nil, &sx, &sy)
 
-		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
+		e.HandleQuery(context.Background(), &sdp.Query{
 			Type:   "person",
 			Method: sdp.RequestMethod_GET,
 			Query:  "Steven",
@@ -478,9 +482,9 @@ func TestExpandRequest(t *testing.T) {
 			ReturnWeight: 11,
 		}
 
-		e := newStartedEngine(t, "TestExpandRequest", nil, &sx, &sy)
+		e := newStartedEngine(t, "TestExpandQuery", nil, &sx, &sy)
 
-		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
+		e.HandleQuery(context.Background(), &sdp.Query{
 			Type:   "person",
 			Method: sdp.RequestMethod_GET,
 			Query:  "Jane",
@@ -515,9 +519,9 @@ func TestExpandRequest(t *testing.T) {
 			},
 		}
 
-		e := newStartedEngine(t, "TestExpandRequest", nil, &sx, &sy)
+		e := newStartedEngine(t, "TestExpandQuery", nil, &sx, &sy)
 
-		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
+		e.HandleQuery(context.Background(), &sdp.Query{
 			Type:   "person",
 			Method: sdp.RequestMethod_LIST,
 			Query:  "Jane",
@@ -541,9 +545,9 @@ func TestExpandRequest(t *testing.T) {
 			},
 		}
 
-		e := newStartedEngine(t, "TestExpandRequest", nil, &sx)
+		e := newStartedEngine(t, "TestExpandQuery", nil, &sx)
 
-		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
+		e.HandleQuery(context.Background(), &sdp.Query{
 			Type:   "person",
 			Method: sdp.RequestMethod_LIST,
 			Query:  "Rachel",
@@ -577,9 +581,9 @@ func TestExpandRequest(t *testing.T) {
 			},
 		}
 
-		e := newStartedEngine(t, "TestExpandRequest", nil, &sx, &sy, &sz)
+		e := newStartedEngine(t, "TestExpandQuery", nil, &sx, &sy, &sz)
 
-		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
+		e.HandleQuery(context.Background(), &sdp.Query{
 			Type:   "person",
 			Method: sdp.RequestMethod_LIST,
 			Query:  "Ross",
@@ -622,9 +626,9 @@ func TestExpandRequest(t *testing.T) {
 			},
 		}
 
-		e := newStartedEngine(t, "TestExpandRequest", nil, &sx, &sy, &sz)
+		e := newStartedEngine(t, "TestExpandQuery", nil, &sx, &sy, &sz)
 
-		e.HandleItemRequest(context.Background(), &sdp.ItemRequest{
+		e.HandleQuery(context.Background(), &sdp.Query{
 			Type:   "person",
 			Method: sdp.RequestMethod_LIST,
 			Query:  "Ross",
