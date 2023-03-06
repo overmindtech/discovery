@@ -154,7 +154,7 @@ func (e *Engine) ExecuteQuerySync(ctx context.Context, q *sdp.Query) ([]*sdp.Ite
 // Note that if these channels are not buffered, something will need to be
 // receiving the results or this method will never finish. If results are not
 // required the channels can be nil
-func (e *Engine) ExecuteQuery(ctx context.Context, q *sdp.Query, items chan<- *sdp.Item, errs chan<- *sdp.QueryError) error {
+func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<- *sdp.Item, errs chan<- *sdp.QueryError) error {
 	// Make sure we close channels once we're done
 	if items != nil {
 		defer close(items)
@@ -167,13 +167,13 @@ func (e *Engine) ExecuteQuery(ctx context.Context, q *sdp.Query, items chan<- *s
 		return ctx.Err()
 	}
 
-	expanded := e.sh.ExpandQuery(q)
+	expanded := e.sh.ExpandQuery(query)
 
 	if len(expanded) == 0 {
 		errs <- &sdp.QueryError{
 			ErrorType:   sdp.QueryError_NOSCOPE,
 			ErrorString: "no matching sources found",
-			Scope:       q.Scope,
+			Scope:       query.Scope,
 		}
 
 		return errors.New("no matching sources found")
@@ -186,10 +186,10 @@ func (e *Engine) ExecuteQuery(ctx context.Context, q *sdp.Query, items chan<- *s
 	// Since we need to wait for only the processing of this query's executions, we need a separate WaitGroup here
 	// Overall MaxParallelExecutions evaluation is handled by e.executionPool
 	wg := sync.WaitGroup{}
-	for qs, sources := range expanded {
+	for q, sources := range expanded {
 		wg.Add(1)
 		// localize values for the closure below
-		qs, sources := qs, sources
+		q, sources := q, sources
 		go func() {
 			// queue everything into the execution pool
 			defer sentry.Recover()
@@ -201,7 +201,7 @@ func (e *Engine) ExecuteQuery(ctx context.Context, q *sdp.Query, items chan<- *s
 				numSources.Add(1)
 
 				// query all sources
-				switch qs.GetMethod() {
+				switch query.GetMethod() {
 				case sdp.RequestMethod_GET:
 					queryItems, queryErrors = e.Get(ctx, q, sources)
 				case sdp.RequestMethod_LIST:
@@ -216,21 +216,21 @@ func (e *Engine) ExecuteQuery(ctx context.Context, q *sdp.Query, items chan<- *s
 					// subject info along with the number of remaining links. If the link
 					// depth is zero then we just pass then back in their normal form as we
 					// won't be executing them
-					if qs.GetLinkDepth() > 0 {
+					if query.GetLinkDepth() > 0 {
 						for _, lir := range i.LinkedItemQueries {
-							lir.LinkDepth = qs.LinkDepth - 1
-							lir.ItemSubject = qs.ItemSubject
-							lir.ResponseSubject = qs.ResponseSubject
-							lir.IgnoreCache = qs.IgnoreCache
-							lir.Timeout = qs.Timeout
-							lir.UUID = qs.UUID
+							lir.LinkDepth = query.LinkDepth - 1
+							lir.ItemSubject = query.ItemSubject
+							lir.ResponseSubject = query.ResponseSubject
+							lir.IgnoreCache = query.IgnoreCache
+							lir.Timeout = query.Timeout
+							lir.UUID = query.UUID
 						}
 					}
 
 					// Assign the source query
 					if i.Metadata != nil {
-						i.Metadata.SourceQuery = qs
-						i.Metadata.SourceQueryUUID = qs.UUID
+						i.Metadata.SourceQuery = query
+						i.Metadata.SourceQueryUUID = query.UUID
 					}
 
 					if items != nil {
