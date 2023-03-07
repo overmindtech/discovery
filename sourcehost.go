@@ -27,25 +27,9 @@ func NewSourceHost() (*SourceHost, error) {
 
 	// Add meta-sources so that we can respond to queries for `overmind-type`,
 	// `overmind-scope` and `overmind-source` resources
-	typeSource, err := NewMetaSource(sh, Type)
-	if err != nil {
-		return nil, err
-	}
-
-	scopeSource, err := NewMetaSource(sh, Scope)
-	if err != nil {
-		return nil, err
-	}
-
-	ms, err := NewMetaSource(sh, Type)
-	if err != nil {
-		return nil, err
-	}
-
-	sourceSource := &SourcesSource{
-		MetaSource: *ms,
-	}
-	sh.AddSources(typeSource, scopeSource, sourceSource)
+	sh.AddSources(&TypeSource{sh: sh})
+	sh.AddSources(&ScopeSource{sh: sh})
+	sh.AddSources(&SourcesSource{sh: sh})
 
 	return sh, nil
 }
