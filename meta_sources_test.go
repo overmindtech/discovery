@@ -2,330 +2,149 @@ package discovery
 
 import (
 	"context"
+	"errors"
 	"testing"
+
+	"github.com/overmindtech/sdp-go"
 )
 
-func TestSourcesSource(t *testing.T) {
+func TestTypeSource(t *testing.T) {
+	s := &TypeSource{
+		sh: newTestSourceHost(t),
+	}
+
 	t.Run("satisfies Source interface", func(t *testing.T) {
 		//lint:ignore S1021 Testing that it satisfies the interface
 		var src Source
 
-		src = &SourcesSource{}
+		src = &TypeSource{}
 
 		t.Log(src)
 	})
-}
 
-func TestMetaSourceSearchType(t *testing.T) {
-	s, err := NewMetaSource(newTestSourceHost(t), Type)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Run("searching for 'instance' type", func(t *testing.T) {
-		types, err := s.SearchField(Type, "instance")
+	t.Run("listing types", func(t *testing.T) {
+		items, err := s.List(context.Background(), "global")
 
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
 
-		if len(types) != 1 {
-			t.Fatalf("expected 1 types got %v", len(types))
-		}
-
-		if types[0].Value != "aws-ec2instance" {
-			t.Errorf("expected first result to be aws-ec2instance, got %v", types[0])
-		}
-
-		if types[0].Score == 0 {
-			t.Error("expected non-zero score")
-		}
-	})
-
-	t.Run("searching for 'ec2' type", func(t *testing.T) {
-		types, err := s.SearchField(Type, "ec2")
-
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if len(types) != 1 {
-			t.Fatalf("expected 1 types got %v", len(types))
-		}
-
-		if types[0].Value != "aws-ec2instance" {
-			t.Errorf("expected first result to be aws-ec2instance, got %v", types[0])
-		}
-	})
-
-	t.Run("searching for 'aws' type", func(t *testing.T) {
-		types, err := s.SearchField(Type, "aws")
-
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if len(types) != 2 {
-			t.Fatalf("expected 2 types got %v", len(types))
-		}
-	})
-
-	t.Run("searching for 'ip' type", func(t *testing.T) {
-		types, err := s.SearchField(Type, "ip")
-
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if len(types) != 1 {
-			t.Fatalf("expected 1 types got %v", len(types))
-		}
-	})
-
-	t.Run("searching for 'elas' type", func(t *testing.T) {
-		types, err := s.SearchField(Type, "elas")
-
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if len(types) != 1 {
-			t.Fatalf("expected 1 types got %v", len(types))
-		}
-	})
-}
-
-func TestMetaSourceSearchScope(t *testing.T) {
-	s, err := NewMetaSource(newTestSourceHost(t), Type)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Run("searching using prefixes", func(t *testing.T) {
-		prefixes := []string{
-			"prod",
-			"prodAccount",
-			"prodAccountInternet",
-			"prodAccountInternetBanking",
-		}
-
-		for _, prefix := range prefixes {
-			t.Run(prefix, func(t *testing.T) {
-				results, err := s.SearchField(Scope, prefix)
-
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				if len(results) == 0 {
-					t.Fatalf("empty results")
-				}
-
-				if results[0].Value != "prodAccountInternetBanking" {
-					t.Errorf("expected first result to be prodAccountInternetBanking, got %v", results[0])
-				}
-			})
-		}
-	})
-
-	t.Run("searching using full words", func(t *testing.T) {
-		words := []string{
-			"Account",
-			"Internet",
-			"InternetBanking",
-		}
-
-		for _, word := range words {
-			t.Run(word, func(t *testing.T) {
-				results, err := s.SearchField(Scope, word)
-
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				if len(results) == 0 {
-					t.Fatal("no results found")
-				}
-			})
-		}
-	})
-}
-
-func TestTypeSource(t *testing.T) {
-	s, err := NewMetaSource(newTestSourceHost(t), Type)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	//lint:ignore S1021 Using to check that it satisfies the interface at
-	//compile time
-	var source Source
-
-	source = s
-
-	if source.Type() == "" {
-		t.Error("empty name")
-	}
-
-	t.Run("Get", func(t *testing.T) {
-		t.Run("good type", func(t *testing.T) {
-			item, err := s.Get(context.Background(), "global", "aws-ec2instance")
-
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if item.UniqueAttributeValue() != "aws-ec2instance" {
-				t.Errorf("expected item to be aws-ec2instance, got %v", item.UniqueAttributeValue())
-			}
-		})
-
-		t.Run("bad type", func(t *testing.T) {
-			_, err := s.Get(context.Background(), "global", "aws-ec2")
-
-			if err == nil {
-				t.Error("expected error")
-			}
-		})
-	})
-
-	t.Run("List", func(t *testing.T) {
-		t.Run("good scope", func(t *testing.T) {
-			items, err := s.List(context.Background(), "global")
-
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if len(s.sh.Sources()) != len(items) {
-				t.Errorf("expected %v sources, got %v", len(s.sh.Sources()), len(items))
-			}
-		})
-
-		t.Run("bad scope", func(t *testing.T) {
-			_, err := s.List(context.Background(), "bad")
-
-			if err == nil {
-				t.Error("expected error")
-			}
-		})
-	})
-
-	t.Run("Search", func(t *testing.T) {
-		t.Run("good type", func(t *testing.T) {
-			items, err := s.Search(context.Background(), "global", "aws")
+		for _, item := range items {
+			err = item.Validate()
 
 			if err != nil {
 				t.Error(err)
 			}
 
-			if len(items) == 0 {
-				t.Error("no items found")
+			// Check that hidden types aren't included
+			if item.UniqueAttributeValue() == "secret" {
+				t.Error("hidden type included")
 			}
-		})
+		}
 
-		t.Run("bad type", func(t *testing.T) {
-			items, err := s.Search(context.Background(), "global", "somethingElse")
+		if len(items) == 0 {
+			t.Error("empty list")
+		}
+	})
 
-			if err != nil {
-				t.Error(err)
+	t.Run("get a specific type", func(t *testing.T) {
+		item, err := s.Get(context.Background(), "global", "secret")
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		err = item.Validate()
+
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	t.Run("get a bad type", func(t *testing.T) {
+		_, err := s.Get(context.Background(), "global", "nothing-here")
+
+		if err == nil {
+			t.Error("expected error got nil")
+		}
+
+		var ire *sdp.QueryError
+
+		if errors.As(err, &ire) {
+			if ire.ErrorType != sdp.QueryError_NOTFOUND {
+				t.Errorf("Expected error type NOTFOUND, got %v", ire.ErrorType)
 			}
-
-			if len(items) != 0 {
-				t.Errorf("expected no items, got %v", len(items))
-			}
-		})
+		}
 	})
 }
 
 func TestScopeSource(t *testing.T) {
-	s, err := NewMetaSource(newTestSourceHost(t), Scope)
-
-	if err != nil {
-		t.Fatal(err)
+	s := &ScopeSource{
+		sh: newTestSourceHost(t),
 	}
 
-	//lint:ignore S1021 Using to check that it satisfies the interface at
-	//compile time
-	var source Source
+	t.Run("satisfies Source interface", func(t *testing.T) {
+		//lint:ignore S1021 Testing that it satisfies the interface
+		var src Source
 
-	source = s
+		src = &ScopeSource{}
 
-	if source.Type() == "" {
-		t.Error("empty name")
-	}
-
-	t.Run("Get", func(t *testing.T) {
-		t.Run("good scope", func(t *testing.T) {
-			item, err := s.Get(context.Background(), "global", "some-other-scope")
-
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if item.UniqueAttributeValue() != "some-other-scope" {
-				t.Errorf("expected item to be some-other-scope, got %v", item.UniqueAttributeValue())
-			}
-		})
-
-		t.Run("bad scope", func(t *testing.T) {
-			_, err := s.Get(context.Background(), "global", "aws-ec2")
-
-			if err == nil {
-				t.Error("expected error")
-			}
-		})
+		t.Log(src)
 	})
 
-	t.Run("List", func(t *testing.T) {
-		t.Run("good scope", func(t *testing.T) {
-			items, err := s.List(context.Background(), "global")
+	t.Run("listing Scopes", func(t *testing.T) {
+		items, err := s.List(context.Background(), "global")
 
-			if err != nil {
-				t.Fatal(err)
-			}
+		if err != nil {
+			t.Error(err)
+		}
 
-			if len(items) == 0 {
-				t.Error("no scopes")
-			}
-		})
-
-		t.Run("bad scope", func(t *testing.T) {
-			_, err := s.List(context.Background(), "bad")
-
-			if err == nil {
-				t.Error("expected error")
-			}
-		})
-	})
-
-	t.Run("Search", func(t *testing.T) {
-		t.Run("good scope", func(t *testing.T) {
-			items, err := s.Search(context.Background(), "global", "AccountInternetBanking")
+		for _, item := range items {
+			err = item.Validate()
 
 			if err != nil {
 				t.Error(err)
 			}
 
-			if len(items) != 2 {
-				t.Errorf("expected 2 items, got %v", len(items))
+			// Check that hidden Scopes aren't included
+			if item.UniqueAttributeValue() == "secret" {
+				t.Error("hidden scope included")
 			}
-		})
+		}
 
-		t.Run("bad scope", func(t *testing.T) {
-			items, err := s.Search(context.Background(), "global", "somethingElse")
+		if len(items) == 0 {
+			t.Error("empty list")
+		}
+	})
 
-			if err != nil {
-				t.Error(err)
+	t.Run("get a specific Scope", func(t *testing.T) {
+		item, err := s.Get(context.Background(), "global", "secret")
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		err = item.Validate()
+
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	t.Run("get a bad Scope", func(t *testing.T) {
+		_, err := s.Get(context.Background(), "global", "nothing-here")
+
+		if err == nil {
+			t.Error("expected error got nil")
+		}
+
+		var ire *sdp.QueryError
+
+		if errors.As(err, &ire) {
+			if ire.ErrorType != sdp.QueryError_NOTFOUND {
+				t.Errorf("Expected error Scope NOTFOUND, got %v", ire.ErrorType)
 			}
-
-			if len(items) != 0 {
-				t.Errorf("expected no items, got %v", len(items))
-			}
-		})
+		}
 	})
 }
 
@@ -359,6 +178,15 @@ func newTestSourceHost(t *testing.T) *SourceHost {
 				"global",
 			},
 			ReturnName: "test-ip-source",
+		},
+		&TestSource{
+			ReturnType: "secret",
+			ReturnScopes: []string{
+				"global",
+				"secret",
+			},
+			ReturnName: "test-secret-source",
+			IsHidden:   true,
 		},
 	)
 
