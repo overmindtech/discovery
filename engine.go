@@ -15,6 +15,7 @@ import (
 	"github.com/overmindtech/sdpcache"
 	log "github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc/pool"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const DefaultMaxRequestTimeout = 1 * time.Minute
@@ -377,6 +378,9 @@ func (e *Engine) IsNATSConnected() bool {
 
 // HandleCancelQuery Takes a CancelQuery and cancels that query if it exists
 func (e *Engine) HandleCancelQuery(ctx context.Context, cancelQuery *sdp.CancelQuery) {
+	span := trace.SpanFromContext(ctx)
+	span.SetName("HandleCancelQuery")
+
 	u, err := uuid.FromBytes(cancelQuery.UUID)
 
 	if err != nil {
