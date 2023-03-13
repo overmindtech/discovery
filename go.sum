@@ -41,8 +41,8 @@ github.com/overmindtech/api-client v0.12.0 h1:zKBTD7Nv9Va17mPD2VB1QxfE5eU+RYqNua
 github.com/overmindtech/api-client v0.12.0/go.mod h1:PqBqkA68q2oFkmnjgfKcB6C8nE//VLnGNnsNqyco9J0=
 github.com/overmindtech/connect v0.8.5 h1:ns4+Q28pwUukrUv6nxX1cjGB1VyohFSj4wUP8LOrlUo=
 github.com/overmindtech/connect v0.8.5/go.mod h1:LWBArHjw274XfEfJqAuYpZ89QpDslDodmPbTJLYFobI=
-github.com/overmindtech/sdp-go v0.18.4 h1:kI8m3Ot2fThFJNLGY+hdXK01gxfJN5I0qPet03cOQJg=
-github.com/overmindtech/sdp-go v0.18.4/go.mod h1:mnS1WY+JWDyRbDvGb758i1vnUXaFEL5fafT1kRSkWvs=
+github.com/overmindtech/sdp-go v0.19.0 h1:+2NdJHwelXW1CkfcjUk1DKIzJqHYdJPxOh26ldHjcZA=
+github.com/overmindtech/sdp-go v0.19.0/go.mod h1:mnS1WY+JWDyRbDvGb758i1vnUXaFEL5fafT1kRSkWvs=
 github.com/overmindtech/sdpcache v1.2.3 h1:By8OdD61XKSn8D3L8BMUZaKE5TNm7oN/FO7ew1LSANs=
 github.com/overmindtech/sdpcache v1.2.3/go.mod h1:gsF2Gu3NcrxP7SaSBr7hk/fHuIiTwa5aViDUhQF+zxI=
 github.com/pingcap/errors v0.11.4 h1:lFuQV/oaUMGcD2tqt+01ROSmJs75VG1ToEOkZIZ4nE4=
