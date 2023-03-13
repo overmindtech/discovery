@@ -43,7 +43,7 @@ func TestGet(t *testing.T) {
 			Type:   "person",
 			Scope:  "test",
 			Query:  "three",
-			Method: sdp.RequestMethod_GET,
+			Method: sdp.QueryMethod_GET,
 		}, nil, nil)
 
 		if x := len(src.GetCalls); x != 1 {
@@ -66,7 +66,7 @@ func TestGet(t *testing.T) {
 			Type:   "person",
 			Scope:  "empty",
 			Query:  "three",
-			Method: sdp.RequestMethod_GET,
+			Method: sdp.QueryMethod_GET,
 		})
 
 		if err == nil {
@@ -117,7 +117,7 @@ func TestGet(t *testing.T) {
 			Type:   "person",
 			Scope:  "test",
 			Query:  "Dylan",
-			Method: sdp.RequestMethod_GET,
+			Method: sdp.QueryMethod_GET,
 		}
 
 		finds1, _, err = e.ExecuteQuerySync(context.Background(), &req)
@@ -160,7 +160,7 @@ func TestGet(t *testing.T) {
 			Type:   "person",
 			Scope:  "empty",
 			Query:  "query",
-			Method: sdp.RequestMethod_GET,
+			Method: sdp.QueryMethod_GET,
 		}
 
 		e.ExecuteQuerySync(context.Background(), &req)
@@ -183,7 +183,7 @@ func TestGet(t *testing.T) {
 				Type:   "person",
 				Scope:  "test",
 				Query:  "three",
-				Method: sdp.RequestMethod_GET,
+				Method: sdp.QueryMethod_GET,
 			})
 
 			if err != nil {
@@ -199,7 +199,7 @@ func TestGet(t *testing.T) {
 			items, _, err := e.ExecuteQuerySync(context.Background(), &sdp.Query{
 				Type:   "person",
 				Scope:  "test",
-				Method: sdp.RequestMethod_LIST,
+				Method: sdp.QueryMethod_LIST,
 			})
 
 			if err != nil {
@@ -216,7 +216,7 @@ func TestGet(t *testing.T) {
 				Type:   "person",
 				Scope:  "test",
 				Query:  "three",
-				Method: sdp.RequestMethod_SEARCH,
+				Method: sdp.QueryMethod_SEARCH,
 			})
 
 			if err != nil {
@@ -238,7 +238,7 @@ func TestList(t *testing.T) {
 	e.ExecuteQuerySync(context.Background(), &sdp.Query{
 		Type:   "person",
 		Scope:  "test",
-		Method: sdp.RequestMethod_LIST,
+		Method: sdp.QueryMethod_LIST,
 	})
 
 	if x := len(src.ListCalls); x != 1 {
@@ -261,7 +261,7 @@ func TestSearch(t *testing.T) {
 		Type:   "person",
 		Scope:  "test",
 		Query:  "query",
-		Method: sdp.RequestMethod_SEARCH,
+		Method: sdp.QueryMethod_SEARCH,
 	})
 
 	if x := len(src.SearchCalls); x != 1 {
@@ -301,7 +301,7 @@ func TestListSearchCaching(t *testing.T) {
 		q := sdp.Query{
 			Type:   "person",
 			Scope:  "test",
-			Method: sdp.RequestMethod_LIST,
+			Method: sdp.QueryMethod_LIST,
 		}
 
 		finds1, _, err = e.ExecuteQuerySync(context.Background(), &q)
@@ -344,7 +344,7 @@ func TestListSearchCaching(t *testing.T) {
 		q := sdp.Query{
 			Type:   "person",
 			Scope:  "empty",
-			Method: sdp.RequestMethod_LIST,
+			Method: sdp.QueryMethod_LIST,
 		}
 
 		_, _, err = e.ExecuteQuerySync(context.Background(), &q)
@@ -391,7 +391,7 @@ func TestListSearchCaching(t *testing.T) {
 			Type:   "person",
 			Scope:  "test",
 			Query:  "query",
-			Method: sdp.RequestMethod_SEARCH,
+			Method: sdp.QueryMethod_SEARCH,
 		}
 
 		finds1, _, err = e.ExecuteQuerySync(context.Background(), &q)
@@ -435,7 +435,7 @@ func TestListSearchCaching(t *testing.T) {
 			Type:   "person",
 			Scope:  "empty",
 			Query:  "query",
-			Method: sdp.RequestMethod_SEARCH,
+			Method: sdp.QueryMethod_SEARCH,
 		}
 
 		_, _, err = e.ExecuteQuerySync(context.Background(), &q)
@@ -478,7 +478,7 @@ func TestListSearchCaching(t *testing.T) {
 			Type:   "person",
 			Scope:  "error",
 			Query:  "query",
-			Method: sdp.RequestMethod_GET,
+			Method: sdp.QueryMethod_GET,
 		}
 
 		e.ExecuteQuerySync(context.Background(), &q)
@@ -498,18 +498,18 @@ func TestListSearchCaching(t *testing.T) {
 			Type:   "person",
 			Scope:  "error",
 			Query:  "query",
-			Method: sdp.RequestMethod_GET,
+			Method: sdp.QueryMethod_GET,
 		}
 
 		e.ExecuteQuerySync(context.Background(), &q)
 		e.ExecuteQuerySync(context.Background(), &q)
 
-		q.Method = sdp.RequestMethod_LIST
+		q.Method = sdp.QueryMethod_LIST
 
 		e.ExecuteQuerySync(context.Background(), &q)
 		e.ExecuteQuerySync(context.Background(), &q)
 
-		q.Method = sdp.RequestMethod_SEARCH
+		q.Method = sdp.QueryMethod_SEARCH
 
 		e.ExecuteQuerySync(context.Background(), &q)
 		e.ExecuteQuerySync(context.Background(), &q)
@@ -556,7 +556,7 @@ func TestSearchGetCaching(t *testing.T) {
 			Type:   "person",
 			Scope:  "test",
 			Query:  "Dylan",
-			Method: sdp.RequestMethod_SEARCH,
+			Method: sdp.QueryMethod_SEARCH,
 		}
 
 		searchResult, searchErrors, err = e.ExecuteQuerySync(context.Background(), &q)
@@ -578,7 +578,7 @@ func TestSearchGetCaching(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 
 		// Do a get query for that same item
-		q.Method = sdp.RequestMethod_GET
+		q.Method = sdp.QueryMethod_GET
 		q.Query = searchResult[0].UniqueAttributeValue()
 
 		getResult, getErrors, err = e.ExecuteQuerySync(context.Background(), &q)

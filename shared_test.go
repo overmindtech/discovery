@@ -48,7 +48,7 @@ func (s *TestSource) NewTestItem(scope string, query string) *sdp.Item {
 		LinkedItemQueries: []*sdp.Query{
 			{
 				Type:   "person",
-				Method: sdp.RequestMethod_GET,
+				Method: sdp.QueryMethod_GET,
 				Query:  RandomName(),
 				Scope:  scope,
 			},

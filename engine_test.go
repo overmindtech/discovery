@@ -56,12 +56,12 @@ func newStartedEngine(t *testing.T, name string, no *connect.NATSOptions, source
 func TestDeleteQuery(t *testing.T) {
 	one := &sdp.Query{
 		Scope:  "one",
-		Method: sdp.RequestMethod_LIST,
+		Method: sdp.QueryMethod_LIST,
 		Query:  "",
 	}
 	two := &sdp.Query{
 		Scope:  "two",
-		Method: sdp.RequestMethod_SEARCH,
+		Method: sdp.QueryMethod_SEARCH,
 		Query:  "2",
 	}
 	irs := []*sdp.Query{
@@ -88,7 +88,7 @@ func TestTrackQuery(t *testing.T) {
 			Engine: e,
 			Query: &sdp.Query{
 				Type:      "person",
-				Method:    sdp.RequestMethod_LIST,
+				Method:    sdp.QueryMethod_LIST,
 				LinkDepth: 10,
 				UUID:      u[:],
 			},
@@ -123,7 +123,7 @@ func TestTrackQuery(t *testing.T) {
 					Query: &sdp.Query{
 						Type:      "person",
 						Query:     fmt.Sprintf("person-%v", i),
-						Method:    sdp.RequestMethod_GET,
+						Method:    sdp.QueryMethod_GET,
 						LinkDepth: 10,
 						UUID:      u[:],
 					},
@@ -159,7 +159,7 @@ func TestDeleteTrackedQuery(t *testing.T) {
 				Query: &sdp.Query{
 					Type:      "person",
 					Query:     fmt.Sprintf("person-%v", i),
-					Method:    sdp.RequestMethod_GET,
+					Method:    sdp.QueryMethod_GET,
 					LinkDepth: 10,
 					UUID:      u[:],
 				},
@@ -231,7 +231,7 @@ func TestNats(t *testing.T) {
 
 		req := sdp.NewQueryProgress(&sdp.Query{
 			Type:            "person",
-			Method:          sdp.RequestMethod_GET,
+			Method:          sdp.QueryMethod_GET,
 			Query:           "basic",
 			LinkDepth:       0,
 			Scope:           "test",
@@ -258,7 +258,7 @@ func TestNats(t *testing.T) {
 
 		req := sdp.NewQueryProgress(&sdp.Query{
 			Type:            "person",
-			Method:          sdp.RequestMethod_GET,
+			Method:          sdp.QueryMethod_GET,
 			Query:           "deeplink",
 			LinkDepth:       10,
 			Scope:           "test",
@@ -327,7 +327,7 @@ func TestNatsCancel(t *testing.T) {
 
 		progress := sdp.NewQueryProgress(&sdp.Query{
 			Type:            "person",
-			Method:          sdp.RequestMethod_GET,
+			Method:          sdp.QueryMethod_GET,
 			Query:           "foo",
 			LinkDepth:       100,
 			Scope:           "*",
@@ -637,7 +637,7 @@ func TestNatsAuth(t *testing.T) {
 
 		_, _, err := sdp.NewQueryProgress(&sdp.Query{
 			Type:            "person",
-			Method:          sdp.RequestMethod_GET,
+			Method:          sdp.QueryMethod_GET,
 			Query:           "basic",
 			LinkDepth:       0,
 			Scope:           "test",
@@ -662,7 +662,7 @@ func TestNatsAuth(t *testing.T) {
 
 		_, _, err := sdp.NewQueryProgress(&sdp.Query{
 			Type:            "person",
-			Method:          sdp.RequestMethod_GET,
+			Method:          sdp.QueryMethod_GET,
 			Query:           "deeplink",
 			LinkDepth:       10,
 			Scope:           "test",

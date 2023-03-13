@@ -76,7 +76,7 @@ Type names should match RFC1123 (lower case). This means the name must:
 			t.Errorf("LinkedItemQuery %v of item %v has empty type", index, i.GloballyUniqueName())
 		}
 
-		if linkedItemQuery.GetMethod() != sdp.RequestMethod_LIST {
+		if linkedItemQuery.GetMethod() != sdp.QueryMethod_LIST {
 			if linkedItemQuery.GetQuery() == "" {
 				t.Errorf("LinkedItemQuery %v of item %v has empty query. This is not allowed unless the method is LIST", index, i.GloballyUniqueName())
 			}

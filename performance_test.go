@@ -53,7 +53,7 @@ func (s *SlowSource) Get(ctx context.Context, scope string, query string) (*sdp.
 	for i := 0; i != 2; i++ {
 		item.LinkedItemQueries = append(item.LinkedItemQueries, &sdp.Query{
 			Type:   "person",
-			Method: sdp.RequestMethod_GET,
+			Method: sdp.QueryMethod_GET,
 			Query:  RandomName(),
 			Scope:  "test",
 		})
@@ -158,7 +158,7 @@ func TimeQueries(numQueries int, linkDepth int, numParallel int) TimedResults {
 		qt := QueryTracker{
 			Query: &sdp.Query{
 				Type:      "person",
-				Method:    sdp.RequestMethod_GET,
+				Method:    sdp.QueryMethod_GET,
 				Query:     RandomName(),
 				Scope:     "test",
 				LinkDepth: uint32(linkDepth),

@@ -1,7 +1,6 @@
 package discovery
 
 import (
-	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -31,7 +30,7 @@ func TestExecuteQuery(t *testing.T) {
 	t.Run("Basic happy-path Get query", func(t *testing.T) {
 		q := &sdp.Query{
 			Type:            "person",
-			Method:          sdp.RequestMethod_GET,
+			Method:          sdp.QueryMethod_GET,
 			Query:           "foo",
 			Scope:           "test",
 			LinkDepth:       3,
@@ -75,16 +74,12 @@ func TestExecuteQuery(t *testing.T) {
 		if item.Metadata.SourceQuery != q {
 			t.Error("source query mismatch")
 		}
-
-		if !bytes.Equal(item.Metadata.SourceQueryUUID, q.UUID) {
-			t.Error("source query UUID mismatch")
-		}
 	})
 
 	t.Run("Wrong scope Get query", func(t *testing.T) {
 		q := &sdp.Query{
 			Type:      "person",
-			Method:    sdp.RequestMethod_GET,
+			Method:    sdp.QueryMethod_GET,
 			Query:     "foo",
 			Scope:     "wrong",
 			LinkDepth: 0,
@@ -109,7 +104,7 @@ func TestExecuteQuery(t *testing.T) {
 	t.Run("Wrong type Get query", func(t *testing.T) {
 		q := &sdp.Query{
 			Type:      "house",
-			Method:    sdp.RequestMethod_GET,
+			Method:    sdp.QueryMethod_GET,
 			Query:     "foo",
 			Scope:     "test",
 			LinkDepth: 0,
@@ -133,7 +128,7 @@ func TestExecuteQuery(t *testing.T) {
 	t.Run("Basic List query", func(t *testing.T) {
 		q := &sdp.Query{
 			Type:      "person",
-			Method:    sdp.RequestMethod_LIST,
+			Method:    sdp.QueryMethod_LIST,
 			Scope:     "test",
 			LinkDepth: 5,
 		}
@@ -156,7 +151,7 @@ func TestExecuteQuery(t *testing.T) {
 	t.Run("Basic Search query", func(t *testing.T) {
 		q := &sdp.Query{
 			Type:      "person",
-			Method:    sdp.RequestMethod_SEARCH,
+			Method:    sdp.QueryMethod_SEARCH,
 			Query:     "TEST",
 			Scope:     "test",
 			LinkDepth: 5,
@@ -207,7 +202,7 @@ func TestHandleQuery(t *testing.T) {
 
 		req := sdp.Query{
 			Type:      sdp.WILDCARD,
-			Method:    sdp.RequestMethod_GET,
+			Method:    sdp.QueryMethod_GET,
 			Query:     "Dylan",
 			Scope:     "test1",
 			LinkDepth: 0,
@@ -234,7 +229,7 @@ func TestHandleQuery(t *testing.T) {
 
 		req := sdp.Query{
 			Type:      "person",
-			Method:    sdp.RequestMethod_GET,
+			Method:    sdp.QueryMethod_GET,
 			Query:     "Dylan1",
 			Scope:     sdp.WILDCARD,
 			LinkDepth: 0,
@@ -268,7 +263,7 @@ func TestWildcardSourceExpansion(t *testing.T) {
 	t.Run("query scope should be preserved", func(t *testing.T) {
 		req := sdp.Query{
 			Type:      "person",
-			Method:    sdp.RequestMethod_GET,
+			Method:    sdp.QueryMethod_GET,
 			Query:     "Dylan1",
 			Scope:     "something.specific",
 			LinkDepth: 0,
@@ -313,7 +308,7 @@ func TestSendQuerySync(t *testing.T) {
 
 		progress = sdp.NewQueryProgress(&sdp.Query{
 			Type:            "person",
-			Method:          sdp.RequestMethod_GET,
+			Method:          sdp.QueryMethod_GET,
 			Query:           "Dylan",
 			Scope:           "test",
 			LinkDepth:       0,
@@ -359,7 +354,7 @@ func TestExpandQuery(t *testing.T) {
 
 		e.HandleQuery(context.Background(), &sdp.Query{
 			Type:   "person",
-			Method: sdp.RequestMethod_GET,
+			Method: sdp.QueryMethod_GET,
 			Query:  "Debby",
 			Scope:  "*",
 		})
@@ -382,7 +377,7 @@ func TestExpandQuery(t *testing.T) {
 
 		e.HandleQuery(context.Background(), &sdp.Query{
 			Type:   "person",
-			Method: sdp.RequestMethod_GET,
+			Method: sdp.QueryMethod_GET,
 			Query:  "Debby",
 			Scope:  "*",
 		})
@@ -410,7 +405,7 @@ func TestExpandQuery(t *testing.T) {
 
 		e.HandleQuery(context.Background(), &sdp.Query{
 			Type:   "person",
-			Method: sdp.RequestMethod_GET,
+			Method: sdp.QueryMethod_GET,
 			Query:  "Daniel",
 			Scope:  "*",
 		})
@@ -447,7 +442,7 @@ func TestExpandQuery(t *testing.T) {
 
 		e.HandleQuery(context.Background(), &sdp.Query{
 			Type:   "person",
-			Method: sdp.RequestMethod_GET,
+			Method: sdp.QueryMethod_GET,
 			Query:  "Steven",
 			Scope:  "*",
 		})
@@ -486,7 +481,7 @@ func TestExpandQuery(t *testing.T) {
 
 		e.HandleQuery(context.Background(), &sdp.Query{
 			Type:   "person",
-			Method: sdp.RequestMethod_GET,
+			Method: sdp.QueryMethod_GET,
 			Query:  "Jane",
 			Scope:  "*",
 		})
@@ -523,7 +518,7 @@ func TestExpandQuery(t *testing.T) {
 
 		e.HandleQuery(context.Background(), &sdp.Query{
 			Type:   "person",
-			Method: sdp.RequestMethod_LIST,
+			Method: sdp.QueryMethod_LIST,
 			Query:  "Jane",
 			Scope:  "*",
 		})
@@ -549,7 +544,7 @@ func TestExpandQuery(t *testing.T) {
 
 		e.HandleQuery(context.Background(), &sdp.Query{
 			Type:   "person",
-			Method: sdp.RequestMethod_LIST,
+			Method: sdp.QueryMethod_LIST,
 			Query:  "Rachel",
 			Scope:  "*",
 		})
@@ -585,7 +580,7 @@ func TestExpandQuery(t *testing.T) {
 
 		e.HandleQuery(context.Background(), &sdp.Query{
 			Type:   "person",
-			Method: sdp.RequestMethod_LIST,
+			Method: sdp.QueryMethod_LIST,
 			Query:  "Ross",
 			Scope:  "*",
 		})
@@ -630,7 +625,7 @@ func TestExpandQuery(t *testing.T) {
 
 		e.HandleQuery(context.Background(), &sdp.Query{
 			Type:   "person",
-			Method: sdp.RequestMethod_LIST,
+			Method: sdp.QueryMethod_LIST,
 			Query:  "Ross",
 			Scope:  "*",
 		})
