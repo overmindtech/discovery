@@ -202,11 +202,11 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 
 				// query all sources
 				switch query.GetMethod() {
-				case sdp.RequestMethod_GET:
+				case sdp.QueryMethod_GET:
 					queryItems, queryErrors = e.Get(ctx, q, sources)
-				case sdp.RequestMethod_LIST:
+				case sdp.QueryMethod_LIST:
 					queryItems, queryErrors = e.List(ctx, q, sources)
-				case sdp.RequestMethod_SEARCH:
+				case sdp.QueryMethod_SEARCH:
 					queryItems, queryErrors = e.Search(ctx, q, sources)
 				}
 
@@ -230,7 +230,6 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 					// Assign the source query
 					if i.Metadata != nil {
 						i.Metadata.SourceQuery = query
-						i.Metadata.SourceQueryUUID = query.UUID
 					}
 
 					if items != nil {
@@ -511,7 +510,6 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.Query, relevantSources 
 					SourceDurationPerItem: durationpb.New(time.Duration(sourceDuration.Nanoseconds() / int64(len(resultItems)))),
 					SourceName:            src.Name(),
 					SourceQuery:           r,
-					SourceQueryUUID:       r.UUID,
 				}
 
 				// Mark the item as hidden if the source is a hidden source

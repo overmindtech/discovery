@@ -44,7 +44,7 @@ var trigger = Trigger{
         } else {
             return &sdp.Query{
                 Type:   "dog",
-                Method: sdp.RequestMethod_SEARCH,
+                Method: sdp.QueryMethod_SEARCH,
                 Query:  "pug",
             }, nil
         }

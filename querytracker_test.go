@@ -58,7 +58,7 @@ func (s *SpeedTestSource) Get(ctx context.Context, scope string, query string) (
 			LinkedItemQueries: []*sdp.Query{
 				{
 					Type:   "person",
-					Method: sdp.RequestMethod_GET,
+					Method: sdp.QueryMethod_GET,
 					Query:  query + time.Now().String(),
 					Scope:  scope,
 				},
@@ -102,7 +102,7 @@ func TestExecute(t *testing.T) {
 			Engine: e,
 			Query: &sdp.Query{
 				Type:      "person",
-				Method:    sdp.RequestMethod_GET,
+				Method:    sdp.QueryMethod_GET,
 				Query:     "Dylan",
 				LinkDepth: 0,
 				Scope:     "test",
@@ -131,7 +131,7 @@ func TestExecute(t *testing.T) {
 			Engine: e,
 			Query: &sdp.Query{
 				Type:      "person",
-				Method:    sdp.RequestMethod_GET,
+				Method:    sdp.QueryMethod_GET,
 				Query:     "Dylan",
 				LinkDepth: 10,
 				Scope:     "test",
@@ -160,7 +160,7 @@ func TestExecute(t *testing.T) {
 			Engine: nil,
 			Query: &sdp.Query{
 				Type:      "person",
-				Method:    sdp.RequestMethod_GET,
+				Method:    sdp.QueryMethod_GET,
 				Query:     "Dylan",
 				LinkDepth: 10,
 				Scope:     "test",
@@ -203,7 +203,7 @@ func TestTimeout(t *testing.T) {
 			Engine: e,
 			Query: &sdp.Query{
 				Type:      "person",
-				Method:    sdp.RequestMethod_GET,
+				Method:    sdp.QueryMethod_GET,
 				Query:     "Dylan",
 				LinkDepth: 0,
 				Scope:     "test",
@@ -233,7 +233,7 @@ func TestTimeout(t *testing.T) {
 			Engine: e,
 			Query: &sdp.Query{
 				Type:      "person",
-				Method:    sdp.RequestMethod_GET,
+				Method:    sdp.QueryMethod_GET,
 				Query:     "somethingElse",
 				LinkDepth: 0,
 				Scope:     "test",
@@ -253,7 +253,7 @@ func TestTimeout(t *testing.T) {
 			Engine: e,
 			Query: &sdp.Query{
 				Type:      "person",
-				Method:    sdp.RequestMethod_GET,
+				Method:    sdp.QueryMethod_GET,
 				Query:     "somethingElse1",
 				LinkDepth: 10,
 				Scope:     "test",
@@ -286,7 +286,7 @@ func TestCancel(t *testing.T) {
 		Engine: e,
 		Query: &sdp.Query{
 			Type:      "person",
-			Method:    sdp.RequestMethod_GET,
+			Method:    sdp.QueryMethod_GET,
 			Query:     "somethingElse1",
 			LinkDepth: 10,
 			Scope:     "test",
