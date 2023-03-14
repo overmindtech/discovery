@@ -44,8 +44,8 @@ func NewResponseSubject() string {
 // HandleQuery Handles a single query. This includes responses, linking
 // etc.
 func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
-	ctx, span := tracer.Start(ctx, "HandleQuery")
-	defer span.End()
+	span := trace.SpanFromContext(ctx)
+	span.SetName("HandleQuery")
 
 	numExpandedQueries := len(e.sh.ExpandQuery(query))
 	span.SetAttributes(attribute.Int("om.discovery.numExpandedQueries", numExpandedQueries))
@@ -347,6 +347,8 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.Query, relevantSources 
 			}
 
 			span.SetAttributes(
+				attribute.String("om.source.method", method.String()),
+				attribute.String("om.source.reqmethod", r.Method.String()),
 				attribute.String("om.source.sourceName", src.Name()),
 				attribute.String("om.source.queryType", r.Type),
 				attribute.String("om.source.queryScope", r.Scope),
@@ -494,10 +496,7 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.Query, relevantSources 
 			//
 			// Use the index here to ensure that we're actually editing the
 			// right thing
-			for i := range resultItems {
-				// Get a pointer to the item we're dealing with
-				item := resultItems[i]
-
+			for _, item := range resultItems {
 				// Handle the case where we are given a nil pointer
 				if item == nil {
 					continue
