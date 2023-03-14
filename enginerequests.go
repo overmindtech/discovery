@@ -401,7 +401,10 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.Query, relevantSources 
 						return false
 					}
 				} else {
-					span.SetAttributes(attribute.Int("om.cache.numItems", len(cachedItems)))
+					span.SetAttributes(
+						attribute.Int("om.source.numItems", len(cachedItems)),
+						attribute.Bool("om.source.cache", true),
+					)
 
 					if method == Get {
 						// If the method was Get we should validate that we have
@@ -458,7 +461,10 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.Query, relevantSources 
 				sourceDuration = time.Since(start)
 			}(ctx)
 
-			span.SetAttributes(attribute.Int("om.source.numItems", len(resultItems)))
+			span.SetAttributes(
+				attribute.Int("om.source.numItems", len(resultItems)),
+				attribute.Bool("om.source.cache", false),
+			)
 
 			if considerFailed(err) {
 				span.SetStatus(codes.Error, err.Error())
