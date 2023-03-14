@@ -319,8 +319,12 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.Query, relevantSources 
 
 	for _, src := range relevantSources {
 		if func() bool {
-			ctx, span := tracer.Start(ctx, src.Name())
-			defer span.End()
+			if len(relevantSources) > 1 {
+				ctx, span = tracer.Start(ctx, src.Name())
+				defer span.End()
+			} else {
+				span.SetName(fmt.Sprintf("CallSources: %v", src.Name()))
+			}
 
 			query := sdpcache.CacheQuery{
 				SST: sdpcache.SST{
