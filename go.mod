@@ -10,13 +10,13 @@ require (
 	github.com/nats-io/nats-server/v2 v2.9.15
 	github.com/nats-io/nats.go v1.24.0
 	github.com/overmindtech/connect v0.8.5
-	github.com/overmindtech/sdp-go v0.18.4
+	github.com/overmindtech/sdp-go v0.19.0
 	github.com/overmindtech/sdpcache v1.2.3
 	github.com/sirupsen/logrus v1.9.0
 	github.com/sourcegraph/conc v0.3.0 // use latest `main` to avoid heavy dependency chain
 	go.opentelemetry.io/otel v1.14.0
 	go.opentelemetry.io/otel/trace v1.14.0
-	google.golang.org/protobuf v1.29.0
+	google.golang.org/protobuf v1.29.1
 )
 
 // Transitive dependencies
@@ -31,7 +31,7 @@ require (
 	github.com/nats-io/jwt/v2 v2.3.0 // indirect
 	github.com/nats-io/nkeys v0.3.0 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
-	github.com/overmindtech/api-client v0.12.0 // indirect
+	github.com/overmindtech/api-client v0.13.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.40.0 // indirect
 	go.opentelemetry.io/otel/metric v0.37.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect

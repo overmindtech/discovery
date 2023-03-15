@@ -33,47 +33,26 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
         ports:
           - 8080:8080
+
     steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: 1.x
 
-    - name: Set up Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: ${{ matrix.go-version }}
+      - name: Get dependencies
+        run: |
+          go get -v -t -d ./...
 
-    - name: Check out code into the Go module directory
-      uses: actions/checkout@v3
+      - name: Vet
+        run: go vet ./...
 
-    # Get values for cache paths to be used in later steps
-    - name: Configure go caching
-      id: go-cache-paths
-      run: |
-        echo "go-build=$(go env GOCACHE)" >> $GITHUB_OUTPUT
-        echo "go-mod=$(go env GOMODCACHE)" >> $GITHUB_OUTPUT
-
-    # Cache go mod cache, used to speedup builds
-    - name: Go Mod Cache
-      uses: actions/cache@v3
-      with:
-        path: ${{ steps.go-cache-paths.outputs.go-mod }}
-        key: ${{ runner.os }}-test-go-${{ matrix.go-version }}-mod-${{ hashFiles('**/go.sum') }}
-
-    # Cache go build cache, used to speedup go test
-    - name: Go Build Cache
-      uses: actions/cache@v3
-      with:
-        path: ${{ steps.go-cache-paths.outputs.go-build }}
-        key: ${{ runner.os }}-test-go-${{ matrix.go-version }}-build-${{ hashFiles('**/go.sum') }}
-
-    - name: Get dependencies
-      run: |
-        go get -v -t -d ./...
-
-    - name: Test
-      env:
-        OVERMIND_NTE_ALLPERMS_CLIENT_ID: ${{ secrets.OVERMIND_NTE_ALLPERMS_CLIENT_ID }}
-        OVERMIND_NTE_ALLPERMS_CLIENT_SECRET: ${{ secrets.OVERMIND_NTE_ALLPERMS_CLIENT_SECRET }}
-        OVERMIND_NTE_ALLPERMS_DOMAIN: ${{ secrets.OVERMIND_NTE_ALLPERMS_DOMAIN }}
-      run: go test -v -timeout 3m ./... -race
+      - name: Test
+        run: go test -v -timeout 3m ./... -race
+        env:
+          OVERMIND_NTE_ALLPERMS_CLIENT_ID: ${{ secrets.OVERMIND_NTE_ALLPERMS_CLIENT_ID }}
+          OVERMIND_NTE_ALLPERMS_CLIENT_SECRET: ${{ secrets.OVERMIND_NTE_ALLPERMS_CLIENT_SECRET }}
+          OVERMIND_NTE_ALLPERMS_DOMAIN: ${{ secrets.OVERMIND_NTE_ALLPERMS_DOMAIN }}
 
   release:
     name: Release
