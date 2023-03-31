@@ -10,7 +10,7 @@ require (
 	github.com/nats-io/nats-server/v2 v2.9.15
 	github.com/nats-io/nats.go v1.24.0
 	github.com/overmindtech/connect v0.8.5
-	github.com/overmindtech/sdp-go v0.19.0
+	github.com/overmindtech/sdp-go v0.22.0
 	github.com/overmindtech/sdpcache v1.2.3
 	github.com/sirupsen/logrus v1.9.0
 	github.com/sourcegraph/conc v0.3.0 // use latest `main` to avoid heavy dependency chain
@@ -42,4 +42,10 @@ require (
 	golang.org/x/text v0.8.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
+)
+
+require (
+	github.com/auth0/go-jwt-middleware/v2 v2.1.0 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
+	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 )
