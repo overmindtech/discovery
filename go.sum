@@ -1,3 +1,5 @@
+github.com/auth0/go-jwt-middleware/v2 v2.1.0 h1:VU4LsC3aFPoqXVyEp8EixU6FNM+ZNIjECszRTvtGQI8=
+github.com/auth0/go-jwt-middleware/v2 v2.1.0/go.mod h1:CpzcJoleayAACpv+vt0AP8/aYn5TDngsqzLapV1nM4c=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
@@ -47,10 +49,13 @@ github.com/overmindtech/connect v0.8.5 h1:ns4+Q28pwUukrUv6nxX1cjGB1VyohFSj4wUP8L
 github.com/overmindtech/connect v0.8.5/go.mod h1:LWBArHjw274XfEfJqAuYpZ89QpDslDodmPbTJLYFobI=
 github.com/overmindtech/sdp-go v0.19.0 h1:+2NdJHwelXW1CkfcjUk1DKIzJqHYdJPxOh26ldHjcZA=
 github.com/overmindtech/sdp-go v0.19.0/go.mod h1:mnS1WY+JWDyRbDvGb758i1vnUXaFEL5fafT1kRSkWvs=
+github.com/overmindtech/sdp-go v0.22.0 h1:GurjRxwsYCTEMZvK+LBLIg6X/pGtxIQUIytbnAlCIh4=
+github.com/overmindtech/sdp-go v0.22.0/go.mod h1:1Zl3ZvAcPuaetwk5y7+0hsO8xFqgwf8DECCc9l5n2rg=
 github.com/overmindtech/sdpcache v1.2.3 h1:By8OdD61XKSn8D3L8BMUZaKE5TNm7oN/FO7ew1LSANs=
 github.com/overmindtech/sdpcache v1.2.3/go.mod h1:gsF2Gu3NcrxP7SaSBr7hk/fHuIiTwa5aViDUhQF+zxI=
 github.com/pingcap/errors v0.11.4 h1:lFuQV/oaUMGcD2tqt+01ROSmJs75VG1ToEOkZIZ4nE4=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
+github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/sirupsen/logrus v1.9.0 h1:trlNQbNUG3OdDrDil03MCb1H2o9nJ1x4/5LYw7byDE0=
@@ -106,5 +111,7 @@ google.golang.org/protobuf v1.29.1/go.mod h1:HV8QOd/L58Z+nl8r43ehVNZIU/HEI6OcFqw
 google.golang.org/protobuf v1.30.0 h1:kPPoIgf3TsEvrm0PFe15JQ+570QVxYzEvvHqChK+cng=
 google.golang.org/protobuf v1.30.0/go.mod h1:HV8QOd/L58Z+nl8r43ehVNZIU/HEI6OcFqwMG9pJV4I=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
+gopkg.in/square/go-jose.v2 v2.6.0 h1:NGk74WTnPKBNUhNzQX7PYcTLUjoq7mzKk2OKbvwk2iI=
+gopkg.in/square/go-jose.v2 v2.6.0/go.mod h1:M9dMgbHiYLoDGQrXy7OpJDJWiKiU//h+vD76mk0e1AI=
 gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
