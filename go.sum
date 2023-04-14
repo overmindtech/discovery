@@ -63,6 +63,8 @@ github.com/overmindtech/sdp-go v0.22.0 h1:GurjRxwsYCTEMZvK+LBLIg6X/pGtxIQUIytbnA
 github.com/overmindtech/sdp-go v0.22.0/go.mod h1:1Zl3ZvAcPuaetwk5y7+0hsO8xFqgwf8DECCc9l5n2rg=
 github.com/overmindtech/sdp-go v0.24.4 h1:aVHwb/8nEvDkOivsiSlHMppwzFGBqekVl2hXjJvSSYE=
 github.com/overmindtech/sdp-go v0.24.4/go.mod h1:UQApAHxnlT9gdGP7cu793ZNB9PK8TC8F3UqMGm2aVLs=
+github.com/overmindtech/sdp-go v0.26.0 h1:7eCC0pDots3yEYeXHiFyowlN2FRYluNy5R36mc4zv+U=
+github.com/overmindtech/sdp-go v0.26.0/go.mod h1:UQApAHxnlT9gdGP7cu793ZNB9PK8TC8F3UqMGm2aVLs=
 github.com/overmindtech/sdpcache v1.2.3 h1:By8OdD61XKSn8D3L8BMUZaKE5TNm7oN/FO7ew1LSANs=
 github.com/overmindtech/sdpcache v1.2.3/go.mod h1:gsF2Gu3NcrxP7SaSBr7hk/fHuIiTwa5aViDUhQF+zxI=
 github.com/overmindtech/sdpcache v1.3.0 h1:58kmqw1l+ZyZafxOaXW5ccDeapdx4E7QHOMRPpWZ5VA=
