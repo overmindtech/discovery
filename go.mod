@@ -7,7 +7,7 @@ require (
 	github.com/getsentry/sentry-go v0.20.0
 	github.com/google/uuid v1.3.0
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
-	github.com/nats-io/nats-server/v2 v2.9.15
+	github.com/nats-io/nats-server/v2 v2.9.16
 	github.com/nats-io/nats.go v1.25.0
 	github.com/overmindtech/connect v0.9.0
 	github.com/overmindtech/sdp-go v0.26.0
@@ -26,7 +26,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/btree v1.1.2 // indirect
-	github.com/klauspost/compress v1.16.0 // indirect
+	github.com/klauspost/compress v1.16.4 // indirect
 	github.com/minio/highwayhash v1.0.2 // indirect
 	github.com/nats-io/jwt/v2 v2.4.1 // indirect
 	github.com/nats-io/nkeys v0.4.4 // indirect
