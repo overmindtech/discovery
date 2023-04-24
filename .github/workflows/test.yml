@@ -28,7 +28,7 @@ jobs:
           # network alias so we can use docker-provided DNS to have them talk to
           # one another
           NATS_URL: nats://nats-auth:4222
-          API_SERVER_PGHOST: localhost
+          API_SERVER_PGHOST: postgres
           API_SERVER_PGUSER: ci
           API_SERVER_PGPASSWORD: ci
           API_SERVER_PGDBNAME: apiserverdb_local
@@ -42,8 +42,6 @@ jobs:
         env:
           POSTGRES_USER: ci
           POSTGRES_PASSWORD: ci
-        ports:
-          - 5432:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
