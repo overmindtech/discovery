@@ -20,7 +20,7 @@ services:
 
     # Runs app on the same network as the database container, allows "forwardPorts" in devcontainer.json function.
     networks:
-      - nats
+      - discovery
 
     # Use "forwardPorts" in **devcontainer.json** to forward an app port locally.
     # (Adding the "ports" property to this file will not forward from a Codespace.)
@@ -29,22 +29,47 @@ services:
   nats-auth:
     image: ghcr.io/overmindtech/test-populated-nats:main
     networks:
-      - nats
+      - discovery
 
   # Unauthenticated NATS for simpler testing
   nats:
     image: nats
     networks:
-      - nats
+      - discovery
 
   api-server:
     image: ghcr.io/overmindtech/test-populated-api-server:main
     command: --nats-url nats://nats-auth:4222 --disable-kube
+    env_file:
+      - ./env/api-server.env
     networks:
-      - nats
+      - discovery
+
+  apiserverdb:
+    image: postgres:14.6-alpine
+
+    restart: always
+    env_file:
+      - ./env/api-server.env
+    environment:
+      PGDATA: /var/lib/postgresql/data/pgdata
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    networks:
+      - discovery
+    volumes:
+      # note that this is a parent dir of PGDIR to avoid permissions issues
+      # see https://github.com/docker-library/docs/blob/master/postgres/README.md#pgdata
+      - discoverydb:/var/lib/postgresql/data
 
 networks:
-  nats:
+  discovery:
 
 volumes:
   nsc-storage:
+  discoverydb:

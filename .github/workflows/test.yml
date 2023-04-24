@@ -28,11 +28,26 @@ jobs:
           # network alias so we can use docker-provided DNS to have them talk to
           # one another
           NATS_URL: nats://nats-auth:4222
+          API_SERVER_PGHOST: postgres
+          API_SERVER_PGUSER: ci
+          API_SERVER_PGPASSWORD: ci
         credentials:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
         ports:
           - 8080:8080
+      postgres:
+        image: postgres:14.6-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - uses: actions/checkout@v3
