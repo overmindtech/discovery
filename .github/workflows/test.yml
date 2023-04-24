@@ -31,17 +31,21 @@ jobs:
           API_SERVER_PGHOST: postgres
           API_SERVER_PGUSER: ci
           API_SERVER_PGPASSWORD: ci
-          API_SERVER_PGDBNAME: apiserverdb_local
+          API_SERVER_PGDBNAME: ci
         credentials:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
         ports:
           - 8080:8080
+        options: >-
+          --restart always
       postgres:
         image: postgres:14.6-alpine
         env:
           POSTGRES_USER: ci
           POSTGRES_PASSWORD: ci
+        ports:
+          - 5432:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
