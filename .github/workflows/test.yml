@@ -28,7 +28,7 @@ jobs:
           # network alias so we can use docker-provided DNS to have them talk to
           # one another
           NATS_URL: nats://nats-auth:4222
-          API_SERVER_PGHOST: localhost
+          API_SERVER_PGHOST: 127.0.0.1
           API_SERVER_PGUSER: ci
           API_SERVER_PGPASSWORD: ci
         credentials:
