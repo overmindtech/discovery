@@ -47,6 +47,8 @@ github.com/overmindtech/connect v0.9.0 h1:laork6I4Ww+4dYv1WHRXhmfRFQKKUORWUSdTMn
 github.com/overmindtech/connect v0.9.0/go.mod h1:CgP8Wko8JBqTM6klTv75Q3kCWagvPXOjD9dvyQRAtHE=
 github.com/overmindtech/sdp-go v0.27.0 h1:g3cILgNfChoItsLQhhC+anVfpef8YfnYtVGtPsFP/FM=
 github.com/overmindtech/sdp-go v0.27.0/go.mod h1:fgvXkK8Adr0jL5Aoc7s1eWRsT1QDS1CJwqlUbhlxUNQ=
+github.com/overmindtech/sdp-go v0.28.1 h1:fNLWanJxd1FWbT8HcHNaFWVwQyIP6AvLAtvNZCkP5PQ=
+github.com/overmindtech/sdp-go v0.28.1/go.mod h1:fgvXkK8Adr0jL5Aoc7s1eWRsT1QDS1CJwqlUbhlxUNQ=
 github.com/overmindtech/sdpcache v1.3.0 h1:58kmqw1l+ZyZafxOaXW5ccDeapdx4E7QHOMRPpWZ5VA=
 github.com/overmindtech/sdpcache v1.3.0/go.mod h1:tE2Qtssr4rZykNctJnS5dCw5fd8JVbBfCh6zUGPRrSI=
 github.com/pingcap/errors v0.11.4 h1:lFuQV/oaUMGcD2tqt+01ROSmJs75VG1ToEOkZIZ4nE4=
