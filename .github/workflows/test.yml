@@ -40,7 +40,7 @@ jobs:
         options: >-
           --restart always
       postgres:
-        image: postgres:14.7-alpine
+        image: postgres:15.2-alpine
         env:
           POSTGRES_USER: ci
           POSTGRES_PASSWORD: ci
