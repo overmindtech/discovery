@@ -32,6 +32,7 @@ jobs:
           API_SERVER_PGUSER: ci
           API_SERVER_PGPASSWORD: ci
           API_SERVER_PGDBNAME: ci
+          ATLAS_DISABLE_SSL: true
         credentials:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
