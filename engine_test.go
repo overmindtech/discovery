@@ -54,17 +54,17 @@ func newStartedEngine(t *testing.T, name string, no *connect.NATSOptions, source
 }
 
 func TestDeleteQuery(t *testing.T) {
-	one := &sdp.Query{
+	one := &sdp.LinkedItemQuery{Query: &sdp.Query{
 		Scope:  "one",
 		Method: sdp.QueryMethod_LIST,
 		Query:  "",
-	}
-	two := &sdp.Query{
+	}}
+	two := &sdp.LinkedItemQuery{Query: &sdp.Query{
 		Scope:  "two",
 		Method: sdp.QueryMethod_SEARCH,
 		Query:  "2",
-	}
-	irs := []*sdp.Query{
+	}}
+	irs := []*sdp.LinkedItemQuery{
 		one,
 		two,
 	}
@@ -87,10 +87,12 @@ func TestTrackQuery(t *testing.T) {
 		qt := QueryTracker{
 			Engine: e,
 			Query: &sdp.Query{
-				Type:      "person",
-				Method:    sdp.QueryMethod_LIST,
-				LinkDepth: 10,
-				UUID:      u[:],
+				Type:   "person",
+				Method: sdp.QueryMethod_LIST,
+				RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+					LinkDepth: 10,
+				},
+				UUID: u[:],
 			},
 		}
 
@@ -105,7 +107,7 @@ func TestTrackQuery(t *testing.T) {
 		}
 	})
 
-	t.Run("With many querys", func(t *testing.T) {
+	t.Run("With many queries", func(t *testing.T) {
 		t.Parallel()
 
 		e := newStartedEngine(t, "TestTrackQuery_many", nil)
@@ -121,11 +123,13 @@ func TestTrackQuery(t *testing.T) {
 				qt := QueryTracker{
 					Engine: e,
 					Query: &sdp.Query{
-						Type:      "person",
-						Query:     fmt.Sprintf("person-%v", i),
-						Method:    sdp.QueryMethod_GET,
-						LinkDepth: 10,
-						UUID:      u[:],
+						Type:   "person",
+						Query:  fmt.Sprintf("person-%v", i),
+						Method: sdp.QueryMethod_GET,
+						RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+							LinkDepth: 10,
+						},
+						UUID: u[:],
 					},
 				}
 
@@ -157,11 +161,13 @@ func TestDeleteTrackedQuery(t *testing.T) {
 			qt := QueryTracker{
 				Engine: e,
 				Query: &sdp.Query{
-					Type:      "person",
-					Query:     fmt.Sprintf("person-%v", i),
-					Method:    sdp.QueryMethod_GET,
-					LinkDepth: 10,
-					UUID:      u[:],
+					Type:   "person",
+					Query:  fmt.Sprintf("person-%v", i),
+					Method: sdp.QueryMethod_GET,
+					RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+						LinkDepth: 10,
+					},
+					UUID: u[:],
 				},
 			}
 
@@ -230,10 +236,12 @@ func TestNats(t *testing.T) {
 		})
 
 		req := sdp.NewQueryProgress(&sdp.Query{
-			Type:            "person",
-			Method:          sdp.QueryMethod_GET,
-			Query:           "basic",
-			LinkDepth:       0,
+			Type:   "person",
+			Method: sdp.QueryMethod_GET,
+			Query:  "basic",
+			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+				LinkDepth: 0,
+			},
 			Scope:           "test",
 			ResponseSubject: NewResponseSubject(),
 			ItemSubject:     NewItemSubject(),
@@ -257,10 +265,12 @@ func TestNats(t *testing.T) {
 		})
 
 		req := sdp.NewQueryProgress(&sdp.Query{
-			Type:            "person",
-			Method:          sdp.QueryMethod_GET,
-			Query:           "deeplink",
-			LinkDepth:       10,
+			Type:   "person",
+			Method: sdp.QueryMethod_GET,
+			Query:  "deeplink",
+			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+				LinkDepth: 10,
+			},
 			Scope:           "test",
 			ResponseSubject: NewResponseSubject(),
 			ItemSubject:     NewItemSubject(),
@@ -326,10 +336,12 @@ func TestNatsCancel(t *testing.T) {
 		u := uuid.New()
 
 		progress := sdp.NewQueryProgress(&sdp.Query{
-			Type:            "person",
-			Method:          sdp.QueryMethod_GET,
-			Query:           "foo",
-			LinkDepth:       100,
+			Type:   "person",
+			Method: sdp.QueryMethod_GET,
+			Query:  "foo",
+			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+				LinkDepth: 100,
+			},
 			Scope:           "*",
 			ResponseSubject: nats.NewInbox(),
 			ItemSubject:     "items.bin",
@@ -636,10 +648,12 @@ func TestNatsAuth(t *testing.T) {
 		})
 
 		_, _, err := sdp.NewQueryProgress(&sdp.Query{
-			Type:            "person",
-			Method:          sdp.QueryMethod_GET,
-			Query:           "basic",
-			LinkDepth:       0,
+			Type:   "person",
+			Method: sdp.QueryMethod_GET,
+			Query:  "basic",
+			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+				LinkDepth: 0,
+			},
 			Scope:           "test",
 			ResponseSubject: NewResponseSubject(),
 			ItemSubject:     NewItemSubject(),
@@ -661,10 +675,12 @@ func TestNatsAuth(t *testing.T) {
 		})
 
 		_, _, err := sdp.NewQueryProgress(&sdp.Query{
-			Type:            "person",
-			Method:          sdp.QueryMethod_GET,
-			Query:           "deeplink",
-			LinkDepth:       10,
+			Type:   "person",
+			Method: sdp.QueryMethod_GET,
+			Query:  "deeplink",
+			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+				LinkDepth: 10,
+			},
 			Scope:           "test",
 			ResponseSubject: NewResponseSubject(),
 			ItemSubject:     NewItemSubject(),

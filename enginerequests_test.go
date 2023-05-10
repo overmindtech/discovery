@@ -29,11 +29,13 @@ func TestExecuteQuery(t *testing.T) {
 
 	t.Run("Basic happy-path Get query", func(t *testing.T) {
 		q := &sdp.Query{
-			Type:            "person",
-			Method:          sdp.QueryMethod_GET,
-			Query:           "foo",
-			Scope:           "test",
-			LinkDepth:       3,
+			Type:   "person",
+			Method: sdp.QueryMethod_GET,
+			Query:  "foo",
+			Scope:  "test",
+			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+				LinkDepth: 3,
+			},
 			ItemSubject:     "items",
 			ResponseSubject: "responses",
 		}
@@ -52,14 +54,18 @@ func TestExecuteQuery(t *testing.T) {
 			t.Errorf("expected source's Get() to have been called 1 time, got %v", x)
 		}
 
-		if x := len(items); x != 1 {
-			t.Errorf("expected 1 item, got %v", x)
+		if len(items) == 0 {
+			t.Fatal("expected 1 item, got none")
+		}
+
+		if len(items) > 1 {
+			t.Errorf("expected 1 item, got %v", items)
 		}
 
 		item := items[0]
-		query := item.LinkedItemQueries[0]
+		query := item.LinkedItemQueries[0].Query
 
-		if ld := query.LinkDepth; ld != 2 {
+		if ld := query.GetRecursionBehaviour().GetLinkDepth(); ld != 2 {
 			t.Errorf("expected linked item depth to be 1 less than the query (2), got %v", ld)
 		}
 
@@ -78,11 +84,13 @@ func TestExecuteQuery(t *testing.T) {
 
 	t.Run("Wrong scope Get query", func(t *testing.T) {
 		q := &sdp.Query{
-			Type:      "person",
-			Method:    sdp.QueryMethod_GET,
-			Query:     "foo",
-			Scope:     "wrong",
-			LinkDepth: 0,
+			Type:   "person",
+			Method: sdp.QueryMethod_GET,
+			Query:  "foo",
+			Scope:  "wrong",
+			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+				LinkDepth: 0,
+			},
 		}
 
 		_, errs, err := e.ExecuteQuerySync(context.Background(), q)
@@ -103,11 +111,13 @@ func TestExecuteQuery(t *testing.T) {
 
 	t.Run("Wrong type Get query", func(t *testing.T) {
 		q := &sdp.Query{
-			Type:      "house",
-			Method:    sdp.QueryMethod_GET,
-			Query:     "foo",
-			Scope:     "test",
-			LinkDepth: 0,
+			Type:   "house",
+			Method: sdp.QueryMethod_GET,
+			Query:  "foo",
+			Scope:  "test",
+			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+				LinkDepth: 0,
+			},
 		}
 
 		_, errs, err := e.ExecuteQuerySync(context.Background(), q)
@@ -127,10 +137,12 @@ func TestExecuteQuery(t *testing.T) {
 
 	t.Run("Basic List query", func(t *testing.T) {
 		q := &sdp.Query{
-			Type:      "person",
-			Method:    sdp.QueryMethod_LIST,
-			Scope:     "test",
-			LinkDepth: 5,
+			Type:   "person",
+			Method: sdp.QueryMethod_LIST,
+			Scope:  "test",
+			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+				LinkDepth: 5,
+			},
 		}
 
 		items, errs, err := e.ExecuteQuerySync(context.Background(), q)
@@ -150,11 +162,13 @@ func TestExecuteQuery(t *testing.T) {
 
 	t.Run("Basic Search query", func(t *testing.T) {
 		q := &sdp.Query{
-			Type:      "person",
-			Method:    sdp.QueryMethod_SEARCH,
-			Query:     "TEST",
-			Scope:     "test",
-			LinkDepth: 5,
+			Type:   "person",
+			Method: sdp.QueryMethod_SEARCH,
+			Query:  "TEST",
+			Scope:  "test",
+			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+				LinkDepth: 5,
+			},
 		}
 
 		items, errs, err := e.ExecuteQuerySync(context.Background(), q)
@@ -201,11 +215,13 @@ func TestHandleQuery(t *testing.T) {
 		})
 
 		req := sdp.Query{
-			Type:      sdp.WILDCARD,
-			Method:    sdp.QueryMethod_GET,
-			Query:     "Dylan",
-			Scope:     "test1",
-			LinkDepth: 0,
+			Type:   sdp.WILDCARD,
+			Method: sdp.QueryMethod_GET,
+			Query:  "Dylan",
+			Scope:  "test1",
+			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+				LinkDepth: 0,
+			},
 		}
 
 		// Run the handler
@@ -228,11 +244,13 @@ func TestHandleQuery(t *testing.T) {
 		})
 
 		req := sdp.Query{
-			Type:      "person",
-			Method:    sdp.QueryMethod_GET,
-			Query:     "Dylan1",
-			Scope:     sdp.WILDCARD,
-			LinkDepth: 0,
+			Type:   "person",
+			Method: sdp.QueryMethod_GET,
+			Query:  "Dylan1",
+			Scope:  sdp.WILDCARD,
+			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+				LinkDepth: 0,
+			},
 		}
 
 		// Run the handler
@@ -262,11 +280,13 @@ func TestWildcardSourceExpansion(t *testing.T) {
 
 	t.Run("query scope should be preserved", func(t *testing.T) {
 		req := sdp.Query{
-			Type:      "person",
-			Method:    sdp.QueryMethod_GET,
-			Query:     "Dylan1",
-			Scope:     "something.specific",
-			LinkDepth: 0,
+			Type:   "person",
+			Method: sdp.QueryMethod_GET,
+			Query:  "Dylan1",
+			Scope:  "something.specific",
+			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+				LinkDepth: 0,
+			},
 		}
 
 		// Run the handler
@@ -307,11 +327,13 @@ func TestSendQuerySync(t *testing.T) {
 		var items []*sdp.Item
 
 		progress = sdp.NewQueryProgress(&sdp.Query{
-			Type:            "person",
-			Method:          sdp.QueryMethod_GET,
-			Query:           "Dylan",
-			Scope:           "test",
-			LinkDepth:       0,
+			Type:   "person",
+			Method: sdp.QueryMethod_GET,
+			Query:  "Dylan",
+			Scope:  "test",
+			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+				LinkDepth: 0,
+			},
 			IgnoreCache:     false,
 			UUID:            u[:],
 			Timeout:         durationpb.New(10 * time.Minute),

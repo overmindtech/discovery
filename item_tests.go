@@ -59,11 +59,12 @@ Type names should match RFC1123 (lower case). This means the name must:
 	}
 
 	for index, linkedItem := range i.GetLinkedItems() {
-		if linkedItem.GetType() == "" {
+		item := linkedItem.Item
+		if item.GetType() == "" {
 			t.Errorf("LinkedItem %v of item %v has empty type", index, i.GloballyUniqueName())
 		}
 
-		if linkedItem.GetUniqueAttributeValue() == "" {
+		if item.GetUniqueAttributeValue() == "" {
 			t.Errorf("LinkedItem %v of item %v has empty UniqueAttributeValue", index, i.GloballyUniqueName())
 		}
 
@@ -72,18 +73,19 @@ Type names should match RFC1123 (lower case). This means the name must:
 	}
 
 	for index, linkedItemQuery := range i.GetLinkedItemQueries() {
-		if linkedItemQuery.GetType() == "" {
-			t.Errorf("LinkedItemQuery %v of item %v has empty type", index, i.GloballyUniqueName())
+		query := linkedItemQuery.Query
+		if query.GetType() == "" {
+			t.Errorf("LinkedItemQueries %v of item %v has empty type", index, i.GloballyUniqueName())
 		}
 
-		if linkedItemQuery.GetMethod() != sdp.QueryMethod_LIST {
-			if linkedItemQuery.GetQuery() == "" {
-				t.Errorf("LinkedItemQuery %v of item %v has empty query. This is not allowed unless the method is LIST", index, i.GloballyUniqueName())
+		if query.GetMethod() != sdp.QueryMethod_LIST {
+			if query.GetQuery() == "" {
+				t.Errorf("LinkedItemQueries %v of item %v has empty query. This is not allowed unless the method is LIST", index, i.GloballyUniqueName())
 			}
 		}
 
-		if linkedItemQuery.GetScope() == "" {
-			t.Errorf("LinkedItemQuery %v of item %v has empty scope", index, i.GloballyUniqueName())
+		if query.GetScope() == "" {
+			t.Errorf("LinkedItemQueries %v of item %v has empty scope", index, i.GloballyUniqueName())
 		}
 	}
 }
