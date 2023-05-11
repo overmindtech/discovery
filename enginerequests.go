@@ -89,13 +89,19 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 		attribute.String("om.sdp.query", query.Query),
 		attribute.String("om.sdp.queryType", query.Type),
 		attribute.String("om.sdp.queryMethod", query.Method.String()),
-		attribute.Int("om.sdp.queryLinkDepth", int(query.LinkDepth)),
 		attribute.String("om.sdp.queryScope", query.Scope),
 		attribute.String("om.sdp.queryTimeout", query.Timeout.AsDuration().String()),
 		attribute.Bool("om.sdp.queryTimeoutOverridden", timeoutOverride),
 		attribute.String("om.sdp.queryUUID", u.String()),
 		attribute.Bool("om.sdp.queryIgnoreCache", query.IgnoreCache),
 	)
+
+	if query.RecursionBehaviour != nil {
+		span.SetAttributes(
+			attribute.Int("om.sdp.queryLinkDepth", int(query.RecursionBehaviour.LinkDepth)),
+			attribute.Bool("om.sdp.queryFollowOnlyBlastPropagation", query.RecursionBehaviour.FollowOnlyBlastPropagation),
+		)
+	}
 
 	qt := QueryTracker{
 		Query:  query,
@@ -216,14 +222,23 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 					// subject info along with the number of remaining links. If the link
 					// depth is zero then we just pass then back in their normal form as we
 					// won't be executing them
-					if query.GetLinkDepth() > 0 {
+					if query.RecursionBehaviour.GetLinkDepth() > 0 {
 						for _, lir := range i.LinkedItemQueries {
-							lir.LinkDepth = query.LinkDepth - 1
-							lir.ItemSubject = query.ItemSubject
-							lir.ResponseSubject = query.ResponseSubject
-							lir.IgnoreCache = query.IgnoreCache
-							lir.Timeout = query.Timeout
-							lir.UUID = query.UUID
+							lir.Query.RecursionBehaviour = &sdp.Query_RecursionBehaviour{
+								LinkDepth:                  query.RecursionBehaviour.LinkDepth - 1,
+								FollowOnlyBlastPropagation: query.RecursionBehaviour.FollowOnlyBlastPropagation,
+							}
+							if query.RecursionBehaviour.FollowOnlyBlastPropagation && !lir.BlastPropagation.Out {
+								// we're only following blast propagation, so do not link this item further
+								// TODO: we might want to drop the link completely if this returns too much
+								// information, but that could risk missing revlinks
+								lir.Query.RecursionBehaviour.LinkDepth = 0
+							}
+							lir.Query.ItemSubject = query.ItemSubject
+							lir.Query.ResponseSubject = query.ResponseSubject
+							lir.Query.IgnoreCache = query.IgnoreCache
+							lir.Query.Timeout = query.Timeout
+							lir.Query.UUID = query.UUID
 						}
 					}
 

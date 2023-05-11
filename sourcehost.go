@@ -146,30 +146,20 @@ func (sh *SourceHost) ExpandQuery(q *sdp.Query) map[*sdp.Query][]Source {
 			// * The query scope is a wildcard (and the source is not hidden), or
 			// * The query scope matches source scope
 			if IsWildcard(sourceScope) || (IsWildcard(q.Scope) && !isHidden) || sourceScope == q.Scope {
-				var scope string
+				dest := sdp.Query{}
+				q.Copy(&dest)
+
+				dest.Type = src.Type()
 
 				// Choose the more specific scope
 				if IsWildcard(sourceScope) {
-					scope = q.Scope
+					dest.Scope = q.Scope
 				} else {
-					scope = sourceScope
-				}
-
-				q := sdp.Query{
-					Type:            src.Type(),
-					Method:          q.Method,
-					Query:           q.Query,
-					Scope:           scope,
-					ItemSubject:     q.ItemSubject,
-					ResponseSubject: q.ResponseSubject,
-					LinkDepth:       q.LinkDepth,
-					IgnoreCache:     q.IgnoreCache,
-					UUID:            q.UUID,
-					Timeout:         q.Timeout,
+					dest.Scope = sourceScope
 				}
 
 				// deal with duplicate queries after expansion
-				hash, err := queryHash(&q)
+				hash, err := queryHash(&dest)
 
 				if err == nil {
 					if existing, ok := queries[hash]; ok {
@@ -179,7 +169,7 @@ func (sh *SourceHost) ExpandQuery(q *sdp.Query) map[*sdp.Query][]Source {
 							Query   *sdp.Query
 							Sources []Source
 						}{
-							Query: &q,
+							Query: &dest,
 							Sources: []Source{
 								src,
 							},

@@ -45,12 +45,14 @@ func (s *TestSource) NewTestItem(scope string, query string) *sdp.Item {
 				},
 			},
 		},
-		LinkedItemQueries: []*sdp.Query{
+		LinkedItemQueries: []*sdp.LinkedItemQuery{
 			{
-				Type:   "person",
-				Method: sdp.QueryMethod_GET,
-				Query:  RandomName(),
-				Scope:  scope,
+				Query: &sdp.Query{
+					Type:   "person",
+					Method: sdp.QueryMethod_GET,
+					Query:  RandomName(),
+					Scope:  scope,
+				},
 			},
 		},
 	}

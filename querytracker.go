@@ -124,7 +124,7 @@ func (qt *QueryTracker) startLinking(ctx context.Context) {
 								hasSourceQuery = true
 								itemSubject = sourceQuery.ItemSubject
 
-								if sourceQuery.GetLinkDepth() > 0 {
+								if sourceQuery.RecursionBehaviour.GetLinkDepth() > 0 {
 									// Resolve links
 									qt.linkItem(ctx, i)
 								}
@@ -170,7 +170,7 @@ func (qt *QueryTracker) linkItem(ctx context.Context, parent *sdp.Item) {
 	lirWG.Add(len(parent.LinkedItemQueries))
 
 	for _, lir := range parent.LinkedItemQueries {
-		go func(p *sdp.Item, req *sdp.Query) {
+		go func(p *sdp.Item, req *sdp.LinkedItemQuery) {
 			defer lirWG.Done()
 
 			if qt.Engine == nil {
@@ -184,7 +184,7 @@ func (qt *QueryTracker) linkItem(ctx context.Context, parent *sdp.Item) {
 
 			go func(e chan error) {
 				defer sentry.RecoverWithContext(ctx)
-				e <- qt.Engine.ExecuteQuery(ctx, req, items, errs)
+				e <- qt.Engine.ExecuteQuery(ctx, req.Query, items, errs)
 			}(queryErr)
 
 			for {
@@ -199,7 +199,7 @@ func (qt *QueryTracker) linkItem(ctx context.Context, parent *sdp.Item) {
 
 						// Create a reference to the newly found item and attach
 						// to the parent item
-						p.LinkedItems = append(p.LinkedItems, li.Reference())
+						p.LinkedItems = append(p.LinkedItems, &sdp.LinkedItem{Item: li.Reference()})
 
 						itemMutex.Unlock()
 					} else {
@@ -346,8 +346,8 @@ func (qt *QueryTracker) Cancel() {
 }
 
 // deleteQuery Deletes an item query from a slice
-func deleteQuery(queries []*sdp.Query, remove *sdp.Query) []*sdp.Query {
-	finalQueries := make([]*sdp.Query, 0)
+func deleteQuery(queries []*sdp.LinkedItemQuery, remove *sdp.LinkedItemQuery) []*sdp.LinkedItemQuery {
+	finalQueries := make([]*sdp.LinkedItemQuery, 0)
 	for _, q := range queries {
 		if q != remove {
 			finalQueries = append(finalQueries, q)

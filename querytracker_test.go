@@ -55,12 +55,14 @@ func (s *SpeedTestSource) Get(ctx context.Context, scope string, query string) (
 					},
 				},
 			},
-			LinkedItemQueries: []*sdp.Query{
+			LinkedItemQueries: []*sdp.LinkedItemQuery{
 				{
-					Type:   "person",
-					Method: sdp.QueryMethod_GET,
-					Query:  query + time.Now().String(),
-					Scope:  scope,
+					Query: &sdp.Query{
+						Type:   "person",
+						Method: sdp.QueryMethod_GET,
+						Query:  query + time.Now().String(),
+						Scope:  scope,
+					},
 				},
 			},
 			Scope: scope,
@@ -101,11 +103,13 @@ func TestExecute(t *testing.T) {
 		qt := QueryTracker{
 			Engine: e,
 			Query: &sdp.Query{
-				Type:      "person",
-				Method:    sdp.QueryMethod_GET,
-				Query:     "Dylan",
-				LinkDepth: 0,
-				Scope:     "test",
+				Type:   "person",
+				Method: sdp.QueryMethod_GET,
+				Query:  "Dylan",
+				RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+					LinkDepth: 0,
+				},
+				Scope: "test",
 			},
 		}
 
@@ -130,11 +134,13 @@ func TestExecute(t *testing.T) {
 		qt := QueryTracker{
 			Engine: e,
 			Query: &sdp.Query{
-				Type:      "person",
-				Method:    sdp.QueryMethod_GET,
-				Query:     "Dylan",
-				LinkDepth: 10,
-				Scope:     "test",
+				Type:   "person",
+				Method: sdp.QueryMethod_GET,
+				Query:  "Dylan",
+				RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+					LinkDepth: 10,
+				},
+				Scope: "test",
 			},
 		}
 
@@ -159,11 +165,13 @@ func TestExecute(t *testing.T) {
 		qt := QueryTracker{
 			Engine: nil,
 			Query: &sdp.Query{
-				Type:      "person",
-				Method:    sdp.QueryMethod_GET,
-				Query:     "Dylan",
-				LinkDepth: 10,
-				Scope:     "test",
+				Type:   "person",
+				Method: sdp.QueryMethod_GET,
+				Query:  "Dylan",
+				RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+					LinkDepth: 10,
+				},
+				Scope: "test",
 			},
 		}
 
@@ -202,12 +210,14 @@ func TestTimeout(t *testing.T) {
 		qt := QueryTracker{
 			Engine: e,
 			Query: &sdp.Query{
-				Type:      "person",
-				Method:    sdp.QueryMethod_GET,
-				Query:     "Dylan",
-				LinkDepth: 0,
-				Scope:     "test",
-				Timeout:   durationpb.New(200 * time.Millisecond),
+				Type:   "person",
+				Method: sdp.QueryMethod_GET,
+				Query:  "Dylan",
+				RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+					LinkDepth: 0,
+				},
+				Scope:   "test",
+				Timeout: durationpb.New(200 * time.Millisecond),
 			},
 		}
 
@@ -232,12 +242,14 @@ func TestTimeout(t *testing.T) {
 		qt := QueryTracker{
 			Engine: e,
 			Query: &sdp.Query{
-				Type:      "person",
-				Method:    sdp.QueryMethod_GET,
-				Query:     "somethingElse",
-				LinkDepth: 0,
-				Scope:     "test",
-				Timeout:   durationpb.New(50 * time.Millisecond),
+				Type:   "person",
+				Method: sdp.QueryMethod_GET,
+				Query:  "somethingElse",
+				RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+					LinkDepth: 0,
+				},
+				Scope:   "test",
+				Timeout: durationpb.New(50 * time.Millisecond),
 			},
 		}
 
@@ -252,12 +264,14 @@ func TestTimeout(t *testing.T) {
 		qt := QueryTracker{
 			Engine: e,
 			Query: &sdp.Query{
-				Type:      "person",
-				Method:    sdp.QueryMethod_GET,
-				Query:     "somethingElse1",
-				LinkDepth: 10,
-				Scope:     "test",
-				Timeout:   durationpb.New(350 * time.Millisecond),
+				Type:   "person",
+				Method: sdp.QueryMethod_GET,
+				Query:  "somethingElse1",
+				RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+					LinkDepth: 10,
+				},
+				Scope:   "test",
+				Timeout: durationpb.New(350 * time.Millisecond),
 			},
 		}
 
@@ -285,12 +299,14 @@ func TestCancel(t *testing.T) {
 	qt := QueryTracker{
 		Engine: e,
 		Query: &sdp.Query{
-			Type:      "person",
-			Method:    sdp.QueryMethod_GET,
-			Query:     "somethingElse1",
-			LinkDepth: 10,
-			Scope:     "test",
-			UUID:      u[:],
+			Type:   "person",
+			Method: sdp.QueryMethod_GET,
+			Query:  "somethingElse1",
+			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+				LinkDepth: 10,
+			},
+			Scope: "test",
+			UUID:  u[:],
 		},
 	}
 

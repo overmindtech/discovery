@@ -47,16 +47,16 @@ func (s *SlowSource) Get(ctx context.Context, scope string, query string) (*sdp.
 		UniqueAttribute:   "name",
 		Attributes:        attributes,
 		Scope:             "test",
-		LinkedItemQueries: []*sdp.Query{},
+		LinkedItemQueries: []*sdp.LinkedItemQuery{},
 	}
 
 	for i := 0; i != 2; i++ {
-		item.LinkedItemQueries = append(item.LinkedItemQueries, &sdp.Query{
+		item.LinkedItemQueries = append(item.LinkedItemQueries, &sdp.LinkedItemQuery{Query: &sdp.Query{
 			Type:   "person",
 			Method: sdp.QueryMethod_GET,
 			Query:  RandomName(),
 			Scope:  "test",
-		})
+		}})
 	}
 
 	time.Sleep(time.Until(end))
@@ -157,11 +157,13 @@ func TimeQueries(numQueries int, linkDepth int, numParallel int) TimedResults {
 	for i := 0; i < numQueries; i++ {
 		qt := QueryTracker{
 			Query: &sdp.Query{
-				Type:      "person",
-				Method:    sdp.QueryMethod_GET,
-				Query:     RandomName(),
-				Scope:     "test",
-				LinkDepth: uint32(linkDepth),
+				Type:   "person",
+				Method: sdp.QueryMethod_GET,
+				Query:  RandomName(),
+				Scope:  "test",
+				RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+					LinkDepth: uint32(linkDepth),
+				},
 			},
 			Engine: e,
 		}
