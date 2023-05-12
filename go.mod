@@ -11,7 +11,7 @@ require (
 	github.com/nats-io/nats.go v1.25.0
 	github.com/overmindtech/connect v0.10.0
 	github.com/overmindtech/sdp-go v0.30.0
-	github.com/overmindtech/sdpcache v1.3.1-0.20230510124051-b75e8c6774cb
+	github.com/overmindtech/sdpcache v1.4.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/sourcegraph/conc v0.3.0
 	go.opentelemetry.io/otel v1.15.1
