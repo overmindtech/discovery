@@ -408,6 +408,13 @@ func (e *Engine) ClearCache() {
 	e.cache.Clear()
 }
 
+// ClearSources Deletes all sources from the engine, allowing new sources to be
+// added using `AddSource()`. Note that this requires a restart using
+// `Restart()` in order to take effect
+func (e *Engine) ClearSources() {
+	e.sh.ClearAllSources()
+}
+
 // IsWildcard checks if a string is the wildcard. Use this instead of
 // implementing the wildcard check everywhere so that if we need to change the
 // wildcard at a later date we can do so here

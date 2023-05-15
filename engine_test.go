@@ -229,6 +229,24 @@ func TestNats(t *testing.T) {
 		}
 	})
 
+	t.Run("Restarting", func(t *testing.T) {
+		err := e.Stop()
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		err = e.Start()
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if len(e.subscriptions) != 4 {
+			t.Errorf("Expected engine to have 4 subscriptions, got %v", len(e.subscriptions))
+		}
+	})
+
 	t.Run("Handling a basic query", func(t *testing.T) {
 		t.Cleanup(func() {
 			src.ClearCalls()
