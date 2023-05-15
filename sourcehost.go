@@ -189,6 +189,14 @@ func (sh *SourceHost) ExpandQuery(q *sdp.Query) map[*sdp.Query][]Source {
 	return finalMap
 }
 
+// ClearAllSources Removes all sources
+func (sh *SourceHost) ClearAllSources() {
+	sh.sourceMapMutex.Lock()
+	defer sh.sourceMapMutex.Unlock()
+
+	sh.sourceMap = make(map[string][]Source)
+}
+
 // queryHash Calculates a hash for a given query which can be used to
 // determine if two queries are identical
 func queryHash(req *sdp.Query) (string, error) {
