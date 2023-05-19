@@ -12,7 +12,7 @@ require (
 	github.com/overmindtech/connect v0.10.0
 	github.com/overmindtech/sdp-go v0.30.0
 	github.com/overmindtech/sdpcache v1.4.0
-	github.com/sirupsen/logrus v1.9.0
+	github.com/sirupsen/logrus v1.9.2
 	github.com/sourcegraph/conc v0.3.0
 	go.opentelemetry.io/otel v1.15.1
 	go.opentelemetry.io/otel/trace v1.15.1
