@@ -10,7 +10,7 @@ require (
 	github.com/nats-io/nats-server/v2 v2.9.16
 	github.com/nats-io/nats.go v1.25.0
 	github.com/overmindtech/connect v0.10.0
-	github.com/overmindtech/sdp-go v0.30.0
+	github.com/overmindtech/sdp-go v0.30.1
 	github.com/overmindtech/sdpcache v1.4.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/sourcegraph/conc v0.3.0
