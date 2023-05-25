@@ -36,8 +36,6 @@ func TestExecuteQuery(t *testing.T) {
 			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
 				LinkDepth: 3,
 			},
-			ItemSubject:     "items",
-			ResponseSubject: "responses",
 		}
 
 		items, errs, err := e.ExecuteQuerySync(context.Background(), q)
@@ -67,14 +65,6 @@ func TestExecuteQuery(t *testing.T) {
 
 		if ld := query.GetRecursionBehaviour().GetLinkDepth(); ld != 2 {
 			t.Errorf("expected linked item depth to be 1 less than the query (2), got %v", ld)
-		}
-
-		if is := query.ItemSubject; is != "items" {
-			t.Errorf("expected linked item query itemsubject to be \"items\" got %v", is)
-		}
-
-		if is := query.ResponseSubject; is != "responses" {
-			t.Errorf("expected linked item query ResponseSubject to be \"responses\" got %v", is)
 		}
 
 		if item.Metadata.SourceQuery != q {
@@ -334,11 +324,9 @@ func TestSendQuerySync(t *testing.T) {
 			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
 				LinkDepth: 0,
 			},
-			IgnoreCache:     false,
-			UUID:            u[:],
-			Timeout:         durationpb.New(10 * time.Minute),
-			ItemSubject:     NewItemSubject(),
-			ResponseSubject: NewResponseSubject(),
+			IgnoreCache: false,
+			UUID:        u[:],
+			Timeout:     durationpb.New(10 * time.Minute),
 		})
 
 		items, errs, err := progress.Execute(context.Background(), e.natsConnection)

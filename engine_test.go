@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats-server/v2/test"
-	"github.com/nats-io/nats.go"
 	"github.com/overmindtech/connect"
 	"github.com/overmindtech/sdp-go"
 )
@@ -260,9 +259,7 @@ func TestNats(t *testing.T) {
 			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
 				LinkDepth: 0,
 			},
-			Scope:           "test",
-			ResponseSubject: NewResponseSubject(),
-			ItemSubject:     NewItemSubject(),
+			Scope: "test",
 		})
 
 		_, _, err := req.Execute(context.Background(), e.natsConnection)
@@ -289,9 +286,7 @@ func TestNats(t *testing.T) {
 			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
 				LinkDepth: 10,
 			},
-			Scope:           "test",
-			ResponseSubject: NewResponseSubject(),
-			ItemSubject:     NewItemSubject(),
+			Scope: "test",
 		})
 
 		_, _, err := req.Execute(context.Background(), e.natsConnection)
@@ -360,10 +355,8 @@ func TestNatsCancel(t *testing.T) {
 			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
 				LinkDepth: 100,
 			},
-			Scope:           "*",
-			ResponseSubject: nats.NewInbox(),
-			ItemSubject:     "items.bin",
-			UUID:            u[:],
+			Scope: "*",
+			UUID:  u[:],
 		})
 
 		items := make(chan *sdp.Item, 1000)
@@ -672,9 +665,7 @@ func TestNatsAuth(t *testing.T) {
 			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
 				LinkDepth: 0,
 			},
-			Scope:           "test",
-			ResponseSubject: NewResponseSubject(),
-			ItemSubject:     NewItemSubject(),
+			Scope: "test",
 		}).Execute(context.Background(), e.natsConnection)
 
 		if err != nil {
@@ -699,9 +690,7 @@ func TestNatsAuth(t *testing.T) {
 			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
 				LinkDepth: 10,
 			},
-			Scope:           "test",
-			ResponseSubject: NewResponseSubject(),
-			ItemSubject:     NewItemSubject(),
+			Scope: "test",
 		}).Execute(context.Background(), e.natsConnection)
 
 		if err != nil {

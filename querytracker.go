@@ -117,12 +117,12 @@ func (qt *QueryTracker) startLinking(ctx context.Context) {
 						}
 
 						var hasSourceQuery bool
-						var itemSubject string
+						var natsSubject string
 
 						if metadata := i.GetMetadata(); metadata != nil {
 							if sourceQuery := metadata.GetSourceQuery(); sourceQuery != nil {
 								hasSourceQuery = true
-								itemSubject = sourceQuery.ItemSubject
+								natsSubject = sourceQuery.Subject()
 
 								if sourceQuery.RecursionBehaviour.GetLinkDepth() > 0 {
 									// Resolve links
@@ -135,7 +135,7 @@ func (qt *QueryTracker) startLinking(ctx context.Context) {
 						if e := qt.Engine; e != nil && hasSourceQuery {
 							if e.IsNATSConnected() {
 								// Respond with the Item
-								err := e.natsConnection.Publish(ctx, itemSubject, i)
+								err := e.natsConnection.Publish(ctx, natsSubject, &sdp.QueryResponse{ResponseType: &sdp.QueryResponse_NewItem{NewItem: i}})
 
 								if err != nil {
 									// TODO: I probably shouldn't be logging directly here but I
@@ -299,8 +299,8 @@ func (qt *QueryTracker) Execute(ctx context.Context) ([]*sdp.Item, []*sdp.QueryE
 			if ok {
 				sdpErrs = append(sdpErrs, err)
 
-				if qt.Query.ErrorSubject != "" && qt.Engine.natsConnection.Underlying() != nil {
-					pubErr := qt.Engine.natsConnection.Publish(ctx, qt.Query.ErrorSubject, err)
+				if qt.Query.Subject() != "" && qt.Engine.natsConnection.Underlying() != nil {
+					pubErr := qt.Engine.natsConnection.Publish(ctx, qt.Query.Subject(), &sdp.QueryResponse{ResponseType: &sdp.QueryResponse_Error{Error: err}})
 
 					if pubErr != nil {
 						// TODO: I probably shouldn't be logging directly here but I
