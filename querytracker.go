@@ -125,7 +125,7 @@ func (qt *QueryTracker) startLinking(ctx context.Context) {
 
 								if sourceQuery.RecursionBehaviour.GetLinkDepth() > 0 {
 									// Resolve links
-									qt.linkItem(ctx, i)
+									qt.linkItem(ctx, i, sourceQuery.RecursionBehaviour.GetFollowOnlyBlastPropagation())
 								}
 							}
 						}
@@ -155,7 +155,7 @@ func (qt *QueryTracker) startLinking(ctx context.Context) {
 // linkItem should run all linkedItemQueries that it can and modify the passed
 // item with the results. Removing any linked item queries that were able to
 // execute
-func (qt *QueryTracker) linkItem(ctx context.Context, parent *sdp.Item) {
+func (qt *QueryTracker) linkItem(ctx context.Context, parent *sdp.Item, followOnlyBlastPropagation bool) {
 	if ctx.Err() != nil {
 		return
 	}
@@ -171,6 +171,10 @@ func (qt *QueryTracker) linkItem(ctx context.Context, parent *sdp.Item) {
 	for _, lir := range parent.LinkedItemQueries {
 		go func(p *sdp.Item, req *sdp.LinkedItemQuery) {
 			defer lirWG.Done()
+			if followOnlyBlastPropagation && !req.BlastPropagation.Out {
+				// skip the LinkedItemQuery if we should follow only blast propagation and the liq does not propagate blast out
+				return
+			}
 
 			if qt.Engine == nil {
 				return
