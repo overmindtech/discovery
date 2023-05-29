@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/overmindtech/sdp-go"
@@ -201,9 +200,9 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 		// as `executionPool.Go()` will block once the max parallelism is hit
 		go func() {
 			// queue everything into the execution pool
-			defer sentry.Recover()
+			defer LogRecoverToReturn(&ctx, "ExecuteQuery outer")
 			e.executionPool.Go(func() {
-				defer sentry.Recover()
+				defer LogRecoverToReturn(&ctx, "ExecuteQuery inner")
 				defer wg.Done()
 				var queryItems []*sdp.Item
 				var queryErrors []*sdp.QueryError
@@ -226,20 +225,20 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 					// depth is zero then we just pass then back in their normal form as we
 					// won't be executing them
 					if query.RecursionBehaviour.GetLinkDepth() > 0 {
-						for _, lir := range i.LinkedItemQueries {
-							lir.Query.RecursionBehaviour = &sdp.Query_RecursionBehaviour{
-								LinkDepth:                  query.RecursionBehaviour.LinkDepth - 1,
-								FollowOnlyBlastPropagation: query.RecursionBehaviour.FollowOnlyBlastPropagation,
+						for _, liq := range i.LinkedItemQueries {
+							liq.Query.RecursionBehaviour = &sdp.Query_RecursionBehaviour{
+								LinkDepth:                  query.RecursionBehaviour.GetLinkDepth() - 1,
+								FollowOnlyBlastPropagation: query.RecursionBehaviour.GetFollowOnlyBlastPropagation(),
 							}
-							if query.RecursionBehaviour.FollowOnlyBlastPropagation && !lir.BlastPropagation.Out {
+							if query.RecursionBehaviour.GetFollowOnlyBlastPropagation() && !liq.BlastPropagation.GetOut() {
 								// we're only following blast propagation, so do not link this item further
 								// TODO: we might want to drop the link completely if this returns too much
 								// information, but that could risk missing revlinks
-								lir.Query.RecursionBehaviour.LinkDepth = 0
+								liq.Query.RecursionBehaviour.LinkDepth = 0
 							}
-							lir.Query.IgnoreCache = query.IgnoreCache
-							lir.Query.Timeout = query.Timeout
-							lir.Query.UUID = query.UUID
+							liq.Query.IgnoreCache = query.IgnoreCache
+							liq.Query.Timeout = query.Timeout
+							liq.Query.UUID = query.UUID
 						}
 					}
 
