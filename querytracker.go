@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/getsentry/sentry-go"
 	"github.com/overmindtech/sdp-go"
 	log "github.com/sirupsen/logrus"
 )
@@ -183,7 +182,7 @@ func (qt *QueryTracker) linkItem(ctx context.Context, parent *sdp.Item) {
 			var shouldRemove bool
 
 			go func(e chan error) {
-				defer sentry.RecoverWithContext(ctx)
+				defer LogRecoverToReturn(&ctx, "linkItem -> ExecuteQuery")
 				e <- qt.Engine.ExecuteQuery(ctx, req.Query, items, errs)
 			}(queryErr)
 
@@ -280,7 +279,7 @@ func (qt *QueryTracker) Execute(ctx context.Context) ([]*sdp.Item, []*sdp.QueryE
 
 	// Run the query
 	go func(e chan error) {
-		defer sentry.RecoverWithContext(ctx)
+		defer LogRecoverToReturn(&ctx, "Execute -> ExecuteQuery")
 		e <- qt.Engine.ExecuteQuery(ctx, qt.Query, items, errs)
 	}(errChan)
 
