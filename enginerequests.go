@@ -65,7 +65,7 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 
 	// Respond saying we've got it
 	responder := sdp.ResponseSender{
-		ResponseSubject: query.ResponseSubject,
+		ResponseSubject: query.Subject(),
 	}
 
 	var pub sdp.EncodedConnection
@@ -196,6 +196,9 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 		wg.Add(1)
 		// localize values for the closure below
 		q, sources := q, sources
+
+		// push all queued items through a goroutine to avoid blocking `ExecuteQuery` from progressing
+		// as `executionPool.Go()` will block once the max parallelism is hit
 		go func() {
 			// queue everything into the execution pool
 			defer sentry.Recover()
@@ -234,8 +237,6 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 								// information, but that could risk missing revlinks
 								lir.Query.RecursionBehaviour.LinkDepth = 0
 							}
-							lir.Query.ItemSubject = query.ItemSubject
-							lir.Query.ResponseSubject = query.ResponseSubject
 							lir.Query.IgnoreCache = query.IgnoreCache
 							lir.Query.Timeout = query.Timeout
 							lir.Query.UUID = query.UUID
