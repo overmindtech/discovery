@@ -171,7 +171,7 @@ func (qt *QueryTracker) linkItem(ctx context.Context, parent *sdp.Item, followOn
 	for _, lir := range parent.LinkedItemQueries {
 		go func(p *sdp.Item, req *sdp.LinkedItemQuery) {
 			defer lirWG.Done()
-			if followOnlyBlastPropagation && !req.BlastPropagation.Out {
+			if followOnlyBlastPropagation && !req.GetBlastPropagation().GetOut() {
 				// skip the LinkedItemQuery if we should follow only blast propagation and the liq does not propagate blast out
 				return
 			}
