@@ -202,7 +202,10 @@ func (qt *QueryTracker) linkItem(ctx context.Context, parent *sdp.Item, followOn
 
 						// Create a reference to the newly found item and attach
 						// to the parent item
-						p.LinkedItems = append(p.LinkedItems, &sdp.LinkedItem{Item: li.Reference()})
+						p.LinkedItems = append(p.LinkedItems, &sdp.LinkedItem{
+							Item:             li.Reference(),
+							BlastPropagation: req.BlastPropagation,
+						})
 
 						itemMutex.Unlock()
 					} else {
