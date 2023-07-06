@@ -4,31 +4,31 @@ go 1.20
 
 // Direct dependencies of my codebase
 require (
-	github.com/getsentry/sentry-go v0.21.0
+	github.com/getsentry/sentry-go v0.22.0
 	github.com/google/uuid v1.3.0
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats-server/v2 v2.9.19
 	github.com/nats-io/nats.go v1.27.1
-	github.com/overmindtech/connect v0.11.3
-	github.com/overmindtech/sdp-go v0.34.2
+	github.com/overmindtech/connect v0.11.4
+	github.com/overmindtech/sdp-go v0.36.0
 	github.com/overmindtech/sdpcache v1.5.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/sourcegraph/conc v0.3.0
 	go.opentelemetry.io/otel v1.16.0
 	go.opentelemetry.io/otel/trace v1.16.0
-	google.golang.org/protobuf v1.30.0
+	google.golang.org/protobuf v1.31.0
 )
 
 // Transitive dependencies
 require (
 	github.com/auth0/go-jwt-middleware/v2 v2.1.0 // indirect
-	github.com/bufbuild/connect-go v1.8.0 // indirect
+	github.com/bufbuild/connect-go v1.9.0 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/btree v1.1.2 // indirect
-	github.com/klauspost/compress v1.16.6 // indirect
+	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/minio/highwayhash v1.0.2 // indirect
 	github.com/nats-io/jwt/v2 v2.4.1 // indirect
 	github.com/nats-io/nkeys v0.4.4 // indirect
