@@ -46,20 +46,41 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 	span := trace.SpanFromContext(ctx)
 	span.SetName("HandleQuery")
 
-	numExpandedQueries := len(e.sh.ExpandQuery(query))
-	span.SetAttributes(attribute.Int("om.discovery.numExpandedQueries", numExpandedQueries))
-
-	if numExpandedQueries == 0 {
-		// If we don't have any relevant sources, exit
-		return
-	}
-
 	var timeoutOverride bool
 
 	// If the timeout is infinite OR greater than the max, set it to the max
 	if query.Timeout.AsDuration() == 0 || query.Timeout.AsDuration() > e.MaxRequestTimeout {
 		query.Timeout = durationpb.New(e.MaxRequestTimeout)
 		timeoutOverride = true
+	}
+
+	numExpandedQueries := len(e.sh.ExpandQuery(query))
+
+	// Extract and parse the UUID
+	u, uuidErr := uuid.FromBytes(query.UUID)
+
+	span.SetAttributes(
+		attribute.Int("om.discovery.numExpandedQueries", numExpandedQueries),
+		attribute.String("om.sdp.query", query.Query),
+		attribute.String("om.sdp.queryType", query.Type),
+		attribute.String("om.sdp.queryMethod", query.Method.String()),
+		attribute.String("om.sdp.queryScope", query.Scope),
+		attribute.String("om.sdp.queryTimeout", query.Timeout.AsDuration().String()),
+		attribute.Bool("om.sdp.queryTimeoutOverridden", timeoutOverride),
+		attribute.String("om.sdp.queryUUID", u.String()),
+		attribute.Bool("om.sdp.queryIgnoreCache", query.IgnoreCache),
+	)
+
+	if query.RecursionBehaviour != nil {
+		span.SetAttributes(
+			attribute.Int("om.sdp.queryLinkDepth", int(query.RecursionBehaviour.LinkDepth)),
+			attribute.Bool("om.sdp.queryFollowOnlyBlastPropagation", query.RecursionBehaviour.FollowOnlyBlastPropagation),
+		)
+	}
+
+	if numExpandedQueries == 0 {
+		// If we don't have any relevant sources, exit
+		return
 	}
 
 	// Respond saying we've got it
@@ -80,27 +101,6 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 		pub,
 		e.Name,
 	)
-
-	// Extract and parse the UUID
-	u, uuidErr := uuid.FromBytes(query.UUID)
-
-	span.SetAttributes(
-		attribute.String("om.sdp.query", query.Query),
-		attribute.String("om.sdp.queryType", query.Type),
-		attribute.String("om.sdp.queryMethod", query.Method.String()),
-		attribute.String("om.sdp.queryScope", query.Scope),
-		attribute.String("om.sdp.queryTimeout", query.Timeout.AsDuration().String()),
-		attribute.Bool("om.sdp.queryTimeoutOverridden", timeoutOverride),
-		attribute.String("om.sdp.queryUUID", u.String()),
-		attribute.Bool("om.sdp.queryIgnoreCache", query.IgnoreCache),
-	)
-
-	if query.RecursionBehaviour != nil {
-		span.SetAttributes(
-			attribute.Int("om.sdp.queryLinkDepth", int(query.RecursionBehaviour.LinkDepth)),
-			attribute.Bool("om.sdp.queryFollowOnlyBlastPropagation", query.RecursionBehaviour.FollowOnlyBlastPropagation),
-		)
-	}
 
 	qt := QueryTracker{
 		Query:  query,
