@@ -149,10 +149,7 @@ func TestScopeSource(t *testing.T) {
 }
 
 func newTestSourceHost(t *testing.T) *SourceHost {
-	sh, err := NewSourceHost()
-	if err != nil {
-		t.Fatalf("Error initializing SourceHost: %v", err)
-	}
+	sh := NewSourceHost()
 	sh.AddSources(
 		&TestSource{
 			ReturnType: "aws-ec2instance",

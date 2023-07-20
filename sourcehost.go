@@ -20,18 +20,22 @@ type SourceHost struct {
 	sourceMapMutex sync.RWMutex
 }
 
-func NewSourceHost() (*SourceHost, error) {
+func NewSourceHost() *SourceHost {
 	sh := &SourceHost{
 		sourceMap: make(map[string][]Source),
 	}
 
 	// Add meta-sources so that we can respond to queries for `overmind-type`,
 	// `overmind-scope` and `overmind-source` resources
+	sh.addBuiltinSources()
+
+	return sh
+}
+
+func (sh *SourceHost) addBuiltinSources() {
 	sh.AddSources(&TypeSource{sh: sh})
 	sh.AddSources(&ScopeSource{sh: sh})
 	sh.AddSources(&SourcesSource{sh: sh})
-
-	return sh, nil
 }
 
 // AddSources Adds a source to this engine
@@ -195,6 +199,8 @@ func (sh *SourceHost) ClearAllSources() {
 	defer sh.sourceMapMutex.Unlock()
 
 	sh.sourceMap = make(map[string][]Source)
+
+	sh.addBuiltinSources()
 }
 
 // queryHash Calculates a hash for a given query which can be used to
