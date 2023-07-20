@@ -39,7 +39,6 @@ services:
 
   api-server:
     image: ghcr.io/overmindtech/test-populated-api-server:main
-    command: --nats-url nats://nats-auth:4222 --disable-kube
     env_file:
       - ./env/api-server.env
     networks:
