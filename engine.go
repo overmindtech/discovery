@@ -83,10 +83,7 @@ type Engine struct {
 }
 
 func NewEngine() (*Engine, error) {
-	sh, err := NewSourceHost()
-	if err != nil {
-		return nil, err
-	}
+	sh := NewSourceHost()
 	return &Engine{
 		MaxParallelExecutions:   runtime.NumCPU(),
 		MaxRequestTimeout:       DefaultMaxRequestTimeout,

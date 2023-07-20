@@ -35,10 +35,7 @@ func (e *ExpectExpand) Validate(t *testing.T, m map[*sdp.Query][]Source) {
 }
 
 func TestSourceHostExpandQuery(t *testing.T) {
-	sh, err := NewSourceHost()
-	if err != nil {
-		t.Fatalf("Error initializing SourceHost: %v", err)
-	}
+	sh := NewSourceHost()
 
 	sh.AddSources(
 		&TestSource{
@@ -197,10 +194,7 @@ func TestSourceHostExpandQuery(t *testing.T) {
 }
 
 func TestSourceHostAddSources(t *testing.T) {
-	sh, err := NewSourceHost()
-	if err != nil {
-		t.Fatalf("Error initializing SourceHost: %v", err)
-	}
+	sh := NewSourceHost()
 
 	src := TestSource{}
 
