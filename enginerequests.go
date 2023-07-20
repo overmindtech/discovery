@@ -96,8 +96,16 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 		pub = NilConnection{}
 	}
 
+	// The context we were given will be context.Background(), we want to create
+	// a child context from here that will be specific to the request. This will
+	// be passed to the responder, which will cancel that context if it's unable
+	// to send responses (i.e. there is no longer anyone listening)
+	//
+	ctx, cancel := context.WithCancel(ctx)
+
 	responder.Start(
 		ctx,
+		cancel,
 		pub,
 		e.Name,
 	)
