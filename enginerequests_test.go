@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/overmindtech/connect"
 	"github.com/overmindtech/sdp-go"
+	"github.com/overmindtech/sdp-go/auth"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
@@ -18,7 +18,7 @@ func TestExecuteQuery(t *testing.T) {
 	}
 
 	e := newStartedEngine(t, "TestExecuteQuery",
-		&connect.NATSOptions{
+		&auth.NATSOptions{
 			Servers:           NatsTestURLs,
 			ConnectionName:    "test-connection",
 			ConnectionTimeout: time.Second,

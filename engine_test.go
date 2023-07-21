@@ -12,11 +12,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats-server/v2/test"
-	"github.com/overmindtech/connect"
 	"github.com/overmindtech/sdp-go"
+	"github.com/overmindtech/sdp-go/auth"
 )
 
-func newStartedEngine(t *testing.T, name string, no *connect.NATSOptions, sources ...Source) *Engine {
+func newStartedEngine(t *testing.T, name string, no *auth.NATSOptions, sources ...Source) *Engine {
 	e, err := NewEngine()
 	if err != nil {
 		t.Fatalf("Error initializing Engine: %v", err)
@@ -25,7 +25,7 @@ func newStartedEngine(t *testing.T, name string, no *connect.NATSOptions, source
 	if no != nil {
 		e.NATSOptions = no
 	} else {
-		e.NATSOptions = &connect.NATSOptions{
+		e.NATSOptions = &auth.NATSOptions{
 			NumRetries:        5,
 			RetryDelay:        time.Second,
 			Servers:           NatsTestURLs,
@@ -194,7 +194,7 @@ func TestNats(t *testing.T) {
 		t.Fatalf("Error initializing Engine: %v", err)
 	}
 	e.Name = "nats-test"
-	e.NATSOptions = &connect.NATSOptions{
+	e.NATSOptions = &auth.NATSOptions{
 		NumRetries:        5,
 		RetryDelay:        time.Second,
 		Servers:           NatsTestURLs,
@@ -317,7 +317,7 @@ func TestNatsCancel(t *testing.T) {
 		t.Fatalf("Error initializing Engine: %v", err)
 	}
 	e.Name = "nats-test"
-	e.NATSOptions = &connect.NATSOptions{
+	e.NATSOptions = &auth.NATSOptions{
 		NumRetries:        5,
 		RetryDelay:        time.Second,
 		Servers:           NatsTestURLs,
@@ -401,7 +401,7 @@ func TestNatsConnections(t *testing.T) {
 			t.Fatalf("Error initializing Engine: %v", err)
 		}
 		e.Name = "nats-test"
-		e.NATSOptions = &connect.NATSOptions{
+		e.NATSOptions = &auth.NATSOptions{
 			Servers:           []string{"nats://bad.server"},
 			ConnectionName:    "test-disconnection",
 			ConnectionTimeout: time.Second,
@@ -439,7 +439,7 @@ func TestNatsConnections(t *testing.T) {
 			t.Fatalf("Error initializing Engine: %v", err)
 		}
 		e.Name = "nats-test"
-		e.NATSOptions = &connect.NATSOptions{
+		e.NATSOptions = &auth.NATSOptions{
 			NumRetries:        5,
 			RetryDelay:        time.Second,
 			Servers:           []string{"127.0.0.1:4111"},
@@ -504,7 +504,7 @@ func TestNatsConnections(t *testing.T) {
 			t.Fatalf("Error initializing Engine: %v", err)
 		}
 		e.Name = "nats-test"
-		e.NATSOptions = &connect.NATSOptions{
+		e.NATSOptions = &auth.NATSOptions{
 			NumRetries:        10,
 			RetryDelay:        time.Second,
 			Servers:           []string{"127.0.0.1:4112"},
@@ -557,7 +557,7 @@ func TestNATSFailureRestart(t *testing.T) {
 		t.Fatalf("Error initializing Engine: %v", err)
 	}
 	e.Name = "nats-test"
-	e.NATSOptions = &connect.NATSOptions{
+	e.NATSOptions = &auth.NATSOptions{
 		NumRetries:        10,
 		RetryDelay:        time.Second,
 		Servers:           []string{"127.0.0.1:4113"},
@@ -617,7 +617,7 @@ func TestNatsAuth(t *testing.T) {
 		t.Fatalf("Error initializing Engine: %v", err)
 	}
 	e.Name = "nats-test"
-	e.NATSOptions = &connect.NATSOptions{
+	e.NATSOptions = &auth.NATSOptions{
 		NumRetries:        5,
 		RetryDelay:        time.Second,
 		Servers:           NatsTestURLs,
@@ -737,7 +737,7 @@ func TestSetupMaxQueryTimeout(t *testing.T) {
 	})
 }
 
-func GetTestOAuthTokenClient(t *testing.T) *connect.OAuthTokenClient {
+func GetTestOAuthTokenClient(t *testing.T) *auth.OAuthTokenClient {
 	var domain string
 	var clientID string
 	var clientSecret string
@@ -767,13 +767,13 @@ func GetTestOAuthTokenClient(t *testing.T) *connect.OAuthTokenClient {
 		t.Fatal(err)
 	}
 
-	ccc := connect.ClientCredentialsConfig{
+	ccc := auth.ClientCredentialsConfig{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		Account:      "org_hdeUXbB55sMMvJLa",
 	}
 
-	return connect.NewOAuthTokenClient(
+	return auth.NewOAuthTokenClient(
 		fmt.Sprintf("https://%v/oauth/token", domain),
 		exchangeURL,
 		ccc,
