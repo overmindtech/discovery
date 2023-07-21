@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
-	"github.com/overmindtech/connect"
 	"github.com/overmindtech/sdp-go"
+	"github.com/overmindtech/sdp-go/auth"
 	"github.com/overmindtech/sdpcache"
 	log "github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc/pool"
@@ -31,8 +31,8 @@ type Engine struct {
 	// Descriptive name of this engine. Used as responder name in SDP responses
 	Name string
 
-	NATSOptions   *connect.NATSOptions // Options for connecting to NATS
-	NATSQueueName string               // The name of the queue to use when subscribing
+	NATSOptions   *auth.NATSOptions // Options for connecting to NATS
+	NATSQueueName string            // The name of the queue to use when subscribing
 
 	// The maximum number of queries that can be executing in parallel. Defaults
 	// to the number of CPUs
