@@ -9,7 +9,7 @@ require (
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats-server/v2 v2.9.20
 	github.com/nats-io/nats.go v1.28.0
-	github.com/overmindtech/sdp-go v0.37.0
+	github.com/overmindtech/sdp-go v0.39.3
 	github.com/overmindtech/sdpcache v1.5.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/sourcegraph/conc v0.3.0
@@ -23,6 +23,7 @@ require (
 	github.com/auth0/go-jwt-middleware/v2 v2.1.0 // indirect
 	github.com/bufbuild/connect-go v1.9.0 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
+	github.com/go-jose/go-jose/v3 v3.0.0 // indirect
 	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
@@ -45,5 +46,4 @@ require (
 	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
-
 )
