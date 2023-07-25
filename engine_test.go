@@ -737,7 +737,7 @@ func TestSetupMaxQueryTimeout(t *testing.T) {
 	})
 }
 
-func GetTestOAuthTokenClient(t *testing.T) *auth.OAuthTokenClient {
+func GetTestOAuthTokenClient(t *testing.T) auth.TokenClient {
 	var domain string
 	var clientID string
 	var clientSecret string
