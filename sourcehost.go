@@ -196,9 +196,8 @@ func (sh *SourceHost) ExpandQuery(q *sdp.Query) map[*sdp.Query][]Source {
 // ClearAllSources Removes all sources
 func (sh *SourceHost) ClearAllSources() {
 	sh.sourceMapMutex.Lock()
-	defer sh.sourceMapMutex.Unlock()
-
 	sh.sourceMap = make(map[string][]Source)
+	sh.sourceMapMutex.Unlock()
 
 	sh.addBuiltinSources()
 }
