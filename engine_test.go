@@ -32,7 +32,7 @@ func newStartedEngine(t *testing.T, name string, no *auth.NATSOptions, sources .
 			ConnectionName:    "test-connection",
 			ConnectionTimeout: time.Second,
 			MaxReconnects:     5,
-			TokenClient:       GetTestOAuthTokenClient(t),
+			TokenClient:       GetTestOAuthTokenClient(t, ""),
 		}
 	}
 	e.NATSQueueName = "test"
@@ -624,7 +624,7 @@ func TestNatsAuth(t *testing.T) {
 		ConnectionName:    "test-connection",
 		ConnectionTimeout: time.Second,
 		MaxReconnects:     5,
-		TokenClient:       GetTestOAuthTokenClient(t),
+		TokenClient:       GetTestOAuthTokenClient(t, ""),
 	}
 	e.NATSQueueName = "test"
 	e.MaxParallelExecutions = 10
@@ -737,7 +737,7 @@ func TestSetupMaxQueryTimeout(t *testing.T) {
 	})
 }
 
-func GetTestOAuthTokenClient(t *testing.T) auth.TokenClient {
+func GetTestOAuthTokenClient(t *testing.T, account string) auth.TokenClient {
 	var domain string
 	var clientID string
 	var clientSecret string
@@ -775,6 +775,7 @@ func GetTestOAuthTokenClient(t *testing.T) auth.TokenClient {
 	return auth.NewOAuthTokenClient(
 		fmt.Sprintf("https://%v/oauth/token", domain),
 		exchangeURL,
+		account,
 		ccc,
 	)
 }
