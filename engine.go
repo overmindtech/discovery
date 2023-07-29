@@ -132,7 +132,7 @@ func (e *Engine) AddSources(sources ...Source) {
 func (e *Engine) connect() error {
 	// Try to connect to NATS
 	if e.NATSOptions != nil {
-		ec, err := e.NATSOptions.ConnectAs("") // rely on the underlying API key's identity
+		ec, err := e.NATSOptions.Connect()
 
 		if err != nil {
 			return err
