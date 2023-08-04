@@ -32,7 +32,7 @@ func newStartedEngine(t *testing.T, name string, no *auth.NATSOptions, sources .
 			ConnectionName:    "test-connection",
 			ConnectionTimeout: time.Second,
 			MaxReconnects:     5,
-			TokenClient:       GetTestOAuthTokenClient(t, ""),
+			TokenClient:       GetTestOAuthTokenClient(t, "org_hdeUXbB55sMMvJLa"),
 		}
 	}
 	e.NATSQueueName = "test"
@@ -624,7 +624,7 @@ func TestNatsAuth(t *testing.T) {
 		ConnectionName:    "test-connection",
 		ConnectionTimeout: time.Second,
 		MaxReconnects:     5,
-		TokenClient:       GetTestOAuthTokenClient(t, ""),
+		TokenClient:       GetTestOAuthTokenClient(t, "org_hdeUXbB55sMMvJLa"),
 	}
 	e.NATSQueueName = "test"
 	e.MaxParallelExecutions = 10
