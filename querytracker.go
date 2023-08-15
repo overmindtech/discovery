@@ -95,7 +95,12 @@ func (qt *QueryTracker) startLinking(ctx context.Context) {
 			select {
 			case <-ctx.Done():
 				return
-			case unlinkedItem := <-qt.unlinkedItems:
+			case unlinkedItem, ok := <-qt.unlinkedItems:
+				if !ok {
+					// Return if the channel is closed
+					return
+				}
+
 				if unlinkedItem != nil {
 					go func(i *sdp.Item) {
 						defer qt.unlinkedItemsWG.Done()

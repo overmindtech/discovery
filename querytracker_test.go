@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/overmindtech/sdp-go"
-	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -207,8 +206,12 @@ func TestTimeout(t *testing.T) {
 	t.Run("With a timeout, but not exceeding it", func(t *testing.T) {
 		t.Parallel()
 
+		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+
 		qt := QueryTracker{
-			Engine: e,
+			Engine:  e,
+			Context: ctx,
+			Cancel:  cancel,
 			Query: &sdp.Query{
 				Type:   "person",
 				Method: sdp.QueryMethod_GET,
@@ -216,8 +219,7 @@ func TestTimeout(t *testing.T) {
 				RecursionBehaviour: &sdp.Query_RecursionBehaviour{
 					LinkDepth: 0,
 				},
-				Scope:   "test",
-				Timeout: durationpb.New(200 * time.Millisecond),
+				Scope: "test",
 			},
 		}
 
@@ -239,8 +241,12 @@ func TestTimeout(t *testing.T) {
 	t.Run("With a timeout that is exceeded", func(t *testing.T) {
 		t.Parallel()
 
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+
 		qt := QueryTracker{
-			Engine: e,
+			Engine:  e,
+			Context: ctx,
+			Cancel:  cancel,
 			Query: &sdp.Query{
 				Type:   "person",
 				Method: sdp.QueryMethod_GET,
@@ -248,21 +254,26 @@ func TestTimeout(t *testing.T) {
 				RecursionBehaviour: &sdp.Query_RecursionBehaviour{
 					LinkDepth: 0,
 				},
-				Scope:   "test",
-				Timeout: durationpb.New(50 * time.Millisecond),
+				Scope: "test",
 			},
 		}
 
-		_, _, err := qt.Execute(context.Background())
+		_, _, err := qt.Execute(ctx)
 
 		if err == nil {
-			t.Error("Expected timout but got no error")
+			t.Error("Expected timeout but got no error")
 		}
 	})
 
-	t.Run("With linking that exceeds the timout", func(t *testing.T) {
+	t.Run("With linking that exceeds the timeout", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 350*time.Millisecond)
+
 		qt := QueryTracker{
-			Engine: e,
+			Engine:  e,
+			Context: ctx,
+			Cancel:  cancel,
 			Query: &sdp.Query{
 				Type:   "person",
 				Method: sdp.QueryMethod_GET,
@@ -270,12 +281,11 @@ func TestTimeout(t *testing.T) {
 				RecursionBehaviour: &sdp.Query_RecursionBehaviour{
 					LinkDepth: 10,
 				},
-				Scope:   "test",
-				Timeout: durationpb.New(350 * time.Millisecond),
+				Scope: "test",
 			},
 		}
 
-		items, errs, err := qt.Execute(context.Background())
+		items, errs, err := qt.Execute(ctx)
 
 		if err == nil {
 			t.Error("Expected timeout but got no error")
@@ -295,9 +305,12 @@ func TestCancel(t *testing.T) {
 	e := newStartedEngine(t, "TestCancel", nil)
 
 	u := uuid.New()
+	ctx, cancel := context.WithCancel(context.Background())
 
 	qt := QueryTracker{
-		Engine: e,
+		Engine:  e,
+		Context: ctx,
+		Cancel:  cancel,
 		Query: &sdp.Query{
 			Type:   "person",
 			Method: sdp.QueryMethod_GET,
