@@ -392,7 +392,7 @@ func (e *Engine) HandleCancelQuery(ctx context.Context, cancelQuery *sdp.CancelQ
 		return
 	}
 
-	if rt != nil {
+	if rt != nil && rt.Cancel != nil {
 		log.WithFields(log.Fields{
 			"UUID": u.String(),
 		}).Debug("Cancelling query")
