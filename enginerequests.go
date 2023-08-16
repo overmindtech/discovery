@@ -54,7 +54,7 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 		timeoutOverride = true
 	}
 
-	// Extract the context from the timeout
+	// Add the query timeout to the context stack
 	ctx, cancel := query.TimeoutContext(ctx)
 	defer cancel()
 
