@@ -18,6 +18,9 @@ type QueryTracker struct {
 	// The query to track
 	Query *sdp.Query
 
+	Context context.Context    // The context that this query is running in
+	Cancel  context.CancelFunc // The cancel function for the context
+
 	// The engine that this is connected to, used for sending NATS messages
 	Engine *Engine
 
@@ -35,10 +38,6 @@ type QueryTracker struct {
 	// The keys in this map are the GloballyUniqueName to speed up searching
 	linkedItems      map[string]*sdp.Item
 	linkedItemsMutex sync.RWMutex
-
-	// cancelFunc A function that will cancel all queries when called
-	cancelFunc      context.CancelFunc
-	cancelFuncMutex sync.Mutex
 }
 
 func (qt *QueryTracker) LinkedItems() []*sdp.Item {
@@ -96,7 +95,12 @@ func (qt *QueryTracker) startLinking(ctx context.Context) {
 			select {
 			case <-ctx.Done():
 				return
-			case unlinkedItem := <-qt.unlinkedItems:
+			case unlinkedItem, ok := <-qt.unlinkedItems:
+				if !ok {
+					// Return if the channel is closed
+					return
+				}
+
 				if unlinkedItem != nil {
 					go func(i *sdp.Item) {
 						defer qt.unlinkedItemsWG.Done()
@@ -257,6 +261,8 @@ func (qt *QueryTracker) stopLinking() {
 // relevant nats subjects. Returns the full list of items, errors, and a final
 // error. The final error will be populated if all sources failed, or some other
 // error was encountered while trying run the query
+//
+// If the context is cancelled, all query work will stop
 func (qt *QueryTracker) Execute(ctx context.Context) ([]*sdp.Item, []*sdp.QueryError, error) {
 	if qt.unlinkedItems == nil {
 		qt.unlinkedItems = make(chan *sdp.Item)
@@ -274,13 +280,6 @@ func (qt *QueryTracker) Execute(ctx context.Context) ([]*sdp.Item, []*sdp.QueryE
 	errs := make(chan *sdp.QueryError)
 	errChan := make(chan error)
 	sdpErrs := make([]*sdp.QueryError, 0)
-
-	// Create context to enforce timeouts
-	ctx, cancel := qt.Query.TimeoutContext(ctx)
-	qt.cancelFuncMutex.Lock()
-	qt.cancelFunc = cancel
-	qt.cancelFuncMutex.Unlock()
-	defer cancel()
 
 	qt.startLinking(ctx)
 
@@ -319,6 +318,9 @@ func (qt *QueryTracker) Execute(ctx context.Context) ([]*sdp.Item, []*sdp.QueryE
 			} else {
 				errs = nil
 			}
+		case <-ctx.Done():
+			// If the context is closed, return an error
+			return qt.LinkedItems(), sdpErrs, ctx.Err()
 		}
 
 		if items == nil && errs == nil {
@@ -339,16 +341,6 @@ func (qt *QueryTracker) Execute(ctx context.Context) ([]*sdp.Item, []*sdp.QueryE
 	}
 
 	return qt.LinkedItems(), sdpErrs, ctx.Err()
-}
-
-// Cancel Cancels the currently running query
-func (qt *QueryTracker) Cancel() {
-	qt.cancelFuncMutex.Lock()
-	defer qt.cancelFuncMutex.Unlock()
-
-	if qt.cancelFunc != nil {
-		qt.cancelFunc()
-	}
 }
 
 // deleteQuery Deletes an item query from a slice

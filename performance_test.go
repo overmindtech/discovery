@@ -82,6 +82,7 @@ func TestParallelQueryPerformance(t *testing.T) {
 	// goroutines running will start to make the response times non-linear which
 	// maybe isn't ideal but given realistic loads we probably don't care.
 	t.Run("Without linking", func(t *testing.T) {
+		RunLinearPerformanceTest(t, "1 query", 1, 0, 1)
 		RunLinearPerformanceTest(t, "10 queries", 10, 0, 1)
 		RunLinearPerformanceTest(t, "100 queries", 100, 0, 10)
 		RunLinearPerformanceTest(t, "1,000 queries", 1000, 0, 100)

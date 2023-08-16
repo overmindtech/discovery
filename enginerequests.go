@@ -54,6 +54,10 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 		timeoutOverride = true
 	}
 
+	// Add the query timeout to the context stack
+	ctx, cancel := query.TimeoutContext(ctx)
+	defer cancel()
+
 	numExpandedQueries := len(e.sh.ExpandQuery(query))
 
 	// Extract and parse the UUID
@@ -96,27 +100,22 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 		pub = NilConnection{}
 	}
 
-	// The context we were given will be context.Background(), we want to create
-	// a child context from here that will be specific to the request. This will
-	// be passed to the responder, which will cancel that context if it's unable
-	// to send responses (i.e. there is no longer anyone listening)
-	//
-	ctx, cancel := context.WithCancel(ctx)
-
 	responder.Start(
 		ctx,
-		cancel,
 		pub,
 		e.Name,
 	)
 
 	qt := QueryTracker{
-		Query:  query,
-		Engine: e,
+		Query:   query,
+		Engine:  e,
+		Context: ctx,
+		Cancel:  cancel,
 	}
 
 	if uuidErr == nil {
 		e.TrackQuery(u, &qt)
+		defer e.DeleteTrackedQuery(u)
 	}
 
 	_, _, err := qt.Execute(ctx)
@@ -321,6 +320,20 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.Query, relevantSources 
 	))
 	defer span.End()
 
+	// Check that our context is okay before doing anything expensive
+	if ctx.Err() != nil {
+		return nil, []*sdp.QueryError{
+			{
+				UUID:          r.UUID,
+				ErrorType:     sdp.QueryError_OTHER,
+				ErrorString:   ctx.Err().Error(),
+				Scope:         r.Scope,
+				ResponderName: e.Name,
+				ItemType:      r.Type,
+			},
+		}
+	}
+
 	items := make([]*sdp.Item, 0)
 	errs := make([]*sdp.QueryError, 0)
 
@@ -456,33 +469,31 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.Query, relevantSources 
 			var err error
 			var sourceDuration time.Duration
 
-			func(ctx context.Context) {
-				start := time.Now()
+			start := time.Now()
 
-				switch method {
-				case Get:
-					var newItem *sdp.Item
+			switch method {
+			case Get:
+				var newItem *sdp.Item
 
-					newItem, err = src.Get(ctx, r.Scope, r.Query)
+				newItem, err = src.Get(ctx, r.Scope, r.Query)
 
-					if err == nil {
-						resultItems = []*sdp.Item{newItem}
-					}
-				case List:
-					resultItems, err = src.List(ctx, r.Scope)
-				case Search:
-					if searchableSrc, ok := src.(SearchableSource); ok {
-						resultItems, err = searchableSrc.Search(ctx, r.Scope, r.Query)
-					} else {
-						err = &sdp.QueryError{
-							ErrorType:   sdp.QueryError_NOTFOUND,
-							ErrorString: "source is not searchable",
-						}
+				if err == nil {
+					resultItems = []*sdp.Item{newItem}
+				}
+			case List:
+				resultItems, err = src.List(ctx, r.Scope)
+			case Search:
+				if searchableSrc, ok := src.(SearchableSource); ok {
+					resultItems, err = searchableSrc.Search(ctx, r.Scope, r.Query)
+				} else {
+					err = &sdp.QueryError{
+						ErrorType:   sdp.QueryError_NOTFOUND,
+						ErrorString: "source is not searchable",
 					}
 				}
+			}
 
-				sourceDuration = time.Since(start)
-			}(ctx)
+			sourceDuration = time.Since(start)
 
 			span.SetAttributes(
 				attribute.Int("om.source.numItems", len(resultItems)),

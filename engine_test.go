@@ -344,7 +344,7 @@ func TestNatsCancel(t *testing.T) {
 		}
 	})
 
-	t.Run("Cancelling querys", func(t *testing.T) {
+	t.Run("Cancelling queries", func(t *testing.T) {
 		conn := e.natsConnection
 		u := uuid.New()
 
@@ -379,6 +379,8 @@ func TestNatsCancel(t *testing.T) {
 		}
 		for range errs {
 		}
+
+		time.Sleep(250 * time.Millisecond)
 
 		if progress.NumCancelled() != 1 {
 			t.Errorf("Expected query to be cancelled, got\n%v", progress.String())
