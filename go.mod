@@ -1,6 +1,6 @@
 module github.com/overmindtech/discovery
 
-go 1.20
+go 1.21
 
 // Direct dependencies of my codebase
 require (
