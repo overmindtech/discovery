@@ -5,7 +5,7 @@ go 1.21
 // Direct dependencies of my codebase
 require (
 	github.com/getsentry/sentry-go v0.23.0
-	github.com/google/uuid v1.3.0
+	github.com/google/uuid v1.3.1
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats-server/v2 v2.9.21
 	github.com/nats-io/nats.go v1.28.0
