@@ -9,7 +9,7 @@ require (
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats-server/v2 v2.9.21
 	github.com/nats-io/nats.go v1.28.0
-	github.com/overmindtech/sdp-go v0.45.0
+	github.com/overmindtech/sdp-go v0.46.2
 	github.com/overmindtech/sdpcache v1.5.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/sourcegraph/conc v0.3.0
@@ -30,7 +30,7 @@ require (
 	github.com/google/btree v1.1.2 // indirect
 	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/minio/highwayhash v1.0.2 // indirect
-	github.com/nats-io/jwt/v2 v2.4.1 // indirect
+	github.com/nats-io/jwt/v2 v2.5.0 // indirect
 	github.com/nats-io/nkeys v0.4.4 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/overmindtech/api-client v0.14.0 // indirect
