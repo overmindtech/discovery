@@ -46,12 +46,13 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 	span := trace.SpanFromContext(ctx)
 	span.SetName("HandleQuery")
 
-	var timeoutOverride bool
+	var deadlineOverride bool
 
-	// If the timeout is infinite OR greater than the max, set it to the max
-	if query.Timeout.AsDuration() == 0 || query.Timeout.AsDuration() > e.MaxRequestTimeout {
-		query.Timeout = durationpb.New(e.MaxRequestTimeout)
-		timeoutOverride = true
+	// If there is no deadline OR further in the future than MaxRequestTimeout, clamp the deadline to MaxRequestTimeout
+	maxRequestDeadline := time.Now().Add(e.MaxRequestTimeout)
+	if query.Deadline == nil || query.Deadline.AsTime().After(maxRequestDeadline) {
+		query.Deadline = timestamppb.New(maxRequestDeadline)
+		deadlineOverride = true
 	}
 
 	// Add the query timeout to the context stack
@@ -65,20 +66,20 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 
 	span.SetAttributes(
 		attribute.Int("om.discovery.numExpandedQueries", numExpandedQueries),
+		attribute.String("om.sdp.uuid", u.String()),
+		attribute.String("om.sdp.type", query.Type),
+		attribute.String("om.sdp.method", query.Method.String()),
 		attribute.String("om.sdp.query", query.Query),
-		attribute.String("om.sdp.queryType", query.Type),
-		attribute.String("om.sdp.queryMethod", query.Method.String()),
-		attribute.String("om.sdp.queryScope", query.Scope),
-		attribute.String("om.sdp.queryTimeout", query.Timeout.AsDuration().String()),
-		attribute.Bool("om.sdp.queryTimeoutOverridden", timeoutOverride),
-		attribute.String("om.sdp.queryUUID", u.String()),
+		attribute.String("om.sdp.scope", query.Scope),
+		attribute.String("om.sdp.deadline", query.Deadline.String()),
+		attribute.Bool("om.sdp.deadlineOverridden", deadlineOverride),
 		attribute.Bool("om.sdp.queryIgnoreCache", query.IgnoreCache),
 	)
 
 	if query.RecursionBehaviour != nil {
 		span.SetAttributes(
-			attribute.Int("om.sdp.queryLinkDepth", int(query.RecursionBehaviour.LinkDepth)),
-			attribute.Bool("om.sdp.queryFollowOnlyBlastPropagation", query.RecursionBehaviour.FollowOnlyBlastPropagation),
+			attribute.Int("om.sdp.linkDepth", int(query.RecursionBehaviour.LinkDepth)),
+			attribute.Bool("om.sdp.followOnlyBlastPropagation", query.RecursionBehaviour.FollowOnlyBlastPropagation),
 		)
 	}
 
@@ -244,7 +245,7 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 								liq.Query.RecursionBehaviour.LinkDepth = 0
 							}
 							liq.Query.IgnoreCache = query.IgnoreCache
-							liq.Query.Timeout = query.Timeout
+							liq.Query.Deadline = query.Deadline
 							liq.Query.UUID = query.UUID
 						}
 					}

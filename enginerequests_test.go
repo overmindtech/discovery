@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/overmindtech/sdp-go"
 	"github.com/overmindtech/sdp-go/auth"
-	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestExecuteQuery(t *testing.T) {
@@ -326,7 +326,7 @@ func TestSendQuerySync(t *testing.T) {
 			},
 			IgnoreCache: false,
 			UUID:        u[:],
-			Timeout:     durationpb.New(10 * time.Minute),
+			Deadline:    timestamppb.New(time.Now().Add(10 * time.Minute)),
 		})
 
 		items, errs, err := progress.Execute(context.Background(), e.natsConnection)
