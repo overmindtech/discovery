@@ -190,7 +190,7 @@ func (qt *QueryTracker) linkItem(ctx context.Context, parent *sdp.Item, followOn
 			var shouldRemove bool
 
 			go func(e chan error) {
-				defer LogRecoverToReturn(&ctx, "linkItem -> ExecuteQuery")
+				defer LogRecoverToReturn(ctx, "linkItem -> ExecuteQuery")
 				e <- qt.Engine.ExecuteQuery(ctx, req.Query, items, errs)
 			}(queryErr)
 
@@ -285,7 +285,7 @@ func (qt *QueryTracker) Execute(ctx context.Context) ([]*sdp.Item, []*sdp.QueryE
 
 	// Run the query
 	go func(e chan error) {
-		defer LogRecoverToReturn(&ctx, "Execute -> ExecuteQuery")
+		defer LogRecoverToReturn(ctx, "Execute -> ExecuteQuery")
 		e <- qt.Engine.ExecuteQuery(ctx, qt.Query, items, errs)
 	}(errChan)
 
