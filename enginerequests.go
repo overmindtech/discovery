@@ -208,9 +208,9 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 		// as `executionPool.Go()` will block once the max parallelism is hit
 		go func() {
 			// queue everything into the execution pool
-			defer LogRecoverToReturn(&ctx, "ExecuteQuery outer")
+			defer LogRecoverToReturn(ctx, "ExecuteQuery outer")
 			e.executionPool.Go(func() {
-				defer LogRecoverToReturn(&ctx, "ExecuteQuery inner")
+				defer LogRecoverToReturn(ctx, "ExecuteQuery inner")
 				defer wg.Done()
 				var queryItems []*sdp.Item
 				var queryErrors []*sdp.QueryError
