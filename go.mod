@@ -8,7 +8,7 @@ require (
 	github.com/google/uuid v1.3.1
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats-server/v2 v2.9.22
-	github.com/nats-io/nats.go v1.28.0
+	github.com/nats-io/nats.go v1.29.0
 	github.com/overmindtech/sdp-go v0.49.0
 	github.com/overmindtech/sdpcache v1.5.0
 	github.com/sirupsen/logrus v1.9.3
