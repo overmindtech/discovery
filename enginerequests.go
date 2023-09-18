@@ -12,6 +12,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/overmindtech/sdp-go"
 	"github.com/overmindtech/sdpcache"
+	log "github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
@@ -53,6 +54,7 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 	if query.Deadline == nil || query.Deadline.AsTime().After(maxRequestDeadline) {
 		query.Deadline = timestamppb.New(maxRequestDeadline)
 		deadlineOverride = true
+		log.WithContext(ctx).WithField("om.deadline", query.Deadline.AsTime()).Debug("capping deadline to MaxRequestTimeout")
 	}
 
 	// Add the query timeout to the context stack
