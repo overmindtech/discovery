@@ -22,7 +22,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -86,7 +86,7 @@ func tracingResource() *resource.Resource {
 		// Add your own custom attributes to identify your application
 		resource.WithAttributes(
 			semconv.ServiceNameKey.String("discovery"),
-			semconv.ServiceVersionKey.String("0.0.1"),
+			semconv.ServiceVersionKey.String(instrumentationVersion),
 		),
 	)
 	if err != nil {

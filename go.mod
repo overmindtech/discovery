@@ -49,6 +49,7 @@ require (
 )
 
 require (
+	github.com/MrAlias/otel-schema-utils v0.2.1-alpha
 	github.com/spf13/viper v1.16.0
 	go.opentelemetry.io/contrib/detectors/aws/ec2 v1.19.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.18.0
@@ -58,6 +59,7 @@ require (
 )
 
 require (
+	github.com/Masterminds/semver/v3 v3.2.1 // indirect
 	github.com/aws/aws-sdk-go v1.45.7 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
@@ -72,10 +74,12 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
+	go.opentelemetry.io/otel/schema v0.0.5 // indirect
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230711160842-782d3b101e98 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230711160842-782d3b101e98 // indirect
 	google.golang.org/grpc v1.58.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
