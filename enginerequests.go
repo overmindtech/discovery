@@ -73,7 +73,7 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 		attribute.String("om.sdp.method", query.Method.String()),
 		attribute.String("om.sdp.query", query.Query),
 		attribute.String("om.sdp.scope", query.Scope),
-		attribute.String("om.sdp.deadline", query.Deadline.String()),
+		attribute.String("om.sdp.deadline", query.Deadline.AsTime().String()),
 		attribute.Bool("om.sdp.deadlineOverridden", deadlineOverride),
 		attribute.Bool("om.sdp.queryIgnoreCache", query.IgnoreCache),
 	)
