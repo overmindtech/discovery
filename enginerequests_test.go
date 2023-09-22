@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/overmindtech/discovery/tracing"
 	"github.com/overmindtech/sdp-go"
 	"github.com/overmindtech/sdp-go/auth"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -113,7 +114,7 @@ func TestExecuteQuery(t *testing.T) {
 		_, errs, err := e.ExecuteQuerySync(context.Background(), q)
 
 		if err == nil {
-			t.Error("expected erro but got nil")
+			t.Error("expected error but got nil")
 		}
 
 		if len(errs) == 1 {
@@ -301,6 +302,12 @@ func TestWildcardSourceExpansion(t *testing.T) {
 func TestSendQuerySync(t *testing.T) {
 	SkipWithoutNats(t)
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	ctx, span := tracing.Tracer().Start(ctx, "TestSendQuerySync")
+	defer span.End()
+
 	src := TestSource{
 		ReturnType: "person",
 		ReturnScopes: []string{
@@ -312,6 +319,7 @@ func TestSendQuerySync(t *testing.T) {
 
 	for i := 0; i < 250; i++ {
 		u := uuid.New()
+		t.Log("starting query: ", u)
 
 		var progress *sdp.QueryProgress
 		var items []*sdp.Item
@@ -328,8 +336,9 @@ func TestSendQuerySync(t *testing.T) {
 			UUID:        u[:],
 			Deadline:    timestamppb.New(time.Now().Add(10 * time.Minute)),
 		})
+		progress.StartTimeout = 10 * time.Millisecond
 
-		items, errs, err := progress.Execute(context.Background(), e.natsConnection)
+		items, errs, err := progress.Execute(ctx, e.natsConnection)
 
 		if err != nil {
 			t.Fatal(err)
