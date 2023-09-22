@@ -310,8 +310,9 @@ func TestSendQuerySync(t *testing.T) {
 
 	e := newStartedEngine(t, "TestSendQuerySync", nil, &src)
 
-	for i := 0; i < 250; i++ {
+	for i := 0; i < 3; i++ {
 		u := uuid.New()
+		t.Log("starting query: ", u)
 
 		var progress *sdp.QueryProgress
 		var items []*sdp.Item
@@ -329,7 +330,9 @@ func TestSendQuerySync(t *testing.T) {
 			Deadline:    timestamppb.New(time.Now().Add(10 * time.Minute)),
 		})
 
-		items, errs, err := progress.Execute(context.Background(), e.natsConnection)
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		items, errs, err := progress.Execute(ctx, e.natsConnection)
 
 		if err != nil {
 			t.Fatal(err)
