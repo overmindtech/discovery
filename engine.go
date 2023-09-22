@@ -12,7 +12,6 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/overmindtech/sdp-go"
 	"github.com/overmindtech/sdp-go/auth"
-	"github.com/overmindtech/sdpcache"
 	log "github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc/pool"
 	"go.opentelemetry.io/otel/trace"
@@ -52,9 +51,6 @@ type Engine struct {
 	// MaxParallelExecutions and is populated when the engine is started
 	executionPool *pool.Pool
 
-	// Cache that is used for storing SDP items in memory
-	cache *sdpcache.Cache
-
 	// The NATS connection
 	natsConnection      sdp.EncodedConnection
 	natsConnectionMutex sync.Mutex
@@ -88,7 +84,6 @@ func NewEngine() (*Engine, error) {
 		MaxParallelExecutions:   runtime.NumCPU(),
 		MaxRequestTimeout:       DefaultMaxRequestTimeout,
 		ConnectionWatchInterval: DefaultConnectionWatchInterval,
-		cache:                   sdpcache.NewCache(),
 		sh:                      sh,
 		trackedQueries:          make(map[uuid.UUID]*QueryTracker),
 	}, nil
@@ -285,8 +280,8 @@ func (e *Engine) Start() error {
 
 	e.cacheContext, e.cacheCancel = context.WithCancel(context.Background())
 
-	// Start purging cache
-	e.cache.StartPurger(e.cacheContext)
+	// Start purging caches
+	e.sh.StartPurger(e.cacheContext)
 
 	return e.connect()
 }
@@ -335,7 +330,7 @@ func (e *Engine) Stop() error {
 
 	// Stop purging and clear the cache
 	e.cacheCancel()
-	e.cache.Clear()
+	e.sh.ClearCaches()
 
 	return nil
 }
@@ -402,7 +397,7 @@ func (e *Engine) HandleCancelQuery(ctx context.Context, cancelQuery *sdp.CancelQ
 
 // ClearCache Completely clears the cache
 func (e *Engine) ClearCache() {
-	e.cache.Clear()
+	e.sh.ClearCaches()
 }
 
 // ClearSources Deletes all sources from the engine, allowing new sources to be

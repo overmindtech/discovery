@@ -1,10 +1,12 @@
 package discovery
 
 import (
+	"context"
 	"crypto/sha1"
 	"encoding/base64"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/overmindtech/sdp-go"
@@ -216,4 +218,39 @@ func queryHash(req *sdp.Query) (string, error) {
 	}
 
 	return base64.URLEncoding.EncodeToString(hash.Sum(b)), nil
+}
+
+// StartPurger Starts the purger for all caching sources
+func (sh *SourceHost) StartPurger(ctx context.Context) {
+	for _, s := range sh.Sources() {
+		if c, ok := s.(CachingSource); ok {
+			cache := c.Cache()
+			if cache != nil {
+				cache.StartPurger(ctx)
+			}
+		}
+	}
+}
+
+func (sh *SourceHost) Purge() {
+	for _, s := range sh.Sources() {
+		if c, ok := s.(CachingSource); ok {
+			cache := c.Cache()
+			if cache != nil {
+				cache.Purge(time.Now())
+			}
+		}
+	}
+}
+
+// ClearCaches Clears caches for all caching sources
+func (sh *SourceHost) ClearCaches() {
+	for _, s := range sh.Sources() {
+		if c, ok := s.(CachingSource); ok {
+			cache := c.Cache()
+			if cache != nil {
+				cache.Clear()
+			}
+		}
+	}
 }

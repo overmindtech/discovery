@@ -111,8 +111,6 @@ func TestGet(t *testing.T) {
 		var item3 []*sdp.Item
 		var err error
 
-		e.cache.MinWaitTime = (10 * time.Millisecond)
-		e.cache.StartPurger(context.Background())
 		req := sdp.Query{
 			Type:   "person",
 			Scope:  "test",
@@ -121,15 +119,12 @@ func TestGet(t *testing.T) {
 		}
 
 		finds1, _, err = e.ExecuteQuerySync(context.Background(), &req)
-
 		if err != nil {
 			t.Error(err)
 		}
 
-		time.Sleep(20 * time.Millisecond)
-
+		time.Sleep(10 * time.Millisecond)
 		item2, _, err = e.ExecuteQuerySync(context.Background(), &req)
-
 		if err != nil {
 			t.Error(err)
 		}
@@ -138,16 +133,16 @@ func TestGet(t *testing.T) {
 			t.Errorf("Get queries 10ms apart had different timestamps, caching not working. %v != %v", finds1[0].Metadata.Timestamp.String(), item2[0].Metadata.Timestamp.String())
 		}
 
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
+		e.sh.Purge()
 
 		item3, _, err = e.ExecuteQuerySync(context.Background(), &req)
-
 		if err != nil {
 			t.Error(err)
 		}
 
 		if item2[0].Metadata.Timestamp.String() == item3[0].Metadata.Timestamp.String() {
-			t.Error("Get queries 200ms apart had the same timestamps, cache not expiring")
+			t.Error("Get queries after purging had the same timestamps, cache not expiring")
 		}
 	})
 
@@ -286,9 +281,6 @@ func TestListSearchCaching(t *testing.T) {
 
 	e := newStartedEngine(t, "TestListSearchCaching", nil, &src)
 
-	e.cache.MinWaitTime = (10 * time.Millisecond)
-	e.cache.StartPurger(context.Background())
-
 	t.Run("caching with successful find", func(t *testing.T) {
 		t.Cleanup(func() {
 			src.ClearCalls()
@@ -313,7 +305,6 @@ func TestListSearchCaching(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 
 		finds2, _, err = e.ExecuteQuerySync(context.Background(), &q)
-
 		if err != nil {
 			t.Error(err)
 		}
@@ -322,16 +313,16 @@ func TestListSearchCaching(t *testing.T) {
 			t.Error("List queries 10ms apart had different timestamps, caching not working")
 		}
 
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
+		e.sh.Purge()
 
 		finds3, _, err = e.ExecuteQuerySync(context.Background(), &q)
-
 		if err != nil {
 			t.Error(err)
 		}
 
 		if finds2[0].Metadata.Timestamp.String() == finds3[0].Metadata.Timestamp.String() {
-			t.Error("List queries 200ms apart had the same timestamps, cache not expiring")
+			t.Error("List queries after purging had the same timestamps, cache not expiring")
 		}
 	})
 
@@ -539,8 +530,6 @@ func TestSearchGetCaching(t *testing.T) {
 	}
 
 	e := newStartedEngine(t, "TestSearchGetCaching", nil, &src)
-	e.cache.MinWaitTime = (10 * time.Millisecond)
-	e.cache.StartPurger(context.Background())
 
 	t.Run("caching with successful search", func(t *testing.T) {
 		t.Cleanup(func() {

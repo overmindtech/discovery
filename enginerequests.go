@@ -317,7 +317,7 @@ func (e *Engine) Search(ctx context.Context, r *sdp.Query, relevantSources []Sou
 	return e.callSources(ctx, r, searchableSources, Search)
 }
 
-func (e *Engine) callSources(ctx context.Context, r *sdp.Query, relevantSources []Source, method SourceMethod) ([]*sdp.Item, []*sdp.QueryError) {
+func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources []Source, method SourceMethod) ([]*sdp.Item, []*sdp.QueryError) {
 	ctx, span := tracer.Start(ctx, "CallSources", trace.WithAttributes(
 		attribute.String("om.engine.method", method.String()),
 	))
@@ -327,12 +327,12 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.Query, relevantSources 
 	if ctx.Err() != nil {
 		return nil, []*sdp.QueryError{
 			{
-				UUID:          r.UUID,
+				UUID:          q.UUID,
 				ErrorType:     sdp.QueryError_OTHER,
 				ErrorString:   ctx.Err().Error(),
-				Scope:         r.Scope,
+				Scope:         q.Scope,
 				ResponderName: e.Name,
-				ItemType:      r.Type,
+				ItemType:      q.Type,
 			},
 		}
 	}
@@ -343,129 +343,66 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.Query, relevantSources 
 	// We want to avoid having a Get and a List running at the same time, we'd
 	// rather run the List first, populate the cache, then have the Get just
 	// grab the value from the cache. To this end we use a GetListMutex to allow
-	// a List to block all subsequent Get querys until it is done
+	// a List to block all subsequent Get queries until it is done
 	switch method {
 	case Get:
-		e.gfm.GetLock(r.Scope, r.Type)
-		defer e.gfm.GetUnlock(r.Scope, r.Type)
+		e.gfm.GetLock(q.Scope, q.Type)
+		defer e.gfm.GetUnlock(q.Scope, q.Type)
 	case List:
-		e.gfm.ListLock(r.Scope, r.Type)
-		defer e.gfm.ListUnlock(r.Scope, r.Type)
+		e.gfm.ListLock(q.Scope, q.Type)
+		defer e.gfm.ListUnlock(q.Scope, q.Type)
 	case Search:
 		// We don't need to lock for a search since they are independent and
 		// will only ever have a cache hit if the query is identical
 	}
 
+	span.SetAttributes(
+		attribute.String("om.source.method", method.String()),
+		attribute.String("om.source.queryMethod", q.Method.String()),
+		attribute.String("om.source.queryType", q.Type),
+		attribute.String("om.source.queryScope", q.Scope),
+	)
+
 	for _, src := range relevantSources {
 		if func() bool {
+			cacheHit := false
+			var cache *sdpcache.Cache
+
+			if c, ok := src.(CachingSource); ok {
+				cache = c.Cache()
+				if cache != nil {
+					actualCacheHit, cachedItems, err := cache.Lookup(ctx, src.Name(), q)
+					cacheHit = actualCacheHit
+					if cacheHit {
+						if err != nil {
+							errs = append(errs, err)
+						} else {
+							span.SetAttributes(attribute.Int("om.source.numItems", len(cachedItems)))
+							items = append(items, cachedItems...)
+						}
+					}
+				}
+			}
+
+			if cacheHit {
+				return true
+			}
+
+			// start querying the source after a cache miss
+
 			if len(relevantSources) > 1 {
-				ctx, span = tracer.Start(ctx, src.Name())
+				ctx, span = tracer.Start(ctx, src.Name(), trace.WithAttributes(
+					attribute.String("om.source.method", method.String()),
+					attribute.String("om.source.queryMethod", q.Method.String()),
+					attribute.String("om.source.queryType", q.Type),
+					attribute.String("om.source.queryScope", q.Scope)),
+				)
 				defer span.End()
 			} else {
 				span.SetName(fmt.Sprintf("CallSources: %v", src.Name()))
-			}
-
-			query := sdpcache.CacheQuery{
-				SST: sdpcache.SST{
-					SourceName: src.Name(),
-					Scope:      r.Scope,
-					Type:       r.Type,
-				},
-			}
-
-			switch method {
-			case Get:
-				// With a Get query we need just the one specific item, so also
-				// filter on uniqueAttributeValue
-				query.UniqueAttributeValue = &r.Query
-			case List:
-				// In the case of a find, we just want everything that was found in
-				// the last find, so we only care about the method
-				query.Method = &r.Method
-			case Search:
-				// For a search, we only want to get from the cache items that were
-				// found using search, and with the exact same query
-				query.Method = &r.Method
-				query.Query = &r.Query
-			}
-
-			span.SetAttributes(
-				attribute.String("om.source.method", method.String()),
-				attribute.String("om.source.reqmethod", r.Method.String()),
-				attribute.String("om.source.sourceName", src.Name()),
-				attribute.String("om.source.queryType", r.Type),
-				attribute.String("om.source.queryScope", r.Scope),
-			)
-
-			if !r.IgnoreCache {
-				cachedItems, err := e.cache.Search(query)
-
-				if err != nil {
-					var ire *sdp.QueryError
-					if errors.Is(err, sdpcache.ErrCacheNotFound) {
-						// If nothing was found then execute the search against the sources
-					} else if errors.As(err, &ire) {
-						// Add relevant info
-						ire.Scope = r.Scope
-						ire.UUID = r.UUID
-						ire.SourceName = src.Name()
-						ire.ItemType = r.Type
-
-						errs = append(errs, ire)
-
-						span.SetAttributes(attribute.String("om.cache.error", err.Error()))
-
-						if ire.ErrorType == sdp.QueryError_NOTFOUND {
-							span.SetStatus(codes.Ok, "cache hit: item not found")
-						} else {
-							span.SetStatus(codes.Ok, "cache hit: QueryError")
-						}
-
-						return false
-					} else {
-						// If it's an unknown error, convert it to SDP and skip this source
-						errs = append(errs, &sdp.QueryError{
-							UUID:        r.UUID,
-							ErrorType:   sdp.QueryError_OTHER,
-							ErrorString: err.Error(),
-							Scope:       r.Scope,
-							SourceName:  src.Name(),
-							ItemType:    r.Type,
-						})
-
-						span.SetAttributes(attribute.String("om.cache.error", err.Error()))
-
-						span.SetStatus(codes.Ok, "cache hit: QueryError")
-
-						return false
-					}
-				} else {
-					span.SetAttributes(
-						attribute.Int("om.source.numItems", len(cachedItems)),
-						attribute.Bool("om.source.cache", true),
-					)
-
-					if method == Get {
-						// If the method was Get we should validate that we have
-						// only pulled one thing from the cache
-
-						if len(cachedItems) < 2 {
-							span.SetStatus(codes.Ok, "cache hit: 1 item")
-
-							items = append(items, cachedItems...)
-							return false
-						} else {
-							span.AddEvent("cache returned >1 value, purging and continuing")
-
-							e.cache.Delete(query)
-						}
-					} else {
-						span.SetStatus(codes.Ok, "cache hit: multiple items")
-
-						items = append(items, cachedItems...)
-						return false
-					}
-				}
+				span.SetAttributes(
+					attribute.String("om.source.name", src.Name()),
+				)
 			}
 
 			var resultItems []*sdp.Item
@@ -478,16 +415,16 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.Query, relevantSources 
 			case Get:
 				var newItem *sdp.Item
 
-				newItem, err = src.Get(ctx, r.Scope, r.Query)
+				newItem, err = src.Get(ctx, q.Scope, q.Query)
 
 				if err == nil {
 					resultItems = []*sdp.Item{newItem}
 				}
 			case List:
-				resultItems, err = src.List(ctx, r.Scope)
+				resultItems, err = src.List(ctx, q.Scope)
 			case Search:
 				if searchableSrc, ok := src.(SearchableSource); ok {
-					resultItems, err = searchableSrc.Search(ctx, r.Scope, r.Query)
+					resultItems, err = searchableSrc.Search(ctx, q.Scope, q.Query)
 				} else {
 					err = &sdp.QueryError{
 						ErrorType:   sdp.QueryError_NOTFOUND,
@@ -506,10 +443,11 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.Query, relevantSources 
 			if considerFailed(err) {
 				span.SetStatus(codes.Error, err.Error())
 			} else {
-				if err != nil {
-					// In this case the error must be a NOTFOUND error, which we
-					// want to cache
-					e.cache.StoreError(err, GetCacheDuration(src), query)
+				if err != nil && cache != nil {
+					// In this case the error must be a NOTFOUND error,
+					// which we want to cache
+					query := sdpcache.CacheQueryFromSDP(q, src.Name())
+					cache.StoreError(err, GetCacheDuration(src), query)
 				}
 			}
 
@@ -519,9 +457,9 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.Query, relevantSources 
 				if sdpErr, ok := err.(*sdp.QueryError); ok {
 					// Add details if they aren't populated
 					if sdpErr.Scope == "" {
-						sdpErr.Scope = r.Scope
+						sdpErr.Scope = q.Scope
 					}
-					sdpErr.UUID = r.UUID
+					sdpErr.UUID = q.UUID
 					sdpErr.ItemType = src.Type()
 					sdpErr.ResponderName = e.Name
 					sdpErr.SourceName = src.Name()
@@ -529,12 +467,12 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.Query, relevantSources 
 					errs = append(errs, sdpErr)
 				} else {
 					errs = append(errs, &sdp.QueryError{
-						UUID:        r.UUID,
+						UUID:        q.UUID,
 						ErrorType:   sdp.QueryError_OTHER,
 						ErrorString: err.Error(),
-						Scope:       r.Scope,
+						Scope:       q.Scope,
 						SourceName:  src.Name(),
-						ItemType:    r.Type,
+						ItemType:    q.Type,
 					})
 				}
 			}
@@ -555,7 +493,7 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.Query, relevantSources 
 					SourceDuration:        durationpb.New(sourceDuration),
 					SourceDurationPerItem: durationpb.New(time.Duration(sourceDuration.Nanoseconds() / int64(len(resultItems)))),
 					SourceName:            src.Name(),
-					SourceQuery:           r,
+					SourceQuery:           q,
 				}
 
 				// Mark the item as hidden if the source is a hidden source
@@ -564,7 +502,9 @@ func (e *Engine) callSources(ctx context.Context, r *sdp.Query, relevantSources 
 				}
 
 				// Cache the item
-				e.cache.StoreItem(item, GetCacheDuration(src))
+				if cache != nil {
+					cache.StoreItem(item, GetCacheDuration(src))
+				}
 			}
 
 			items = append(items, resultItems...)

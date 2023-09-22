@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/overmindtech/sdp-go"
+	"github.com/overmindtech/sdpcache"
 )
 
 // Source is capable of finding information about items
@@ -41,7 +42,13 @@ type Source interface {
 	Weight() int
 }
 
-// SearchableItemSource Is a source of items that supports searching
+// CachingSource Is a source of items that supports caching
+type CachingSource interface {
+	Source
+	Cache() *sdpcache.Cache
+}
+
+// SearchableSource Is a source of items that supports searching
 type SearchableSource interface {
 	Source
 	// Search executes a specific search and returns zero or many items as a
