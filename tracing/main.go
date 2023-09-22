@@ -86,7 +86,7 @@ func tracingResource() *resource.Resource {
 		// Add your own custom attributes to identify your application
 		resource.WithAttributes(
 			semconv.ServiceNameKey.String("discovery"),
-			semconv.ServiceVersionKey.String("0.0.1"),
+			semconv.ServiceVersionKey.String(instrumentationVersion),
 		),
 	)
 	if err != nil {
