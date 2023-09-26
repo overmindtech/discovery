@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/overmindtech/sdp-go"
-	"github.com/overmindtech/sdpcache"
 	log "github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -219,14 +218,7 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 				numSources.Add(1)
 
 				// query all sources
-				switch query.GetMethod() {
-				case sdp.QueryMethod_GET:
-					queryItems, queryErrors = e.Get(ctx, q, sources)
-				case sdp.QueryMethod_LIST:
-					queryItems, queryErrors = e.List(ctx, q, sources)
-				case sdp.QueryMethod_SEARCH:
-					queryItems, queryErrors = e.Search(ctx, q, sources)
-				}
+				queryItems, queryErrors = e.Execute(ctx, q, sources)
 
 				for _, i := range queryItems {
 					// If the main query had a linkDepth of greater than zero it means we
@@ -287,39 +279,28 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 	return nil
 }
 
-// Get Runs a get query against known sources in priority order. If nothing was
+// Execute Runs the query against known sources in priority order. If nothing was
 // found, returns the first error. This returns a slice if items for
 // convenience, but this should always be of length 1 or 0
-func (e *Engine) Get(ctx context.Context, r *sdp.Query, relevantSources []Source) ([]*sdp.Item, []*sdp.QueryError) {
-	return e.callSources(ctx, r, relevantSources, Get)
-}
+func (e *Engine) Execute(ctx context.Context, q *sdp.Query, relevantSources []Source) ([]*sdp.Item, []*sdp.QueryError) {
+	sources := relevantSources
+	if q.Method == sdp.QueryMethod_SEARCH {
+		sources = make([]Source, 0)
 
-// List executes List() on all sources for a given type, returning the merged
-// results. Only returns an error if all sources fail, in which case returns the
-// first error
-func (e *Engine) List(ctx context.Context, r *sdp.Query, relevantSources []Source) ([]*sdp.Item, []*sdp.QueryError) {
-	return e.callSources(ctx, r, relevantSources, List)
-}
-
-// Search executes Search() on all sources for a given type, returning the merged
-// results. Only returns an error if all sources fail, in which case returns the
-// first error
-func (e *Engine) Search(ctx context.Context, r *sdp.Query, relevantSources []Source) ([]*sdp.Item, []*sdp.QueryError) {
-	searchableSources := make([]Source, 0)
-
-	// Filter further by searchability
-	for _, source := range relevantSources {
-		if searchable, ok := source.(SearchableSource); ok {
-			searchableSources = append(searchableSources, searchable)
+		// Filter further by searchability
+		for _, source := range relevantSources {
+			if searchable, ok := source.(SearchableSource); ok {
+				sources = append(sources, searchable)
+			}
 		}
 	}
 
-	return e.callSources(ctx, r, searchableSources, Search)
+	return e.callSources(ctx, q, sources)
 }
 
-func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources []Source, method SourceMethod) ([]*sdp.Item, []*sdp.QueryError) {
+func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources []Source) ([]*sdp.Item, []*sdp.QueryError) {
 	ctx, span := tracer.Start(ctx, "CallSources", trace.WithAttributes(
-		attribute.String("om.engine.method", method.String()),
+		attribute.String("om.source.queryMethod", q.Method.String()),
 	))
 	defer span.End()
 
@@ -344,55 +325,29 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 	// rather run the List first, populate the cache, then have the Get just
 	// grab the value from the cache. To this end we use a GetListMutex to allow
 	// a List to block all subsequent Get queries until it is done
-	switch method {
-	case Get:
+	switch q.Method {
+	case sdp.QueryMethod_GET:
 		e.gfm.GetLock(q.Scope, q.Type)
 		defer e.gfm.GetUnlock(q.Scope, q.Type)
-	case List:
+	case sdp.QueryMethod_LIST:
 		e.gfm.ListLock(q.Scope, q.Type)
 		defer e.gfm.ListUnlock(q.Scope, q.Type)
-	case Search:
+	case sdp.QueryMethod_SEARCH:
 		// We don't need to lock for a search since they are independent and
 		// will only ever have a cache hit if the query is identical
 	}
 
 	span.SetAttributes(
-		attribute.String("om.source.method", method.String()),
-		attribute.String("om.source.queryMethod", q.Method.String()),
 		attribute.String("om.source.queryType", q.Type),
 		attribute.String("om.source.queryScope", q.Scope),
 	)
 
 	for _, src := range relevantSources {
 		if func() bool {
-			cacheHit := false
-			var cache *sdpcache.Cache
-
-			if c, ok := src.(CachingSource); ok {
-				cache = c.Cache()
-				if cache != nil {
-					actualCacheHit, cachedItems, err := cache.Lookup(ctx, src.Name(), q)
-					cacheHit = actualCacheHit
-					if cacheHit {
-						if err != nil {
-							errs = append(errs, err)
-						} else {
-							span.SetAttributes(attribute.Int("om.source.numItems", len(cachedItems)))
-							items = append(items, cachedItems...)
-						}
-					}
-				}
-			}
-
-			if cacheHit {
-				return true
-			}
-
 			// start querying the source after a cache miss
-
 			if len(relevantSources) > 1 {
 				ctx, span = tracer.Start(ctx, src.Name(), trace.WithAttributes(
-					attribute.String("om.source.method", method.String()),
+					attribute.String("om.source.method", q.Method.String()),
 					attribute.String("om.source.queryMethod", q.Method.String()),
 					attribute.String("om.source.queryType", q.Type),
 					attribute.String("om.source.queryScope", q.Scope)),
@@ -411,20 +366,20 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 
 			start := time.Now()
 
-			switch method {
-			case Get:
+			switch q.Method {
+			case sdp.QueryMethod_GET:
 				var newItem *sdp.Item
 
-				newItem, err = src.Get(ctx, q.Scope, q.Query)
+				newItem, err = src.Get(ctx, q.Scope, q.Query, q.IgnoreCache)
 
 				if err == nil {
 					resultItems = []*sdp.Item{newItem}
 				}
-			case List:
-				resultItems, err = src.List(ctx, q.Scope)
-			case Search:
+			case sdp.QueryMethod_LIST:
+				resultItems, err = src.List(ctx, q.Scope, q.IgnoreCache)
+			case sdp.QueryMethod_SEARCH:
 				if searchableSrc, ok := src.(SearchableSource); ok {
-					resultItems, err = searchableSrc.Search(ctx, q.Scope, q.Query)
+					resultItems, err = searchableSrc.Search(ctx, q.Scope, q.Query, q.IgnoreCache)
 				} else {
 					err = &sdp.QueryError{
 						ErrorType:   sdp.QueryError_NOTFOUND,
@@ -442,13 +397,6 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 
 			if considerFailed(err) {
 				span.SetStatus(codes.Error, err.Error())
-			} else {
-				if err != nil && cache != nil {
-					// In this case the error must be a NOTFOUND error,
-					// which we want to cache
-					query := sdpcache.CacheQueryFromSDP(q, src.Name())
-					cache.StoreError(err, GetCacheDuration(src), query)
-				}
 			}
 
 			if err != nil {
@@ -500,16 +448,11 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 				if hs, ok := src.(HiddenSource); ok {
 					item.Metadata.Hidden = hs.Hidden()
 				}
-
-				// Cache the item
-				if cache != nil {
-					cache.StoreItem(item, GetCacheDuration(src))
-				}
 			}
 
 			items = append(items, resultItems...)
 
-			if method == Get {
+			if q.Method == sdp.QueryMethod_GET {
 				// If it's a get, we just return the first thing that works
 				if len(resultItems) > 0 {
 					return true

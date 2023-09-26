@@ -36,7 +36,7 @@ func (s *SlowSource) Hidden() bool {
 	return false
 }
 
-func (s *SlowSource) Get(ctx context.Context, scope string, query string) (*sdp.Item, error) {
+func (s *SlowSource) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
 	end := time.Now().Add(s.QueryDuration)
 	attributes, _ := sdp.ToAttributes(map[string]interface{}{
 		"name": query,
@@ -64,7 +64,7 @@ func (s *SlowSource) Get(ctx context.Context, scope string, query string) (*sdp.
 	return &item, nil
 }
 
-func (s *SlowSource) List(ctx context.Context, scope string) ([]*sdp.Item, error) {
+func (s *SlowSource) List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error) {
 	return []*sdp.Item{}, nil
 }
 

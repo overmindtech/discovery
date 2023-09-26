@@ -23,7 +23,7 @@ func TestTypeSource(t *testing.T) {
 	})
 
 	t.Run("listing types", func(t *testing.T) {
-		items, err := s.List(context.Background(), "global")
+		items, err := s.List(context.Background(), "global", false)
 
 		if err != nil {
 			t.Error(err)
@@ -48,7 +48,7 @@ func TestTypeSource(t *testing.T) {
 	})
 
 	t.Run("get a specific type", func(t *testing.T) {
-		item, err := s.Get(context.Background(), "global", "secret")
+		item, err := s.Get(context.Background(), "global", "secret", false)
 
 		if err != nil {
 			t.Error(err)
@@ -62,7 +62,7 @@ func TestTypeSource(t *testing.T) {
 	})
 
 	t.Run("get a bad type", func(t *testing.T) {
-		_, err := s.Get(context.Background(), "global", "nothing-here")
+		_, err := s.Get(context.Background(), "global", "nothing-here", false)
 
 		if err == nil {
 			t.Error("expected error got nil")
@@ -93,7 +93,7 @@ func TestScopeSource(t *testing.T) {
 	})
 
 	t.Run("listing Scopes", func(t *testing.T) {
-		items, err := s.List(context.Background(), "global")
+		items, err := s.List(context.Background(), "global", false)
 
 		if err != nil {
 			t.Error(err)
@@ -118,7 +118,7 @@ func TestScopeSource(t *testing.T) {
 	})
 
 	t.Run("get a specific Scope", func(t *testing.T) {
-		item, err := s.Get(context.Background(), "global", "secret")
+		item, err := s.Get(context.Background(), "global", "secret", false)
 
 		if err != nil {
 			t.Error(err)
@@ -132,7 +132,7 @@ func TestScopeSource(t *testing.T) {
 	})
 
 	t.Run("get a bad Scope", func(t *testing.T) {
-		_, err := s.Get(context.Background(), "global", "nothing-here")
+		_, err := s.Get(context.Background(), "global", "nothing-here", false)
 
 		if err == nil {
 			t.Error("expected error got nil")

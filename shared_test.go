@@ -105,7 +105,7 @@ func (s *TestSource) Hidden() bool {
 	return s.IsHidden
 }
 
-func (s *TestSource) Get(ctx context.Context, scope string, query string) (*sdp.Item, error) {
+func (s *TestSource) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -129,7 +129,7 @@ func (s *TestSource) Get(ctx context.Context, scope string, query string) (*sdp.
 	}
 }
 
-func (s *TestSource) List(ctx context.Context, scope string) ([]*sdp.Item, error) {
+func (s *TestSource) List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.ListCalls = append(s.ListCalls, []string{scope})
@@ -152,7 +152,7 @@ func (s *TestSource) List(ctx context.Context, scope string) ([]*sdp.Item, error
 	}
 }
 
-func (s *TestSource) Search(ctx context.Context, scope string, query string) ([]*sdp.Item, error) {
+func (s *TestSource) Search(ctx context.Context, scope string, query string, ignoreCache bool) ([]*sdp.Item, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
