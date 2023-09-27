@@ -404,23 +404,28 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 
 				if sdpErr, ok := err.(*sdp.QueryError); ok {
 					// Add details if they aren't populated
-					if sdpErr.Scope == "" {
-						sdpErr.Scope = q.Scope
+					scope := sdpErr.Scope
+					if scope == "" {
+						scope = q.Scope
 					}
-					sdpErr.UUID = q.UUID
-					sdpErr.ItemType = src.Type()
-					sdpErr.ResponderName = e.Name
-					sdpErr.SourceName = src.Name()
-
-					errs = append(errs, sdpErr)
+					errs = append(errs, &sdp.QueryError{
+						UUID:          q.UUID,
+						ErrorType:     sdpErr.ErrorType,
+						ErrorString:   sdpErr.ErrorString,
+						Scope:         scope,
+						SourceName:    src.Name(),
+						ItemType:      src.Type(),
+						ResponderName: e.Name,
+					})
 				} else {
 					errs = append(errs, &sdp.QueryError{
-						UUID:        q.UUID,
-						ErrorType:   sdp.QueryError_OTHER,
-						ErrorString: err.Error(),
-						Scope:       q.Scope,
-						SourceName:  src.Name(),
-						ItemType:    q.Type,
+						UUID:          q.UUID,
+						ErrorType:     sdp.QueryError_OTHER,
+						ErrorString:   err.Error(),
+						Scope:         q.Scope,
+						SourceName:    src.Name(),
+						ItemType:      q.Type,
+						ResponderName: e.Name,
 					})
 				}
 			}
