@@ -77,20 +77,20 @@ func TestGet(t *testing.T) {
 			if errs[0].ErrorType != sdp.QueryError_NOTFOUND {
 				t.Errorf("expected ErrorType to be %v, got %v", sdp.QueryError_NOTFOUND, errs[0].ErrorType)
 			}
-			if errs[0].ErrorString != "not found (test)" {
-				t.Errorf("expected ErrorString to be %v, got %v", "", errs[0].ErrorString)
+			if errs[0].ErrorString != "no items found" {
+				t.Errorf("expected ErrorString to be '%v', got '%v'", "no items found", errs[0].ErrorString)
 			}
 			if errs[0].Scope != "empty" {
-				t.Errorf("expected Scope to be %v, got %v", "empty", errs[0].Scope)
+				t.Errorf("expected Scope to be '%v', got '%v'", "empty", errs[0].Scope)
 			}
 			if errs[0].SourceName != "testSource-orange" {
-				t.Errorf("expected SourceName to be %v, got %v", "testSource-orange", errs[0].SourceName)
+				t.Errorf("expected SourceName to be '%v', got '%v'", "testSource-orange", errs[0].SourceName)
 			}
 			if errs[0].ItemType != "person" {
-				t.Errorf("expected ItemType to be %v, got %v", "person", errs[0].ItemType)
+				t.Errorf("expected ItemType to be '%v', got '%v'", "person", errs[0].ItemType)
 			}
 			if errs[0].ResponderName != "TestGet" {
-				t.Errorf("expected ResponderName to be %v, got %v", "TestGet", errs[0].ResponderName)
+				t.Errorf("expected ResponderName to be '%v', got '%v'", "TestGet", errs[0].ResponderName)
 			}
 		} else {
 			t.Errorf("expected 1 error, got %v", len(errs))
@@ -106,13 +106,11 @@ func TestGet(t *testing.T) {
 			src.ClearCalls()
 		})
 
-		var finds1 []*sdp.Item
+		var list1 []*sdp.Item
 		var item2 []*sdp.Item
 		var item3 []*sdp.Item
 		var err error
 
-		e.cache.MinWaitTime = (10 * time.Millisecond)
-		e.cache.StartPurger(context.Background())
 		req := sdp.Query{
 			Type:   "person",
 			Scope:  "test",
@@ -120,34 +118,31 @@ func TestGet(t *testing.T) {
 			Method: sdp.QueryMethod_GET,
 		}
 
-		finds1, _, err = e.ExecuteQuerySync(context.Background(), &req)
-
+		list1, _, err = e.ExecuteQuerySync(context.Background(), &req)
 		if err != nil {
 			t.Error(err)
 		}
 
-		time.Sleep(20 * time.Millisecond)
-
+		time.Sleep(10 * time.Millisecond)
 		item2, _, err = e.ExecuteQuerySync(context.Background(), &req)
-
 		if err != nil {
 			t.Error(err)
 		}
 
-		if finds1[0].Metadata.Timestamp.String() != item2[0].Metadata.Timestamp.String() {
-			t.Errorf("Get queries 10ms apart had different timestamps, caching not working. %v != %v", finds1[0].Metadata.Timestamp.String(), item2[0].Metadata.Timestamp.String())
+		if list1[0].Attributes.AttrStruct.Fields["generation"].GetNumberValue() != item2[0].Attributes.AttrStruct.Fields["generation"].GetNumberValue() {
+			t.Errorf("Get queries 10ms apart had different timestamps, caching not working. %v != %v", list1[0].Attributes.AttrStruct.Fields["generation"].GetNumberValue(), item2[0].Attributes.AttrStruct.Fields["generation"].GetNumberValue())
 		}
 
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
+		e.sh.Purge()
 
 		item3, _, err = e.ExecuteQuerySync(context.Background(), &req)
-
 		if err != nil {
 			t.Error(err)
 		}
 
 		if item2[0].Metadata.Timestamp.String() == item3[0].Metadata.Timestamp.String() {
-			t.Error("Get queries 200ms apart had the same timestamps, cache not expiring")
+			t.Error("Get queries after purging had the same timestamps, cache not expiring")
 		}
 	})
 
@@ -286,17 +281,14 @@ func TestListSearchCaching(t *testing.T) {
 
 	e := newStartedEngine(t, "TestListSearchCaching", nil, &src)
 
-	e.cache.MinWaitTime = (10 * time.Millisecond)
-	e.cache.StartPurger(context.Background())
-
-	t.Run("caching with successful find", func(t *testing.T) {
+	t.Run("caching with successful list", func(t *testing.T) {
 		t.Cleanup(func() {
 			src.ClearCalls()
 		})
 
-		var finds1 []*sdp.Item
-		var finds2 []*sdp.Item
-		var finds3 []*sdp.Item
+		var list1 []*sdp.Item
+		var list2 []*sdp.Item
+		var list3 []*sdp.Item
 		var err error
 		q := sdp.Query{
 			Type:   "person",
@@ -304,7 +296,7 @@ func TestListSearchCaching(t *testing.T) {
 			Method: sdp.QueryMethod_LIST,
 		}
 
-		finds1, _, err = e.ExecuteQuerySync(context.Background(), &q)
+		list1, _, err = e.ExecuteQuerySync(context.Background(), &q)
 
 		if err != nil {
 			t.Error(err)
@@ -312,30 +304,29 @@ func TestListSearchCaching(t *testing.T) {
 
 		time.Sleep(10 * time.Millisecond)
 
-		finds2, _, err = e.ExecuteQuerySync(context.Background(), &q)
-
+		list2, _, err = e.ExecuteQuerySync(context.Background(), &q)
 		if err != nil {
 			t.Error(err)
 		}
 
-		if finds1[0].Metadata.Timestamp.String() != finds2[0].Metadata.Timestamp.String() {
-			t.Error("List queries 10ms apart had different timestamps, caching not working")
+		if list1[0].Attributes.AttrStruct.Fields["generation"].GetNumberValue() != list2[0].Attributes.AttrStruct.Fields["generation"].GetNumberValue() {
+			t.Errorf("List queries had different generations, caching not working. %v != %v", list1[0].Attributes.AttrStruct.Fields["generation"], list2[0].Attributes.AttrStruct.Fields["generation"])
 		}
 
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
+		e.sh.Purge()
 
-		finds3, _, err = e.ExecuteQuerySync(context.Background(), &q)
-
+		list3, _, err = e.ExecuteQuerySync(context.Background(), &q)
 		if err != nil {
 			t.Error(err)
 		}
 
-		if finds2[0].Metadata.Timestamp.String() == finds3[0].Metadata.Timestamp.String() {
-			t.Error("List queries 200ms apart had the same timestamps, cache not expiring")
+		if list2[0].Attributes.AttrStruct.Fields["generation"] == list3[0].Attributes.AttrStruct.Fields["generation"] {
+			t.Errorf("List queries after purging had the same generation, caching not working. %v == %v", list2[0].Attributes.AttrStruct.Fields["generation"], list3[0].Attributes.AttrStruct.Fields["generation"])
 		}
 	})
 
-	t.Run("empty find", func(t *testing.T) {
+	t.Run("empty list", func(t *testing.T) {
 		t.Cleanup(func() {
 			src.ClearCalls()
 		})
@@ -348,7 +339,6 @@ func TestListSearchCaching(t *testing.T) {
 		}
 
 		_, _, err = e.ExecuteQuerySync(context.Background(), &q)
-
 		if err == nil {
 			t.Error("expected error but got nil")
 		}
@@ -362,7 +352,7 @@ func TestListSearchCaching(t *testing.T) {
 		}
 
 		if l := len(src.ListCalls); l != 1 {
-			t.Errorf("Expected only 1 find call, got %v, cache not working", l)
+			t.Errorf("Expected only 1 list call, got %v, cache not working: %v", l, src.ListCalls)
 		}
 
 		time.Sleep(200 * time.Millisecond)
@@ -374,7 +364,7 @@ func TestListSearchCaching(t *testing.T) {
 		}
 
 		if l := len(src.ListCalls); l != 2 {
-			t.Errorf("Expected 2 find calls, got %v, cache not clearing", l)
+			t.Errorf("Expected 2 list calls, got %v, cache not clearing: %v", l, src.ListCalls)
 		}
 	})
 
@@ -383,9 +373,9 @@ func TestListSearchCaching(t *testing.T) {
 			src.ClearCalls()
 		})
 
-		var finds1 []*sdp.Item
-		var finds2 []*sdp.Item
-		var finds3 []*sdp.Item
+		var list1 []*sdp.Item
+		var list2 []*sdp.Item
+		var list3 []*sdp.Item
 		var err error
 		q := sdp.Query{
 			Type:   "person",
@@ -394,34 +384,31 @@ func TestListSearchCaching(t *testing.T) {
 			Method: sdp.QueryMethod_SEARCH,
 		}
 
-		finds1, _, err = e.ExecuteQuerySync(context.Background(), &q)
-
+		list1, _, err = e.ExecuteQuerySync(context.Background(), &q)
 		if err != nil {
 			t.Error(err)
 		}
 
 		time.Sleep(10 * time.Millisecond)
 
-		finds2, _, err = e.ExecuteQuerySync(context.Background(), &q)
-
+		list2, _, err = e.ExecuteQuerySync(context.Background(), &q)
 		if err != nil {
 			t.Error(err)
 		}
 
-		if finds1[0].Metadata.Timestamp.String() != finds2[0].Metadata.Timestamp.String() {
-			t.Error("List queries 10ms apart had different timestamps, caching not working")
+		if list1[0].Attributes.AttrStruct.Fields["generation"].GetNumberValue() != list2[0].Attributes.AttrStruct.Fields["generation"].GetNumberValue() {
+			t.Errorf("List queries had different generations, caching not working. %v != %v", list1[0].Attributes.AttrStruct.Fields["generation"], list2[0].Attributes.AttrStruct.Fields["generation"])
 		}
 
 		time.Sleep(200 * time.Millisecond)
 
-		finds3, _, err = e.ExecuteQuerySync(context.Background(), &q)
-
+		list3, _, err = e.ExecuteQuerySync(context.Background(), &q)
 		if err != nil {
 			t.Error(err)
 		}
 
-		if finds2[0].Metadata.Timestamp.String() == finds3[0].Metadata.Timestamp.String() {
-			t.Error("List queries 200ms apart had the same timestamps, cache not expiring")
+		if list2[0].Attributes.AttrStruct.Fields["generation"].GetNumberValue() == list3[0].Attributes.AttrStruct.Fields["generation"].GetNumberValue() {
+			t.Errorf("List queries 200ms apart had the same generations, caching not working. %v == %v", list2[0].Attributes.AttrStruct.Fields["generation"], list3[0].Attributes.AttrStruct.Fields["generation"])
 		}
 	})
 
@@ -539,8 +526,6 @@ func TestSearchGetCaching(t *testing.T) {
 	}
 
 	e := newStartedEngine(t, "TestSearchGetCaching", nil, &src)
-	e.cache.MinWaitTime = (10 * time.Millisecond)
-	e.cache.StartPurger(context.Background())
 
 	t.Run("caching with successful search", func(t *testing.T) {
 		t.Cleanup(func() {
@@ -559,8 +544,8 @@ func TestSearchGetCaching(t *testing.T) {
 			Method: sdp.QueryMethod_SEARCH,
 		}
 
+		t.Logf("Searching for %v", q.Query)
 		searchResult, searchErrors, err = e.ExecuteQuerySync(context.Background(), &q)
-
 		if err != nil {
 			t.Error(err)
 		}
@@ -575,12 +560,17 @@ func TestSearchGetCaching(t *testing.T) {
 			t.Fatal("Got no results")
 		}
 
+		if len(searchResult) > 1 {
+			t.Fatalf("Got too many results: %v", searchResult)
+		}
+
 		time.Sleep(10 * time.Millisecond)
 
 		// Do a get query for that same item
 		q.Method = sdp.QueryMethod_GET
 		q.Query = searchResult[0].UniqueAttributeValue()
 
+		t.Logf("Getting %v from cache", q.Query)
 		getResult, getErrors, err = e.ExecuteQuerySync(context.Background(), &q)
 
 		if err != nil {
@@ -597,8 +587,8 @@ func TestSearchGetCaching(t *testing.T) {
 			t.Error("No result from GET")
 		}
 
-		if searchResult[0].Metadata.Timestamp.String() != getResult[0].Metadata.Timestamp.String() {
-			t.Error("Item timestamps do not match, caching has not worked")
+		if searchResult[0].Attributes.AttrStruct.Fields["generation"].GetNumberValue() != getResult[0].Attributes.AttrStruct.Fields["generation"].GetNumberValue() {
+			t.Errorf("Search and Get queries had different generations, caching not working. %v != %v", searchResult[0].Attributes.AttrStruct.Fields["generation"], getResult[0].Attributes.AttrStruct.Fields["generation"])
 		}
 	})
 }

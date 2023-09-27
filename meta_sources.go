@@ -37,7 +37,7 @@ func newTypeItem(typ string) *sdp.Item {
 	}
 }
 
-func (t *TypeSource) Get(ctx context.Context, scope string, query string) (*sdp.Item, error) {
+func (t *TypeSource) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
 	if scope != "global" {
 		return nil, &sdp.QueryError{
 			ErrorType:   sdp.QueryError_NOSCOPE,
@@ -57,7 +57,7 @@ func (t *TypeSource) Get(ctx context.Context, scope string, query string) (*sdp.
 	return newTypeItem(sources[0].Type()), nil
 }
 
-func (t *TypeSource) List(ctx context.Context, scope string) ([]*sdp.Item, error) {
+func (t *TypeSource) List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error) {
 	if scope != "global" {
 		return nil, &sdp.QueryError{
 			ErrorType:   sdp.QueryError_NOSCOPE,
@@ -135,7 +135,7 @@ func newScopeItem(scope string) *sdp.Item {
 	}
 }
 
-func (t *ScopeSource) Get(ctx context.Context, scope string, query string) (*sdp.Item, error) {
+func (t *ScopeSource) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
 	if scope != "global" {
 		return nil, &sdp.QueryError{
 			ErrorType:   sdp.QueryError_NOSCOPE,
@@ -157,7 +157,7 @@ func (t *ScopeSource) Get(ctx context.Context, scope string, query string) (*sdp
 	}
 }
 
-func (t *ScopeSource) List(ctx context.Context, scope string) ([]*sdp.Item, error) {
+func (t *ScopeSource) List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error) {
 	if scope != "global" {
 		return nil, &sdp.QueryError{
 			ErrorType:   sdp.QueryError_NOSCOPE,
@@ -230,7 +230,7 @@ func (s *SourcesSource) Scopes() []string {
 	return []string{"global"}
 }
 
-func (s *SourcesSource) Get(ctx context.Context, scope string, query string) (*sdp.Item, error) {
+func (s *SourcesSource) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
 	for _, src := range s.sh.Sources() {
 		if src.Name() == query {
 			return s.sourceToItem(src)
@@ -242,7 +242,7 @@ func (s *SourcesSource) Get(ctx context.Context, scope string, query string) (*s
 	}
 }
 
-func (s *SourcesSource) List(ctx context.Context, scope string) ([]*sdp.Item, error) {
+func (s *SourcesSource) List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error) {
 	sources := s.sh.Sources()
 	items := make([]*sdp.Item, len(sources))
 

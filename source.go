@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/overmindtech/sdp-go"
+	"github.com/overmindtech/sdpcache"
 )
 
 // Source is capable of finding information about items
@@ -29,10 +30,10 @@ type Source interface {
 
 	// Get Get a single item with a given scope and query. The item returned
 	// should have a UniqueAttributeValue that matches the `query` parameter.
-	Get(ctx context.Context, scope string, query string) (*sdp.Item, error)
+	Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error)
 
 	// List Lists all items in a given scope
-	List(ctx context.Context, scope string) ([]*sdp.Item, error)
+	List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error)
 
 	// Weight Returns the priority weighting of items returned by this source.
 	// This is used to resolve conflicts where two sources of the same type
@@ -41,14 +42,20 @@ type Source interface {
 	Weight() int
 }
 
-// SearchableItemSource Is a source of items that supports searching
+// CachingSource Is a source of items that supports caching
+type CachingSource interface {
+	Source
+	Cache() *sdpcache.Cache
+}
+
+// SearchableSource Is a source of items that supports searching
 type SearchableSource interface {
 	Source
 	// Search executes a specific search and returns zero or many items as a
 	// result (and optionally an error). The specific format of the query that
 	// needs to be provided to Search is dependant on the source itself as each
 	// source will respond to searches differently
-	Search(ctx context.Context, scope string, query string) ([]*sdp.Item, error)
+	Search(ctx context.Context, scope string, query string, ignoreCache bool) ([]*sdp.Item, error)
 }
 
 // CacheDefiner Some backends may implement the CacheDefiner interface which
@@ -75,25 +82,4 @@ func GetCacheDuration(s Source) time.Duration {
 	}
 
 	return (10 * time.Minute)
-}
-
-type SourceMethod int64
-
-const (
-	Get SourceMethod = iota
-	List
-	Search
-)
-
-func (s SourceMethod) String() string {
-	switch s {
-	case Get:
-		return "Get"
-	case List:
-		return "List"
-	case Search:
-		return "Search"
-	default:
-		return "Unknown"
-	}
 }

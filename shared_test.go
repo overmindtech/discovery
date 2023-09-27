@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/goombaio/namegenerator"
 	"github.com/overmindtech/sdp-go"
+	"github.com/overmindtech/sdpcache"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -32,7 +34,10 @@ func RandomName() string {
 	return fmt.Sprintf("%v-%v", name, randGarbage)
 }
 
+var generation atomic.Int32
+
 func (s *TestSource) NewTestItem(scope string, query string) *sdp.Item {
+	gen := generation.Add(1)
 	return &sdp.Item{
 		Type:            s.Type(),
 		Scope:           scope,
@@ -40,8 +45,9 @@ func (s *TestSource) NewTestItem(scope string, query string) *sdp.Item {
 		Attributes: &sdp.ItemAttributes{
 			AttrStruct: &structpb.Struct{
 				Fields: map[string]*structpb.Value{
-					"name": structpb.NewStringValue(query),
-					"age":  structpb.NewNumberValue(28),
+					"name":       structpb.NewStringValue(query),
+					"age":        structpb.NewNumberValue(28),
+					"generation": structpb.NewNumberValue(float64(gen)),
 				},
 			},
 		},
@@ -68,13 +74,24 @@ type TestSource struct {
 	ReturnWeight int    // Weight to be returned
 	ReturnName   string // The name of the source
 	mutex        sync.Mutex
+
+	CacheDuration time.Duration   // How long to cache items for
+	cache         *sdpcache.Cache // The sdpcache of this source
+	cacheInitMu   sync.Mutex      // Mutex to ensure cache is only initialised once
 }
+
+// assert interface implementation
+var _ CachingSource = (*TestSource)(nil)
 
 // ClearCalls Clears the call counters between tests
 func (s *TestSource) ClearCalls() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
 	s.ListCalls = make([][]string, 0)
 	s.SearchCalls = make([][]string, 0)
 	s.GetCalls = make([][]string, 0)
+	s.cache.Clear()
 }
 
 func (s *TestSource) Type() string {
@@ -93,6 +110,21 @@ func (s *TestSource) DefaultCacheDuration() time.Duration {
 	return 100 * time.Millisecond
 }
 
+func (s *TestSource) ensureCache() {
+	s.cacheInitMu.Lock()
+	defer s.cacheInitMu.Unlock()
+
+	if s.cache == nil {
+		s.cache = sdpcache.NewCache()
+		s.cache.MinWaitTime = 100 * time.Millisecond
+	}
+}
+
+func (s *TestSource) Cache() *sdpcache.Cache {
+	s.ensureCache()
+	return s.cache
+}
+
 func (s *TestSource) Scopes() []string {
 	if len(s.ReturnScopes) > 0 {
 		return s.ReturnScopes
@@ -105,42 +137,34 @@ func (s *TestSource) Hidden() bool {
 	return s.IsHidden
 }
 
-func (s *TestSource) Get(ctx context.Context, scope string, query string) (*sdp.Item, error) {
+func (s *TestSource) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+
+	s.ensureCache()
+	cacheHit, ck, cachedItems, qErr := s.cache.Lookup(ctx, s.Name(), sdp.QueryMethod_GET, scope, s.Type(), query, ignoreCache)
+	if qErr != nil {
+		return nil, qErr
+	}
+	if cacheHit {
+		if len(cachedItems) > 0 {
+			return cachedItems[0], nil
+		} else {
+			return nil, nil
+		}
+	}
 
 	s.GetCalls = append(s.GetCalls, []string{scope, query})
 
 	switch scope {
 	case "empty":
-		return nil, &sdp.QueryError{
-			ErrorType:   sdp.QueryError_NOTFOUND,
-			ErrorString: "not found (test)",
-			Scope:       scope,
-		}
-	case "error":
-		return nil, &sdp.QueryError{
-			ErrorType:   sdp.QueryError_OTHER,
-			ErrorString: "Error for testing",
-			Scope:       scope,
-		}
-	default:
-		return s.NewTestItem(scope, query), nil
-	}
-}
-
-func (s *TestSource) List(ctx context.Context, scope string) ([]*sdp.Item, error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.ListCalls = append(s.ListCalls, []string{scope})
-
-	switch scope {
-	case "empty":
-		return nil, &sdp.QueryError{
+		err := &sdp.QueryError{
 			ErrorType:   sdp.QueryError_NOTFOUND,
 			ErrorString: "no items found",
 			Scope:       scope,
 		}
+		s.cache.StoreError(err, s.DefaultCacheDuration(), ck)
+		return nil, err
 	case "error":
 		return nil, &sdp.QueryError{
 			ErrorType:   sdp.QueryError_OTHER,
@@ -148,23 +172,73 @@ func (s *TestSource) List(ctx context.Context, scope string) ([]*sdp.Item, error
 			Scope:       scope,
 		}
 	default:
-		return []*sdp.Item{s.NewTestItem(scope, "Dylan")}, nil
+		item := s.NewTestItem(scope, query)
+		s.cache.StoreItem(item, s.DefaultCacheDuration(), ck)
+		return item, nil
 	}
 }
 
-func (s *TestSource) Search(ctx context.Context, scope string, query string) ([]*sdp.Item, error) {
+func (s *TestSource) List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+
+	s.ensureCache()
+	cacheHit, ck, cachedItems, qErr := s.cache.Lookup(ctx, s.Name(), sdp.QueryMethod_LIST, scope, s.Type(), "", ignoreCache)
+	if qErr != nil {
+		return nil, qErr
+	}
+	if cacheHit {
+		return cachedItems, nil
+	}
+
+	s.ListCalls = append(s.ListCalls, []string{scope})
+
+	switch scope {
+	case "empty":
+		err := &sdp.QueryError{
+			ErrorType:   sdp.QueryError_NOTFOUND,
+			ErrorString: "no items found",
+			Scope:       scope,
+		}
+		s.cache.StoreError(err, s.DefaultCacheDuration(), ck)
+		return nil, err
+	case "error":
+		return nil, &sdp.QueryError{
+			ErrorType:   sdp.QueryError_OTHER,
+			ErrorString: "Error for testing",
+			Scope:       scope,
+		}
+	default:
+		item := s.NewTestItem(scope, "Dylan")
+		s.cache.StoreItem(item, s.DefaultCacheDuration(), ck)
+		return []*sdp.Item{item}, nil
+	}
+}
+
+func (s *TestSource) Search(ctx context.Context, scope string, query string, ignoreCache bool) ([]*sdp.Item, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	s.ensureCache()
+	cacheHit, ck, cachedItems, qErr := s.cache.Lookup(ctx, s.Name(), sdp.QueryMethod_SEARCH, scope, s.Type(), query, ignoreCache)
+	if qErr != nil {
+		return nil, qErr
+	}
+	if cacheHit {
+		return cachedItems, nil
+	}
 
 	s.SearchCalls = append(s.SearchCalls, []string{scope, query})
 
 	switch scope {
 	case "empty":
-		return nil, &sdp.QueryError{
+		err := &sdp.QueryError{
 			ErrorType:   sdp.QueryError_NOTFOUND,
 			ErrorString: "no items found",
 			Scope:       scope,
 		}
+		s.cache.StoreError(err, s.DefaultCacheDuration(), ck)
+		return nil, err
 	case "error":
 		return nil, &sdp.QueryError{
 			ErrorType:   sdp.QueryError_OTHER,
@@ -172,7 +246,9 @@ func (s *TestSource) Search(ctx context.Context, scope string, query string) ([]
 			Scope:       scope,
 		}
 	default:
-		return []*sdp.Item{s.NewTestItem(scope, "Dylan")}, nil
+		item := s.NewTestItem(scope, "Dylan")
+		s.cache.StoreItem(item, s.DefaultCacheDuration(), ck)
+		return []*sdp.Item{item}, nil
 	}
 }
 

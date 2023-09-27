@@ -37,7 +37,7 @@ func (s *SpeedTestSource) Scopes() []string {
 	return []string{"test"}
 }
 
-func (s *SpeedTestSource) Get(ctx context.Context, scope string, query string) (*sdp.Item, error) {
+func (s *SpeedTestSource) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
 	select {
 	case <-time.After(s.QueryDelay):
 		return &sdp.Item{
@@ -76,8 +76,8 @@ func (s *SpeedTestSource) Get(ctx context.Context, scope string, query string) (
 
 }
 
-func (s *SpeedTestSource) List(ctx context.Context, scope string) ([]*sdp.Item, error) {
-	item, err := s.Get(ctx, scope, "dylan")
+func (s *SpeedTestSource) List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error) {
+	item, err := s.Get(ctx, scope, "dylan", ignoreCache)
 
 	return []*sdp.Item{item}, err
 }
