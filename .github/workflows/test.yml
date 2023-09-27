@@ -3,7 +3,7 @@ on: push
 jobs:
   test:
     name: test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8cpu
     strategy:
       matrix:
         # Go only supports 2x revisions at once
