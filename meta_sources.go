@@ -280,10 +280,6 @@ func (s *SourcesSource) sourceToItem(src Source) (*sdp.Item, error) {
 	_, searchable := src.(SearchableSource)
 	attrMap["searchable"] = searchable
 
-	if cd, ok := src.(CacheDefiner); ok {
-		attrMap["defaultCacheDuration"] = cd.DefaultCacheDuration().String()
-	}
-
 	var hidden bool
 
 	if h, ok := src.(HiddenSource); ok {

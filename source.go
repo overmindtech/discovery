@@ -2,7 +2,6 @@ package discovery
 
 import (
 	"context"
-	"time"
 
 	"github.com/overmindtech/sdp-go"
 	"github.com/overmindtech/sdpcache"
@@ -58,13 +57,6 @@ type SearchableSource interface {
 	Search(ctx context.Context, scope string, query string, ignoreCache bool) ([]*sdp.Item, error)
 }
 
-// CacheDefiner Some backends may implement the CacheDefiner interface which
-// means that they specify a custom default cache interval. The config will
-// always take precedence however
-type CacheDefiner interface {
-	DefaultCacheDuration() time.Duration
-}
-
 // HiddenSource Sources that define a `Hidden()` method are able to tell whether
 // or not the items they produce should be marked as hidden within the metadata.
 // Hidden items will not be shown in GUIs or stored in databases and are used
@@ -72,14 +64,4 @@ type CacheDefiner interface {
 // secondary sources
 type HiddenSource interface {
 	Hidden() bool
-}
-
-// GetCacheDuration Gets the cache duration for a specific source, or a default
-// value
-func GetCacheDuration(s Source) time.Duration {
-	if cd, ok := s.(CacheDefiner); ok {
-		return cd.DefaultCacheDuration()
-	}
-
-	return (10 * time.Minute)
 }
