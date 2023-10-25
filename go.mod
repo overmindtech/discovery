@@ -10,7 +10,7 @@ require (
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats-server/v2 v2.10.3
 	github.com/nats-io/nats.go v1.31.0
-	github.com/overmindtech/sdp-go v0.51.0
+	github.com/overmindtech/sdp-go v0.53.0
 	github.com/overmindtech/sdpcache v1.6.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/sourcegraph/conc v0.3.0
@@ -27,10 +27,10 @@ require (
 
 // Transitive dependencies
 require (
+	connectrpc.com/connect v1.12.0 // indirect
 	github.com/Masterminds/semver/v3 v3.2.1 // indirect
 	github.com/auth0/go-jwt-middleware/v2 v2.1.0 // indirect
 	github.com/aws/aws-sdk-go v1.45.16 // indirect
-	github.com/bufbuild/connect-go v1.10.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
@@ -52,9 +52,10 @@ require (
 	github.com/overmindtech/api-client v0.14.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.1.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/sagikazarmark/locafero v0.3.0 // indirect
+	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/spf13/afero v1.10.0 // indirect
 	github.com/spf13/cast v1.5.1 // indirect
-	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.45.0 // indirect
@@ -63,8 +64,9 @@ require (
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.14.0 // indirect
+	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
 	golang.org/x/net v0.17.0 // indirect
-	golang.org/x/oauth2 v0.12.0 // indirect
+	golang.org/x/oauth2 v0.13.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
@@ -76,10 +78,4 @@ require (
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-)
-
-require (
-	github.com/sagikazarmark/locafero v0.3.0 // indirect
-	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
-	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
 )
