@@ -6,7 +6,7 @@ go 1.21
 require (
 	github.com/MrAlias/otel-schema-utils v0.2.1-alpha
 	github.com/getsentry/sentry-go v0.25.0
-	github.com/google/uuid v1.3.1
+	github.com/google/uuid v1.4.0
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats-server/v2 v2.10.3
 	github.com/nats-io/nats.go v1.31.0
