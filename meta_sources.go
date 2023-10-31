@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/overmindtech/sdp-go"
@@ -38,10 +39,10 @@ func newTypeItem(typ string) *sdp.Item {
 }
 
 func (t *TypeSource) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
-	if scope != "global" {
+	if !strings.Contains("global", scope) {
 		return nil, &sdp.QueryError{
 			ErrorType:   sdp.QueryError_NOSCOPE,
-			ErrorString: fmt.Sprintf("%v only available in global scope", t.Type()),
+			ErrorString: fmt.Sprintf("'%v' only available in global scope", t.Type()),
 		}
 	}
 
@@ -50,7 +51,7 @@ func (t *TypeSource) Get(ctx context.Context, scope string, query string, ignore
 	if len(sources) == 0 {
 		return nil, &sdp.QueryError{
 			ErrorType:   sdp.QueryError_NOTFOUND,
-			ErrorString: fmt.Sprintf("scope %v not found", query),
+			ErrorString: fmt.Sprintf("type '%v' not found", query),
 		}
 	}
 
@@ -58,7 +59,7 @@ func (t *TypeSource) Get(ctx context.Context, scope string, query string, ignore
 }
 
 func (t *TypeSource) List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error) {
-	if scope != "global" {
+	if !strings.Contains("global", scope) {
 		return nil, &sdp.QueryError{
 			ErrorType:   sdp.QueryError_NOSCOPE,
 			ErrorString: fmt.Sprintf("%v only available in global scope", t.Type()),
@@ -136,7 +137,7 @@ func newScopeItem(scope string) *sdp.Item {
 }
 
 func (t *ScopeSource) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
-	if scope != "global" {
+	if !strings.Contains("global", scope) {
 		return nil, &sdp.QueryError{
 			ErrorType:   sdp.QueryError_NOSCOPE,
 			ErrorString: fmt.Sprintf("%v only available in global scope", t.Type()),
@@ -153,12 +154,12 @@ func (t *ScopeSource) Get(ctx context.Context, scope string, query string, ignor
 
 	return nil, &sdp.QueryError{
 		ErrorType:   sdp.QueryError_NOTFOUND,
-		ErrorString: fmt.Sprintf("scope %v not found", query),
+		ErrorString: fmt.Sprintf("scope '%v' not found", query),
 	}
 }
 
 func (t *ScopeSource) List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error) {
-	if scope != "global" {
+	if !strings.Contains("global", scope) {
 		return nil, &sdp.QueryError{
 			ErrorType:   sdp.QueryError_NOSCOPE,
 			ErrorString: fmt.Sprintf("%v only available in global scope", t.Type()),

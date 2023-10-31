@@ -26,11 +26,11 @@ func (e *ExpectExpand) Validate(t *testing.T, m map[*sdp.Query][]Source) {
 	}
 
 	if e.NumQueries != numQueries {
-		t.Errorf("Expected %v queries, got %v", e.NumQueries, numQueries)
+		t.Errorf("Expected %v queries, got %v: %v", e.NumQueries, numQueries, m)
 	}
 
 	if e.NumSources != numSources {
-		t.Errorf("Expected %v sources, got %v", e.NumSources, numSources)
+		t.Errorf("Expected %v sources, got %v: %v", e.NumSources, numSources, m)
 	}
 }
 
@@ -52,8 +52,8 @@ func TestSourceHostExpandQuery(t *testing.T) {
 		},
 		&TestSource{
 			ReturnScopes: []string{
-				"testA",
-				"testB",
+				"multiA",
+				"multiB",
 			},
 			ReturnType: "chair",
 		},
@@ -109,7 +109,7 @@ func TestSourceHostExpandQuery(t *testing.T) {
 	t.Run("Multi-scope", func(t *testing.T) {
 		req := sdp.Query{
 			Type:  "chair",
-			Scope: "testB",
+			Scope: "multiB",
 		}
 
 		ee := ExpectExpand{
@@ -169,6 +169,20 @@ func TestSourceHostExpandQuery(t *testing.T) {
 		ee := ExpectExpand{
 			NumQueries: 5,
 			NumSources: 5,
+		}
+
+		ee.Validate(t, sh.ExpandQuery(&req))
+	})
+
+	t.Run("substring match", func(t *testing.T) {
+		req := sdp.Query{
+			Type:  sdp.WILDCARD,
+			Scope: "multi",
+		}
+
+		ee := ExpectExpand{
+			NumQueries: 3,
+			NumSources: 3,
 		}
 
 		ee.Validate(t, sh.ExpandQuery(&req))
