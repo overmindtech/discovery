@@ -181,45 +181,12 @@ func (e *Engine) connect() error {
 			return err
 		}
 
-		// Loop over all sources and work out what subscriptions we need to make
-		// depending on what scopes they support. These scope names are then
-		// stored in a map for de-duplication before being subscribed to
-		subscriptionMap := make(map[string]bool)
-
-		// We need to track if we are making a wildcard subscription. If we are then
-		// there isn't any point making 10 subscriptions since they will be covered
-		// by the wildcard anyway and will end up being duplicates. In that case we
-		// should just be making the one
-		var wildcardExists bool
-
-		for _, src := range e.sh.Sources() {
-			for _, itemScope := range src.Scopes() {
-				if itemScope == sdp.WILDCARD {
-					wildcardExists = true
-				} else {
-					subscriptionMap[itemScope] = true
-				}
-			}
-		}
-
-		// Now actually create the required subscriptions
-		if wildcardExists {
-			e.subscribe("request.scope.>", sdp.NewAsyncRawQueryHandler("WildcardQueryHandler", func(ctx context.Context, m *nats.Msg, i *sdp.Query) {
-				e.HandleQuery(ctx, i)
-			}))
-			e.subscribe("cancel.scope.>", sdp.NewAsyncRawCancelQueryHandler("WildcardCancelQueryHandler", func(ctx context.Context, m *nats.Msg, i *sdp.CancelQuery) {
-				e.HandleCancelQuery(ctx, i)
-			}))
-		} else {
-			for suffix := range subscriptionMap {
-				e.subscribe(fmt.Sprintf("request.scope.%v", suffix), sdp.NewAsyncRawQueryHandler("WildcardQueryHandler", func(ctx context.Context, m *nats.Msg, i *sdp.Query) {
-					e.HandleQuery(ctx, i)
-				}))
-				e.subscribe(fmt.Sprintf("cancel.scope.%v", suffix), sdp.NewAsyncRawCancelQueryHandler("WildcardCancelQueryHandler", func(ctx context.Context, m *nats.Msg, i *sdp.CancelQuery) {
-					e.HandleCancelQuery(ctx, i)
-				}))
-			}
-		}
+		e.subscribe("request.scope.>", sdp.NewAsyncRawQueryHandler("WildcardQueryHandler", func(ctx context.Context, m *nats.Msg, i *sdp.Query) {
+			e.HandleQuery(ctx, i)
+		}))
+		e.subscribe("cancel.scope.>", sdp.NewAsyncRawCancelQueryHandler("WildcardCancelQueryHandler", func(ctx context.Context, m *nats.Msg, i *sdp.CancelQuery) {
+			e.HandleCancelQuery(ctx, i)
+		}))
 
 		return nil
 	}

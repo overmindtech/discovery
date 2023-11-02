@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -150,8 +151,8 @@ func (sh *SourceHost) ExpandQuery(q *sdp.Query) map[*sdp.Query][]Source {
 			//
 			// * The source supports all scopes, or
 			// * The query scope is a wildcard (and the source is not hidden), or
-			// * The query scope matches source scope
-			if IsWildcard(sourceScope) || (IsWildcard(q.Scope) && !isHidden) || sourceScope == q.Scope {
+			// * The query scope substring matches source scope
+			if IsWildcard(sourceScope) || (IsWildcard(q.Scope) && !isHidden) || strings.Contains(sourceScope, q.Scope) {
 				dest := sdp.Query{}
 				q.Copy(&dest)
 
