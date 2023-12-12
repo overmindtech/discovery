@@ -53,7 +53,7 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 	if query.Deadline == nil || query.Deadline.AsTime().After(maxRequestDeadline) {
 		query.Deadline = timestamppb.New(maxRequestDeadline)
 		deadlineOverride = true
-		log.WithContext(ctx).WithField("om.deadline", query.Deadline.AsTime()).Debug("capping deadline to MaxRequestTimeout")
+		log.WithContext(ctx).WithField("ovm.deadline", query.Deadline.AsTime()).Debug("capping deadline to MaxRequestTimeout")
 	}
 
 	// Add the query timeout to the context stack
@@ -66,21 +66,21 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 	u, uuidErr := uuid.FromBytes(query.UUID)
 
 	span.SetAttributes(
-		attribute.Int("om.discovery.numExpandedQueries", numExpandedQueries),
-		attribute.String("om.sdp.uuid", u.String()),
-		attribute.String("om.sdp.type", query.Type),
-		attribute.String("om.sdp.method", query.Method.String()),
-		attribute.String("om.sdp.query", query.Query),
-		attribute.String("om.sdp.scope", query.Scope),
-		attribute.String("om.sdp.deadline", query.Deadline.AsTime().String()),
-		attribute.Bool("om.sdp.deadlineOverridden", deadlineOverride),
-		attribute.Bool("om.sdp.queryIgnoreCache", query.IgnoreCache),
+		attribute.Int("ovm.discovery.numExpandedQueries", numExpandedQueries),
+		attribute.String("ovm.sdp.uuid", u.String()),
+		attribute.String("ovm.sdp.type", query.Type),
+		attribute.String("ovm.sdp.method", query.Method.String()),
+		attribute.String("ovm.sdp.query", query.Query),
+		attribute.String("ovm.sdp.scope", query.Scope),
+		attribute.String("ovm.sdp.deadline", query.Deadline.AsTime().String()),
+		attribute.Bool("ovm.sdp.deadlineOverridden", deadlineOverride),
+		attribute.Bool("ovm.sdp.queryIgnoreCache", query.IgnoreCache),
 	)
 
 	if query.RecursionBehaviour != nil {
 		span.SetAttributes(
-			attribute.Int("om.sdp.linkDepth", int(query.RecursionBehaviour.LinkDepth)),
-			attribute.Bool("om.sdp.followOnlyBlastPropagation", query.RecursionBehaviour.FollowOnlyBlastPropagation),
+			attribute.Int("ovm.sdp.linkDepth", int(query.RecursionBehaviour.LinkDepth)),
+			attribute.Bool("ovm.sdp.followOnlyBlastPropagation", query.RecursionBehaviour.FollowOnlyBlastPropagation),
 		)
 	}
 
@@ -131,8 +131,8 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 		}
 
 		span.SetAttributes(
-			attribute.String("om.sdp.errorType", "OTHER"),
-			attribute.String("om.sdp.errorString", err.Error()),
+			attribute.String("ovm.sdp.errorType", "OTHER"),
+			attribute.String("ovm.sdp.errorString", err.Error()),
 		)
 	} else {
 		responder.Done()
@@ -300,7 +300,7 @@ func (e *Engine) Execute(ctx context.Context, q *sdp.Query, relevantSources []So
 
 func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources []Source) ([]*sdp.Item, []*sdp.QueryError) {
 	ctx, span := tracer.Start(ctx, "CallSources", trace.WithAttributes(
-		attribute.String("om.source.queryMethod", q.Method.String()),
+		attribute.String("ovm.source.queryMethod", q.Method.String()),
 	))
 	defer span.End()
 
@@ -338,8 +338,8 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 	}
 
 	span.SetAttributes(
-		attribute.String("om.source.queryType", q.Type),
-		attribute.String("om.source.queryScope", q.Scope),
+		attribute.String("ovm.source.queryType", q.Type),
+		attribute.String("ovm.source.queryScope", q.Scope),
 	)
 
 	for _, src := range relevantSources {
@@ -347,16 +347,16 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 			// start querying the source after a cache miss
 			if len(relevantSources) > 1 {
 				ctx, span = tracer.Start(ctx, src.Name(), trace.WithAttributes(
-					attribute.String("om.source.method", q.Method.String()),
-					attribute.String("om.source.queryMethod", q.Method.String()),
-					attribute.String("om.source.queryType", q.Type),
-					attribute.String("om.source.queryScope", q.Scope)),
+					attribute.String("ovm.source.method", q.Method.String()),
+					attribute.String("ovm.source.queryMethod", q.Method.String()),
+					attribute.String("ovm.source.queryType", q.Type),
+					attribute.String("ovm.source.queryScope", q.Scope)),
 				)
 				defer span.End()
 			} else {
 				span.SetName(fmt.Sprintf("CallSources: %v", src.Name()))
 				span.SetAttributes(
-					attribute.String("om.source.name", src.Name()),
+					attribute.String("ovm.source.name", src.Name()),
 				)
 			}
 
@@ -391,8 +391,8 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 			sourceDuration = time.Since(start)
 
 			span.SetAttributes(
-				attribute.Int("om.source.numItems", len(resultItems)),
-				attribute.Bool("om.source.cache", false),
+				attribute.Int("ovm.source.numItems", len(resultItems)),
+				attribute.Bool("ovm.source.cache", false),
 			)
 
 			if considerFailed(err) {
@@ -400,7 +400,7 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 			}
 
 			if err != nil {
-				span.SetAttributes(attribute.String("om.source.error", err.Error()))
+				span.SetAttributes(attribute.String("ovm.source.error", err.Error()))
 
 				if sdpErr, ok := err.(*sdp.QueryError); ok {
 					// Add details if they aren't populated
