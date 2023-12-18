@@ -62,7 +62,7 @@ func handleError(ctx context.Context, loc string, err interface{}, stack string)
 
 	if ctx != nil {
 		span := trace.SpanFromContext(ctx)
-		span.SetAttributes(attribute.String("om.panic.loc", loc))
-		span.SetAttributes(attribute.String("om.panic.stack", stack))
+		span.SetAttributes(attribute.String("ovm.panic.loc", loc))
+		span.SetAttributes(attribute.String("ovm.panic.stack", stack))
 	}
 }
