@@ -10,7 +10,7 @@ require (
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats-server/v2 v2.10.9
 	github.com/nats-io/nats.go v1.31.0
-	github.com/overmindtech/sdp-go v0.61.0
+	github.com/overmindtech/sdp-go v0.61.4
 	github.com/overmindtech/sdpcache v1.6.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/sourcegraph/conc v0.3.0
@@ -27,7 +27,7 @@ require (
 
 // Transitive dependencies
 require (
-	connectrpc.com/connect v1.13.0 // indirect
+	connectrpc.com/connect v1.14.0 // indirect
 	github.com/Masterminds/semver/v3 v3.2.1 // indirect
 	github.com/auth0/go-jwt-middleware/v2 v2.2.0 // indirect
 	github.com/aws/aws-sdk-go v1.48.16 // indirect
