@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
+	"slices"
 	"time"
 
 	_ "embed"
@@ -154,7 +155,7 @@ func InitTracer(opts ...otlptracehttp.Option) error {
 	tracerOpts := []sdktrace.TracerProviderOption{
 		sdktrace.WithBatcher(otlpExp),
 		sdktrace.WithResource(tracingResource()),
-		sdktrace.WithSampler(sdktrace.ParentBased(NewUserAgentSampler("ELB-HealthChecker/2.0", 200))),
+		sdktrace.WithSampler(sdktrace.ParentBased(NewUserAgentSampler(200, "ELB-HealthChecker/2.0", "kube-probe/1.27+"))),
 	}
 	if viper.GetBool("stdout-trace-dump") {
 		stdoutExp, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
@@ -186,12 +187,12 @@ func ShutdownTracer() {
 }
 
 type UserAgentSampler struct {
-	userAgent           string
+	userAgents          []string
 	innerSampler        sdktrace.Sampler
 	sampleRateAttribute attribute.KeyValue
 }
 
-func NewUserAgentSampler(userAgent string, sampleRate int) *UserAgentSampler {
+func NewUserAgentSampler(sampleRate int, userAgents ...string) *UserAgentSampler {
 	var innerSampler sdktrace.Sampler
 	switch {
 	case sampleRate <= 0:
@@ -202,7 +203,7 @@ func NewUserAgentSampler(userAgent string, sampleRate int) *UserAgentSampler {
 		innerSampler = sdktrace.TraceIDRatioBased(1.0 / float64(sampleRate))
 	}
 	return &UserAgentSampler{
-		userAgent:           userAgent,
+		userAgents:          userAgents,
 		innerSampler:        innerSampler,
 		sampleRateAttribute: attribute.Int("SampleRate", sampleRate),
 	}
@@ -212,7 +213,7 @@ func NewUserAgentSampler(userAgent string, sampleRate int) *UserAgentSampler {
 // passed parameters.
 func (h *UserAgentSampler) ShouldSample(parameters sdktrace.SamplingParameters) sdktrace.SamplingResult {
 	for _, attr := range parameters.Attributes {
-		if attr.Key == "http.user_agent" && attr.Value.AsString() == h.userAgent {
+		if (attr.Key == "http.user_agent" || attr.Key == "user_agent.original") && slices.Contains(h.userAgents, attr.Value.AsString()) {
 			result := h.innerSampler.ShouldSample(parameters)
 			if result.Decision == sdktrace.RecordAndSample {
 				result.Attributes = append(result.Attributes, h.sampleRateAttribute)
