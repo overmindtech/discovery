@@ -741,6 +741,7 @@ func TestSetupMaxQueryTimeout(t *testing.T) {
 }
 
 var testTokenSource oauth2.TokenSource
+var testTokenSourceMu sync.Mutex
 
 func GetTestOAuthTokenClient(t *testing.T, account string) auth.TokenClient {
 	var domain string
@@ -772,6 +773,8 @@ func GetTestOAuthTokenClient(t *testing.T, account string) auth.TokenClient {
 		t.Fatal(err)
 	}
 
+	testTokenSourceMu.Lock()
+	defer testTokenSourceMu.Unlock()
 	if testTokenSource == nil {
 		ccc := auth.ClientCredentialsConfig{
 			ClientID:     clientID,
