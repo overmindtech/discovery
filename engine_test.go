@@ -14,6 +14,7 @@ import (
 	"github.com/nats-io/nats-server/v2/test"
 	"github.com/overmindtech/sdp-go"
 	"github.com/overmindtech/sdp-go/auth"
+	"golang.org/x/oauth2"
 )
 
 func newStartedEngine(t *testing.T, name string, no *auth.NATSOptions, sources ...Source) *Engine {
@@ -739,6 +740,9 @@ func TestSetupMaxQueryTimeout(t *testing.T) {
 	})
 }
 
+var testTokenSource oauth2.TokenSource
+var testTokenSourceMu sync.Mutex
+
 func GetTestOAuthTokenClient(t *testing.T, account string) auth.TokenClient {
 	var domain string
 	var clientID string
@@ -769,15 +773,19 @@ func GetTestOAuthTokenClient(t *testing.T, account string) auth.TokenClient {
 		t.Fatal(err)
 	}
 
-	ccc := auth.ClientCredentialsConfig{
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
+	testTokenSourceMu.Lock()
+	defer testTokenSourceMu.Unlock()
+	if testTokenSource == nil {
+		ccc := auth.ClientCredentialsConfig{
+			ClientID:     clientID,
+			ClientSecret: clientSecret,
+		}
+		testTokenSource = ccc.TokenSource(fmt.Sprintf("https://%v/oauth/token", domain))
 	}
 
 	return auth.NewOAuthTokenClient(
-		fmt.Sprintf("https://%v/oauth/token", domain),
 		exchangeURL,
 		account,
-		ccc,
+		testTokenSource,
 	)
 }
