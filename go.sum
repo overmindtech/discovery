@@ -41,8 +41,6 @@ github.com/google/go-cmp v0.5.0/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/
 github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
 github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
-github.com/google/uuid v1.5.0 h1:1p67kYwdtXjb0gL0BPiP1Av9wiZPo5A8z2cWkTZ+eyU=
-github.com/google/uuid v1.5.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e h1:XmA6L9IPRdUr28a+SK/oMchGgQy159wvzXA5tJ7l+40=
@@ -79,8 +77,6 @@ github.com/nats-io/nuid v1.0.1 h1:5iA8DT8V7q8WK2EScv2padNa/rTESc1KdnPw4TC2paw=
 github.com/nats-io/nuid v1.0.1/go.mod h1:19wcPz3Ph3q0Jbyiqsd0kePYG7A95tJPxeL+1OSON2c=
 github.com/overmindtech/api-client v0.14.0 h1:zXyjJsIeawNqoWv7FqOjwcqgFpLrDYz7l9MWqh1G9ZQ=
 github.com/overmindtech/api-client v0.14.0/go.mod h1:msdkTAQFlvDGOU4tQk2adk2P8j23uaMWkJ9YRX4wGWI=
-github.com/overmindtech/sdp-go v0.61.8 h1:BfO1l/TkEmTL6Tr+yclhZABtSHYyBOplfqzVDsuogUI=
-github.com/overmindtech/sdp-go v0.61.8/go.mod h1:jhozOp2DZMXjK7Sizk7ycV5vXnEeTvktsuyY4p/YRq4=
 github.com/overmindtech/sdp-go v0.63.1 h1:4AB83zSrqXOyWpirTdrStDVzvDvJFHs1xe2cCOy4IxA=
 github.com/overmindtech/sdp-go v0.63.1/go.mod h1:jhozOp2DZMXjK7Sizk7ycV5vXnEeTvktsuyY4p/YRq4=
 github.com/overmindtech/sdpcache v1.6.2 h1:E5XKq8p45Vr6S40HAQt/cwi5Aw6OGWdgjvf5kgok1zw=
