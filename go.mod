@@ -8,8 +8,8 @@ require (
 	github.com/getsentry/sentry-go v0.27.0
 	github.com/google/uuid v1.6.0
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
-	github.com/nats-io/nats-server/v2 v2.10.10
-	github.com/nats-io/nats.go v1.32.0
+	github.com/nats-io/nats-server/v2 v2.10.11
+	github.com/nats-io/nats.go v1.33.0
 	github.com/overmindtech/sdp-go v0.63.2
 	github.com/overmindtech/sdpcache v1.6.3
 	github.com/sirupsen/logrus v1.9.3
@@ -43,7 +43,7 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.19.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/klauspost/compress v1.17.5 // indirect
+	github.com/klauspost/compress v1.17.6 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/minio/highwayhash v1.0.2 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
