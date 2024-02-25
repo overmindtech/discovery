@@ -350,7 +350,7 @@ func (e *Engine) HandleCancelQuery(ctx context.Context, cancelQuery *sdp.CancelQ
 	rt, err := e.GetTrackedQuery(u)
 
 	if err != nil {
-		log.Debugf("Could not find tracked query %v. Possibly is has already finished", u.String())
+		log.Debugf("Could not find tracked query %v. Possibly it has already finished", u.String())
 		return
 	}
 
