@@ -780,7 +780,7 @@ func GetTestOAuthTokenClient(t *testing.T, account string) auth.TokenClient {
 			ClientID:     clientID,
 			ClientSecret: clientSecret,
 		}
-		testTokenSource = ccc.TokenSource(fmt.Sprintf("https://%v/oauth/token", domain))
+		testTokenSource = ccc.TokenSource(fmt.Sprintf("https://%v/oauth/token", domain), "https://api.overmind.tech")
 	}
 
 	return auth.NewOAuthTokenClient(
