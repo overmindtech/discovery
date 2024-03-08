@@ -28,6 +28,7 @@ jobs:
           # network alias so we can use docker-provided DNS to have them talk to
           # one another
           NATS_URL: nats://nats-auth:4222
+          AUTH0_AUDIENCE: ${{ vars.API_SERVER_AUDIENCE }}
           API_SERVER_PGHOST: postgres
           API_SERVER_PGUSER: ci
           API_SERVER_PGPASSWORD: ci
@@ -73,6 +74,7 @@ jobs:
       - name: Test
         run: go test -v -timeout 3m ./... -race
         env:
+          API_SERVER_AUDIENCE: ${{ vars.API_SERVER_AUDIENCE }}
           OVERMIND_NTE_ALLPERMS_CLIENT_ID: ${{ secrets.OVERMIND_NTE_ALLPERMS_CLIENT_ID }}
           OVERMIND_NTE_ALLPERMS_CLIENT_SECRET: ${{ secrets.OVERMIND_NTE_ALLPERMS_CLIENT_SECRET }}
           OVERMIND_NTE_ALLPERMS_DOMAIN: ${{ secrets.OVERMIND_NTE_ALLPERMS_DOMAIN }}
