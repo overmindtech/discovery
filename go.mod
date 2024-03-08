@@ -11,7 +11,7 @@ require (
 	github.com/nats-io/nats-server/v2 v2.10.11
 	github.com/nats-io/nats.go v1.33.1
 	github.com/overmindtech/sdp-go v0.67.1
-	github.com/overmindtech/sdpcache v1.6.3
+	github.com/overmindtech/sdpcache v1.6.4
 	github.com/sirupsen/logrus v1.9.3
 	github.com/sourcegraph/conc v0.3.0
 	github.com/spf13/viper v1.18.2
