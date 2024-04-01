@@ -27,13 +27,14 @@ jobs:
           # creates all service containers on the same network, and with a nice
           # network alias so we can use docker-provided DNS to have them talk to
           # one another
-          NATS_URL: nats://nats-auth:4222
-          AUTH0_AUDIENCE: ${{ vars.API_SERVER_AUDIENCE }}
+          API_SERVER_NATS_HOST: nats-auth
+          API_SERVER_NATS_PORT: 4222
+          API_SERVER_AUTH0_AUDIENCE: ${{ vars.API_SERVER_AUDIENCE }}
           API_SERVER_PGHOST: postgres
           API_SERVER_PGUSER: ci
           API_SERVER_PGPASSWORD: ci
           API_SERVER_PGDBNAME: ci
-          ATLAS_DISABLE_SSL: true
+          API_SERVER_ATLAS_DISABLE_SSL: true
         credentials:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
