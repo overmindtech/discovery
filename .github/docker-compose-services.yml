@@ -1,0 +1,54 @@
+version: "3"
+services:
+  api-server:
+    image: ghcr.io/overmindtech/test-populated-api-server:main
+    env_file:
+      - ./env/api-server.env
+    ports:
+      - 8080:8080
+    networks:
+      - sdpgo
+    depends_on:
+      apiserverdb:
+        condition: service_healthy
+
+  # Authenticted NATS for testing auth mechanisms
+  nats-auth:
+    image: ghcr.io/overmindtech/test-populated-nats:main
+    ports:
+      - 4223:4222
+    networks:
+      - sdpgo
+
+  nats:
+    image: nats:latest
+    command: "-DV"
+    ports:
+      - 4222:4222
+    networks:
+      - sdpgo
+
+  apiserverdb:
+    image: postgres:14.6-alpine
+
+    restart: always
+    env_file:
+      - ./env/api-server.env
+    environment:
+      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_USER: ${API_SERVER_PGUSER}
+      POSTGRES_PASSWORD: ${API_SERVER_PGPASSWORD}
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    ports:
+      - 5433:5432
+    networks:
+      - sdpgo
+
+networks:
+  sdpgo:
