@@ -42,7 +42,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker Compose Action
-        uses: isbang/compose-action@v1.5.1
+        uses: isbang/compose-action@v2.0.0
         with:
           compose-file: ".github/docker-compose-services.yml"
         env:
