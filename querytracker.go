@@ -60,7 +60,6 @@ func (qt *QueryTracker) Execute(ctx context.Context) ([]*sdp.Item, []*sdp.QueryE
 			if ok {
 				sdpItems = append(sdpItems, item)
 
-				// Send the fully item back onto the network
 				if qt.Query.Subject() != "" && qt.Engine.natsConnection != nil {
 					// Respond with the Item
 					err := qt.Engine.natsConnection.Publish(ctx, qt.Query.Subject(), &sdp.QueryResponse{
