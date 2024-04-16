@@ -10,7 +10,7 @@ import (
 
 func TestTypeSource(t *testing.T) {
 	s := &TypeSource{
-		sh: newTestSourceHost(t),
+		sh: newTestSourceHost(),
 	}
 
 	t.Run("satisfies Source interface", func(t *testing.T) {
@@ -80,7 +80,7 @@ func TestTypeSource(t *testing.T) {
 
 func TestScopeSource(t *testing.T) {
 	s := &ScopeSource{
-		sh: newTestSourceHost(t),
+		sh: newTestSourceHost(),
 	}
 
 	t.Run("satisfies Source interface", func(t *testing.T) {
@@ -148,7 +148,7 @@ func TestScopeSource(t *testing.T) {
 	})
 }
 
-func newTestSourceHost(t *testing.T) *SourceHost {
+func newTestSourceHost() *SourceHost {
 	sh := NewSourceHost()
 	sh.AddSources(
 		&TestSource{

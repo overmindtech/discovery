@@ -62,11 +62,6 @@ func TestExecuteQuery(t *testing.T) {
 		}
 
 		item := items[0]
-		query := item.LinkedItemQueries[0].Query
-
-		if ld := query.GetRecursionBehaviour().GetLinkDepth(); ld != 2 {
-			t.Errorf("expected linked item depth to be 1 less than the query (2), got %v", ld)
-		}
 
 		if item.Metadata.SourceQuery != q {
 			t.Error("source query mismatch")

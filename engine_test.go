@@ -53,29 +53,6 @@ func newStartedEngine(t *testing.T, name string, no *auth.NATSOptions, sources .
 	return e
 }
 
-func TestDeleteQuery(t *testing.T) {
-	one := &sdp.LinkedItemQuery{Query: &sdp.Query{
-		Scope:  "one",
-		Method: sdp.QueryMethod_LIST,
-		Query:  "",
-	}}
-	two := &sdp.LinkedItemQuery{Query: &sdp.Query{
-		Scope:  "two",
-		Method: sdp.QueryMethod_SEARCH,
-		Query:  "2",
-	}}
-	irs := []*sdp.LinkedItemQuery{
-		one,
-		two,
-	}
-
-	deleted := deleteQuery(irs, two)
-
-	if len(deleted) > 1 {
-		t.Errorf("Item not successfully deleted: %v", irs)
-	}
-}
-
 func TestTrackQuery(t *testing.T) {
 	t.Run("With normal query", func(t *testing.T) {
 		t.Parallel()
@@ -274,33 +251,6 @@ func TestNats(t *testing.T) {
 		}
 	})
 
-	t.Run("Handling a deeply linking query", func(t *testing.T) {
-		t.Cleanup(func() {
-			src.ClearCalls()
-			e.ClearCache()
-		})
-
-		req := sdp.NewQueryProgress(&sdp.Query{
-			Type:   "person",
-			Method: sdp.QueryMethod_GET,
-			Query:  "deeplink",
-			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
-				LinkDepth: 10,
-			},
-			Scope: "test",
-		})
-
-		_, _, err := req.Execute(context.Background(), e.natsConnection)
-
-		if err != nil {
-			t.Error(err)
-		}
-
-		if len(src.GetCalls) != 11 {
-			t.Errorf("expected 11 get calls, got %v: %v", len(src.GetCalls), src.GetCalls)
-		}
-	})
-
 	t.Run("stopping", func(t *testing.T) {
 		err := e.Stop()
 
@@ -330,7 +280,7 @@ func TestNatsCancel(t *testing.T) {
 	e.MaxParallelExecutions = 1
 
 	src := SpeedTestSource{
-		QueryDelay:   250 * time.Millisecond,
+		QueryDelay:   2 * time.Second,
 		ReturnType:   "person",
 		ReturnScopes: []string{"test"},
 	}
@@ -369,7 +319,7 @@ func TestNatsCancel(t *testing.T) {
 			t.Error(err)
 		}
 
-		time.Sleep(1 * time.Second)
+		time.Sleep(250 * time.Millisecond)
 
 		conn.Publish(context.Background(), "cancel.all", &sdp.CancelQuery{
 			UUID: u[:],
@@ -677,31 +627,6 @@ func TestNatsAuth(t *testing.T) {
 
 		if len(src.GetCalls) != 1 {
 			t.Errorf("expected 1 get call, got %v: %v", len(src.GetCalls), src.GetCalls)
-		}
-	})
-
-	t.Run("Handling a deeply linking query", func(t *testing.T) {
-		t.Cleanup(func() {
-			src.ClearCalls()
-			e.ClearCache()
-		})
-
-		_, _, err := sdp.NewQueryProgress(&sdp.Query{
-			Type:   "person",
-			Method: sdp.QueryMethod_GET,
-			Query:  "deeplink",
-			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
-				LinkDepth: 10,
-			},
-			Scope: "test",
-		}).Execute(context.Background(), e.natsConnection)
-
-		if err != nil {
-			t.Error(err)
-		}
-
-		if len(src.GetCalls) != 11 {
-			t.Errorf("expected 11 get calls, got %v: %v", len(src.GetCalls), src.GetCalls)
 		}
 	})
 

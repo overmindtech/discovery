@@ -28,7 +28,7 @@ func SkipWithoutNats(t *testing.T) {
 	var err error
 
 	for _, url := range NatsTestURLs {
-		err := testURL(url)
+		err = testURL(url)
 
 		if err == nil {
 			return
@@ -46,7 +46,7 @@ func SkipWithoutNatsAuth(t *testing.T) {
 	var err error
 
 	for _, url := range NatsAuthTestURLs {
-		err := testURL(url)
+		err = testURL(url)
 
 		if err == nil {
 			return
