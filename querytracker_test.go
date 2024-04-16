@@ -127,37 +127,6 @@ func TestExecute(t *testing.T) {
 		}
 	})
 
-	t.Run("With linking", func(t *testing.T) {
-		t.Parallel()
-
-		qt := QueryTracker{
-			Engine: e,
-			Query: &sdp.Query{
-				Type:   "person",
-				Method: sdp.QueryMethod_GET,
-				Query:  "Dylan",
-				RecursionBehaviour: &sdp.Query_RecursionBehaviour{
-					LinkDepth: 10,
-				},
-				Scope: "test",
-			},
-		}
-
-		items, errs, err := qt.Execute(context.Background())
-
-		if err != nil {
-			t.Error(err)
-		}
-
-		for _, e := range errs {
-			t.Error(e)
-		}
-
-		if l := len(items); l != 11 {
-			t.Errorf("expected 10 items, got %v", l)
-		}
-	})
-
 	t.Run("With no engine", func(t *testing.T) {
 		t.Parallel()
 
@@ -262,41 +231,6 @@ func TestTimeout(t *testing.T) {
 
 		if err == nil {
 			t.Error("Expected timeout but got no error")
-		}
-	})
-
-	t.Run("With linking that exceeds the timeout", func(t *testing.T) {
-		t.Parallel()
-
-		ctx, cancel := context.WithTimeout(context.Background(), 350*time.Millisecond)
-
-		qt := QueryTracker{
-			Engine:  e,
-			Context: ctx,
-			Cancel:  cancel,
-			Query: &sdp.Query{
-				Type:   "person",
-				Method: sdp.QueryMethod_GET,
-				Query:  "somethingElse1",
-				RecursionBehaviour: &sdp.Query_RecursionBehaviour{
-					LinkDepth: 10,
-				},
-				Scope: "test",
-			},
-		}
-
-		items, errs, err := qt.Execute(ctx)
-
-		if err == nil {
-			t.Error("Expected timeout but got no error")
-		}
-
-		for _, e := range errs {
-			t.Error(e)
-		}
-
-		if len(items) != 3 {
-			t.Errorf("Expected 3 items, got %v", len(items))
 		}
 	})
 }

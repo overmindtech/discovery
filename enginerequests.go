@@ -221,29 +221,6 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 				queryItems, queryErrors = e.Execute(ctx, q, sources)
 
 				for _, i := range queryItems {
-					// If the main query had a linkDepth of greater than zero it means we
-					// need to keep linking, this means that we need to pass down all of the
-					// subject info along with the number of remaining links. If the link
-					// depth is zero then we just pass then back in their normal form as we
-					// won't be executing them
-					if query.RecursionBehaviour.GetLinkDepth() > 0 {
-						for _, liq := range i.LinkedItemQueries {
-							liq.Query.RecursionBehaviour = &sdp.Query_RecursionBehaviour{
-								LinkDepth:                  query.RecursionBehaviour.GetLinkDepth() - 1,
-								FollowOnlyBlastPropagation: query.RecursionBehaviour.GetFollowOnlyBlastPropagation(),
-							}
-							if query.RecursionBehaviour.GetFollowOnlyBlastPropagation() && !liq.BlastPropagation.GetOut() {
-								// we're only following blast propagation, so do not link this item further
-								// TODO: we might want to drop the link completely if this returns too much
-								// information, but that could risk missing revlinks
-								liq.Query.RecursionBehaviour.LinkDepth = 0
-							}
-							liq.Query.IgnoreCache = query.IgnoreCache
-							liq.Query.Deadline = query.Deadline
-							liq.Query.UUID = query.UUID
-						}
-					}
-
 					// Assign the source query
 					if i.Metadata != nil {
 						i.Metadata.SourceQuery = query
@@ -306,6 +283,8 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 
 	// Check that our context is okay before doing anything expensive
 	if ctx.Err() != nil {
+		span.RecordError(ctx.Err())
+
 		return nil, []*sdp.QueryError{
 			{
 				UUID:          q.UUID,

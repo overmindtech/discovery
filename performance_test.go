@@ -87,13 +87,6 @@ func TestParallelQueryPerformance(t *testing.T) {
 		RunLinearPerformanceTest(t, "100 queries", 100, 0, 10)
 		RunLinearPerformanceTest(t, "1,000 queries", 1000, 0, 100)
 	})
-
-	t.Run("With linking", func(t *testing.T) {
-		RunLinearPerformanceTest(t, "1 query 3 depth", 1, 3, 1)
-		RunLinearPerformanceTest(t, "1 query 3 depth", 1, 3, 100)
-		RunLinearPerformanceTest(t, "1 query 5 depth", 1, 5, 100)
-		RunLinearPerformanceTest(t, "10 queries 5 depth", 10, 5, 100)
-	})
 }
 
 // RunLinearPerformanceTest Runs a test with a given number in input queries,
