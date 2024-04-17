@@ -186,7 +186,7 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 	expanded := e.sh.ExpandQuery(query)
 
 	span.SetAttributes(
-		attribute.Int("ovm.discovery.numExpandedQueries", len(expanded)),
+		attribute.Int("ovm.source.numExpandedQueries", len(expanded)),
 	)
 
 	if len(expanded) == 0 {
