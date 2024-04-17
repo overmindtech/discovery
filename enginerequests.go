@@ -169,6 +169,8 @@ func (e *Engine) ExecuteQuerySync(ctx context.Context, q *sdp.Query) ([]*sdp.Ite
 // receiving the results or this method will never finish. If results are not
 // required the channels can be nil
 func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<- *sdp.Item, errs chan<- *sdp.QueryError) error {
+	span := trace.SpanFromContext(ctx)
+
 	// Make sure we close channels once we're done
 	if items != nil {
 		defer close(items)
@@ -182,6 +184,10 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 	}
 
 	expanded := e.sh.ExpandQuery(query)
+
+	span.SetAttributes(
+		attribute.Int("ovm.source.numExpandedQueries", len(expanded)),
+	)
 
 	if len(expanded) == 0 {
 		errs <- &sdp.QueryError{
@@ -324,20 +330,13 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 	for _, src := range relevantSources {
 		if func() bool {
 			// start querying the source after a cache miss
-			if len(relevantSources) > 1 {
-				ctx, span = tracer.Start(ctx, src.Name(), trace.WithAttributes(
-					attribute.String("ovm.source.method", q.Method.String()),
-					attribute.String("ovm.source.queryMethod", q.Method.String()),
-					attribute.String("ovm.source.queryType", q.Type),
-					attribute.String("ovm.source.queryScope", q.Scope)),
-				)
-				defer span.End()
-			} else {
-				span.SetName(fmt.Sprintf("CallSources: %v", src.Name()))
-				span.SetAttributes(
-					attribute.String("ovm.source.name", src.Name()),
-				)
-			}
+			ctx, span = tracer.Start(ctx, src.Name(), trace.WithAttributes(
+				attribute.String("ovm.source.method", q.Method.String()),
+				attribute.String("ovm.source.queryMethod", q.Method.String()),
+				attribute.String("ovm.source.queryType", q.Type),
+				attribute.String("ovm.source.queryScope", q.Scope),
+				attribute.String("ovm.source.name", src.Name())))
+			defer span.End()
 
 			var resultItems []*sdp.Item
 			var err error
@@ -372,6 +371,7 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 			span.SetAttributes(
 				attribute.Int("ovm.source.numItems", len(resultItems)),
 				attribute.Bool("ovm.source.cache", false),
+				attribute.String("ovm.source.duration", sourceDuration.String()),
 			)
 
 			if considerFailed(err) {
