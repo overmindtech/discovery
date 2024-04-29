@@ -96,6 +96,8 @@ github.com/overmindtech/sdp-go v0.70.0 h1:SBjAybjkVz5sAYXp9YI2sPmdjWuxaQ15NWzajN
 github.com/overmindtech/sdp-go v0.70.0/go.mod h1:wlktpRz0BMJsDyBjA1YbFeswFetMQ8+clQJG6slXMG8=
 github.com/overmindtech/sdp-go v0.71.1 h1:8c9IofcVHFmecWeOWmm2GJ8KLfugbc+enJnLcpUGzBc=
 github.com/overmindtech/sdp-go v0.71.1/go.mod h1:wlktpRz0BMJsDyBjA1YbFeswFetMQ8+clQJG6slXMG8=
+github.com/overmindtech/sdp-go v0.71.2 h1:Ti+gZ6DxjfKGpPzBuhB1WOblUkgaRE+tZsXyTyHkswA=
+github.com/overmindtech/sdp-go v0.71.2/go.mod h1:nx8W04vfLATrU6tDT6kD0MsXJmjEDC3XvAvknaoKS/s=
 github.com/overmindtech/sdpcache v1.6.4 h1:MJoYBDqDE3s8FrRzZ0RPgFiH39HWI/Mv2ImH1NdLT8k=
 github.com/overmindtech/sdpcache v1.6.4/go.mod h1:/F9XStVdntRJEQjlZ86BPuB1Y7VPo1PFcsCNiU1IoGE=
 github.com/pelletier/go-toml/v2 v2.1.0 h1:FnwAJ4oYMvbT/34k9zzHuZNrhlz48GB3/s6at6/MHO4=
@@ -146,6 +148,8 @@ go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0 h1:jq9TW8u
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0/go.mod h1:p8pYQP+m5XfbZm9fxtSKAbM6oIllS7s2AfxrChvc7iw=
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.50.0 h1:cEPbyTSEHlQR89XVlyo78gqluF8Y3oMeBkXGWzQsfXY=
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.50.0/go.mod h1:DKdbWcT4GH1D0Y3Sqt/PFXt2naRKDWtU+eE6oLdFNA8=
+go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.51.0 h1:Xs2Ncz0gNihqu9iosIZ5SkBbWo5T8JhhLJFMQL1qmLI=
+go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.51.0/go.mod h1:vy+2G/6NvVMpwGX/NyLqcC41fxepnuKHk16E6IZUcJc=
 go.opentelemetry.io/otel v1.24.0 h1:0LAOdjNmQeSTzGBzduGe/rU4tZhMwL5rWgtp9Ku5Jfo=
 go.opentelemetry.io/otel v1.24.0/go.mod h1:W7b9Ozg4nkF5tWI5zsXkaKKDjdVjpD4oAt9Qi/MArHo=
 go.opentelemetry.io/otel v1.25.0 h1:gldB5FfhRl7OJQbUHt/8s0a7cE8fbsPAtdpRaApKy4k=
