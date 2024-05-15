@@ -48,8 +48,18 @@ type Engine struct {
 	connectionWatcher       NATSWatcher
 
 	// Internal throttle used to limit MaxParallelExecutions. This reads
-	// MaxParallelExecutions and is populated when the engine is started
-	executionPool *pool.Pool
+	// MaxParallelExecutions and is populated when the engine is started. This
+	// pool is only used for LIST requests. Since GET requests can be blocked by
+	// LIST requests, they need to be handled in a different pool to avoid
+	// deadlocking.
+	listExecutionPool *pool.Pool
+
+	// Internal throttle used to limit MaxParallelExecutions. This reads
+	// MaxParallelExecutions and is populated when the engine is started. This
+	// pool is only used for GET and SEARCH requests. Since GET requests can be
+	// blocked by LIST requests, they need to be handled in a different pool to
+	// avoid deadlocking.
+	getExecutionPool *pool.Pool
 
 	// The NATS connection
 	natsConnection      sdp.EncodedConnection
@@ -243,7 +253,8 @@ func (e *Engine) disconnect() error {
 // modifying the Sources value after an engine has been started will not have
 // any effect until the engine is restarted
 func (e *Engine) Start() error {
-	e.executionPool = pool.New().WithMaxGoroutines(e.MaxParallelExecutions)
+	e.listExecutionPool = pool.New().WithMaxGoroutines(e.MaxParallelExecutions)
+	e.getExecutionPool = pool.New().WithMaxGoroutines(e.MaxParallelExecutions)
 
 	e.cacheContext, e.cacheCancel = context.WithCancel(context.Background())
 

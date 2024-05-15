@@ -12,6 +12,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/overmindtech/sdp-go"
 	log "github.com/sirupsen/logrus"
+	"github.com/sourcegraph/conc/pool"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
@@ -162,7 +163,8 @@ func (e *Engine) ExecuteQuerySync(ctx context.Context, q *sdp.Query) ([]*sdp.Ite
 	return items, errs, err
 }
 
-var executionPoolCount atomic.Int32
+var listExecutionPoolCount atomic.Int32
+var getExecutionPoolCount atomic.Int32
 
 // ExecuteQuery Executes a single Query and returns the results without any
 // linking. Will return an error if all sources fail, or the Query couldn't be
@@ -212,9 +214,17 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 	wg := sync.WaitGroup{}
 	for q, sources := range expanded {
 		wg.Add(1)
-		executionPoolCount.Add(1)
 		// localize values for the closure below
 		q, sources := q, sources
+
+		var p *pool.Pool
+		if q.Method == sdp.QueryMethod_LIST {
+			p = e.listExecutionPool
+			listExecutionPoolCount.Add(1)
+		} else {
+			p = e.getExecutionPool
+			getExecutionPoolCount.Add(1)
+		}
 
 		// push all queued items through a goroutine to avoid blocking `ExecuteQuery` from progressing
 		// as `executionPool.Go()` will block once the max parallelism is hit
@@ -222,12 +232,19 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 			// queue everything into the execution pool
 			defer LogRecoverToReturn(ctx, "ExecuteQuery outer")
 			span.SetAttributes(
-				attribute.Int("ovm.discovery.executionPoolCount", int(executionPoolCount.Load())),
+				attribute.Int("ovm.discovery.listExecutionPoolCount", int(listExecutionPoolCount.Load())),
+				attribute.Int("ovm.discovery.getExecutionPoolCount", int(getExecutionPoolCount.Load())),
 			)
-			e.executionPool.Go(func() {
+			p.Go(func() {
 				defer LogRecoverToReturn(ctx, "ExecuteQuery inner")
 				defer wg.Done()
-				defer executionPoolCount.Add(-1)
+				defer func() {
+					if q.Method == sdp.QueryMethod_LIST {
+						listExecutionPoolCount.Add(-1)
+					} else {
+						getExecutionPoolCount.Add(-1)
+					}
+				}()
 				var queryItems []*sdp.Item
 				var queryErrors []*sdp.QueryError
 				numSources.Add(1)
