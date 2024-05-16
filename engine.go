@@ -14,6 +14,7 @@ import (
 	"github.com/overmindtech/sdp-go/auth"
 	log "github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc/pool"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -344,6 +345,27 @@ func (e *Engine) IsNATSConnected() bool {
 	}
 
 	return false
+}
+
+// HealthCheck returns an errir if the Engine is not healthy. Call this inside
+// an opentelemetry span to capture default metrics from the engine.
+func (e *Engine) HealthCheck(ctx context.Context) error {
+	span := trace.SpanFromContext(ctx)
+
+	natsConnected := e.IsNATSConnected()
+
+	span.SetAttributes(
+		attribute.String("ovm.engine.name", e.Name),
+		attribute.Bool("ovm.nats.connected", natsConnected),
+		attribute.Int("ovm.discovery.listExecutionPoolCount", int(listExecutionPoolCount.Load())),
+		attribute.Int("ovm.discovery.getExecutionPoolCount", int(getExecutionPoolCount.Load())),
+	)
+
+	if !natsConnected {
+		return errors.New("NATS connection is not connected")
+	}
+
+	return nil
 }
 
 // HandleCancelQuery Takes a CancelQuery and cancels that query if it exists
