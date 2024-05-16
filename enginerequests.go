@@ -313,23 +313,6 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 	))
 	defer span.End()
 
-	// Ensure that the span is closed when the context is done. This is based on
-	// the assumption that some sources may not respect the context deadline and
-	// may run indefinitely. This ensures that we at least get notified about
-	// it.
-	go func() {
-		<-ctx.Done()
-		if ctx.Err() != nil {
-			// get a fresh copy of the span to avoid data races
-			span := trace.SpanFromContext(ctx)
-			span.RecordError(ctx.Err())
-			span.SetAttributes(
-				attribute.Bool("ovm.discover.hang", true),
-			)
-			span.End()
-		}
-	}()
-
 	// Check that our context is okay before doing anything expensive
 	if ctx.Err() != nil {
 		span.RecordError(ctx.Err())
@@ -380,6 +363,23 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 				attribute.String("ovm.source.queryScope", q.Scope),
 				attribute.String("ovm.source.name", src.Name())))
 			defer span.End()
+
+			// Ensure that the span is closed when the context is done. This is based on
+			// the assumption that some sources may not respect the context deadline and
+			// may run indefinitely. This ensures that we at least get notified about
+			// it.
+			go func() {
+				<-ctx.Done()
+				if ctx.Err() != nil {
+					// get a fresh copy of the span to avoid data races
+					span := trace.SpanFromContext(ctx)
+					span.RecordError(ctx.Err())
+					span.SetAttributes(
+						attribute.Bool("ovm.discover.hang", true),
+					)
+					span.End()
+				}
+			}()
 
 			var resultItems []*sdp.Item
 			var err error
