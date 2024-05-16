@@ -313,6 +313,23 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 	))
 	defer span.End()
 
+	// Ensure that the span is closed when the context is done. This is based on
+	// the assumption that some sources may not respect the context deadline and
+	// may run indefinitely. This ensures that we at least get notified about
+	// it.
+	go func() {
+		<-ctx.Done()
+		if ctx.Err() != nil {
+			// get a fresh copy of the span to avoid data races
+			span := trace.SpanFromContext(ctx)
+			span.RecordError(ctx.Err())
+			span.SetAttributes(
+				attribute.Bool("ovm.discover.hang", true),
+			)
+			span.End()
+		}
+	}()
+
 	// Check that our context is okay before doing anything expensive
 	if ctx.Err() != nil {
 		span.RecordError(ctx.Err())
@@ -356,7 +373,7 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 	for _, src := range relevantSources {
 		if func() bool {
 			// start querying the source after a cache miss
-			ctx, span = tracer.Start(ctx, src.Name(), trace.WithAttributes(
+			ctx, span := tracer.Start(ctx, src.Name(), trace.WithAttributes(
 				attribute.String("ovm.source.method", q.Method.String()),
 				attribute.String("ovm.source.queryMethod", q.Method.String()),
 				attribute.String("ovm.source.queryType", q.Type),
