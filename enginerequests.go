@@ -128,9 +128,9 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 	// If all failed then return an error
 	if err != nil {
 		if err == context.Canceled {
-			responder.Cancel()
+			responder.CancelWithContext(ctx)
 		} else {
-			responder.Error()
+			responder.ErrorWithContext(ctx)
 		}
 
 		span.SetAttributes(
@@ -138,7 +138,7 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 			attribute.String("ovm.sdp.errorString", err.Error()),
 		)
 	} else {
-		responder.Done()
+		responder.DoneWithContext(ctx)
 	}
 }
 
