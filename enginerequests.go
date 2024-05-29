@@ -105,10 +105,15 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 		pub = NilConnection{}
 	}
 
+	ru, err := uuid.FromBytes(query.UUID)
+	if err != nil {
+		ru = uuid.New()
+	}
 	responder.Start(
 		ctx,
 		pub,
 		e.Name,
+		ru,
 	)
 
 	qt := QueryTracker{
@@ -123,7 +128,7 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 		defer e.DeleteTrackedQuery(u)
 	}
 
-	_, _, err := qt.Execute(ctx)
+	_, _, err = qt.Execute(ctx)
 
 	// If all failed then return an error
 	if err != nil {
