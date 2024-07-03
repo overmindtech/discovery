@@ -29,7 +29,7 @@ services:
       - sdpgo
 
   apiserverdb:
-    image: postgres:14.9-alpine
+    image: pgvector/pgvector:pg16
 
     restart: always
     env_file:
