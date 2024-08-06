@@ -29,7 +29,7 @@ import (
 
 const instrumentationName = "github.com/overmindtech/discovery"
 
-//go:generate sh -c "echo -n $(git describe --tags --long) > commit.txt"
+//go:generate sh -c "echo -n $(git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD) > commit.txt"
 //go:embed commit.txt
 var instrumentationVersion string
 
