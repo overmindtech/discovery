@@ -71,8 +71,8 @@ func TestTypeSource(t *testing.T) {
 		var ire *sdp.QueryError
 
 		if errors.As(err, &ire) {
-			if ire.ErrorType != sdp.QueryError_NOTFOUND {
-				t.Errorf("Expected error type NOTFOUND, got %v", ire.ErrorType)
+			if ire.GetErrorType() != sdp.QueryError_NOTFOUND {
+				t.Errorf("Expected error type NOTFOUND, got %v", ire.GetErrorType())
 			}
 		}
 	})
@@ -141,8 +141,8 @@ func TestScopeSource(t *testing.T) {
 		var ire *sdp.QueryError
 
 		if errors.As(err, &ire) {
-			if ire.ErrorType != sdp.QueryError_NOTFOUND {
-				t.Errorf("Expected error Scope NOTFOUND, got %v", ire.ErrorType)
+			if ire.GetErrorType() != sdp.QueryError_NOTFOUND {
+				t.Errorf("Expected error Scope NOTFOUND, got %v", ire.GetErrorType())
 			}
 		}
 	})

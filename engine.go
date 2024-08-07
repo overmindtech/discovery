@@ -72,10 +72,10 @@ type Engine struct {
 	// All Sources managed by this Engine
 	sh *SourceHost
 
-	// GetListMutex used for locking out Get querys when there's a List happening
+	// GetListMutex used for locking out Get queries when there's a List happening
 	gfm GetListMutex
 
-	// trackedQueries is used for storing querys that have a UUID so they can
+	// trackedQueries is used for storing queries that have a UUID so they can
 	// be cancelled if required
 	trackedQueries      map[uuid.UUID]*QueryTracker
 	trackedQueriesMutex sync.RWMutex
@@ -179,7 +179,6 @@ func (e *Engine) connect() error {
 		err = e.subscribe("request.all", sdp.NewAsyncRawQueryHandler("QueryHandler", func(ctx context.Context, _ *nats.Msg, i *sdp.Query) {
 			e.HandleQuery(ctx, i)
 		}))
-
 		if err != nil {
 			return err
 		}
@@ -187,17 +186,23 @@ func (e *Engine) connect() error {
 		err = e.subscribe("cancel.all", sdp.NewAsyncRawCancelQueryHandler("CancelQueryHandler", func(ctx context.Context, m *nats.Msg, i *sdp.CancelQuery) {
 			e.HandleCancelQuery(ctx, i)
 		}))
-
 		if err != nil {
 			return err
 		}
 
-		e.subscribe("request.scope.>", sdp.NewAsyncRawQueryHandler("WildcardQueryHandler", func(ctx context.Context, m *nats.Msg, i *sdp.Query) {
+		err = e.subscribe("request.scope.>", sdp.NewAsyncRawQueryHandler("WildcardQueryHandler", func(ctx context.Context, m *nats.Msg, i *sdp.Query) {
 			e.HandleQuery(ctx, i)
 		}))
-		e.subscribe("cancel.scope.>", sdp.NewAsyncRawCancelQueryHandler("WildcardCancelQueryHandler", func(ctx context.Context, m *nats.Msg, i *sdp.CancelQuery) {
+		if err != nil {
+			return err
+		}
+
+		err = e.subscribe("cancel.scope.>", sdp.NewAsyncRawCancelQueryHandler("WildcardCancelQueryHandler", func(ctx context.Context, m *nats.Msg, i *sdp.CancelQuery) {
 			e.HandleCancelQuery(ctx, i)
 		}))
+		if err != nil {
+			return err
+		}
 
 		return nil
 	}
@@ -347,7 +352,7 @@ func (e *Engine) IsNATSConnected() bool {
 	return false
 }
 
-// HealthCheck returns an errir if the Engine is not healthy. Call this inside
+// HealthCheck returns an error if the Engine is not healthy. Call this inside
 // an opentelemetry span to capture default metrics from the engine.
 func (e *Engine) HealthCheck(ctx context.Context) error {
 	span := trace.SpanFromContext(ctx)
@@ -373,7 +378,7 @@ func (e *Engine) HandleCancelQuery(ctx context.Context, cancelQuery *sdp.CancelQ
 	span := trace.SpanFromContext(ctx)
 	span.SetName("HandleCancelQuery")
 
-	u, err := uuid.FromBytes(cancelQuery.UUID)
+	u, err := uuid.FromBytes(cancelQuery.GetUUID())
 
 	if err != nil {
 		log.Errorf("Error parsing UUID for cancel query: %v", err)

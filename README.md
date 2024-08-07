@@ -14,7 +14,7 @@ This library is currently under development and documentation can be found on [p
 The engine is responsible for managing all communication over NATS, handling queries, reporting on progress, caching etc. Authors of sources should only need to do the following in order to have a functional source:
 
 * Give the engine a name
-    * Note that this name is used as the `Responder` when responding to queries, this means that this name should be unique as if there are multiple responders with the same name, users will not be able to properly track the progress of their queries
+  * Note that this name is used as the `Responder` when responding to queries, this means that this name should be unique as if there are multiple responders with the same name, users will not be able to properly track the progress of their queries
 * Provide the engine with config
 * Manage the engine's lifecycle (start and stop it)
 
@@ -86,10 +86,9 @@ Methods:
 * [x] `List()`
 * [x] `Search()`: Search by any string. Intended to be used by autocomplete in the GUI and therefore places extra weight on prefixes however will also perform free-text and fuzzy matching too
 
-
 ## Developing
 
-This repository is configured to us [VSCode devcontainers](https://code.visualstudio.com/docs/remote/containers). This means that if you don't want to install Go locally, you can do all of your development inside a container. You can also use Github codespaces to host these containers meaning that the only requirement is having VSCode installed. Use of this is optional but does have some benefits:
+This repository is configured to us [VSCode devcontainers](https://code.visualstudio.com/docs/remote/containers). This means that if you don't want to install Go locally, you can do all of your development inside a container. You can also use Github code spaces to host these containers meaning that the only requirement is having VSCode installed. Use of this is optional but does have some benefits:
 
 * Local environment not polluted
 * NATS sidecar container automatically started for end-to-end tests

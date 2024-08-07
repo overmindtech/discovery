@@ -165,7 +165,7 @@ func TestGetLock(t *testing.T) {
 
 			// The expected order is: Firstly getLock1 since nothing else is waiting
 			// for a lock. While this one is working there is a query for a
-			// findlock, then a getlock. The findlock should block the getlock until
+			// findLock, then a getLock. The findLock should block the getLock until
 			// it is done
 			if order[0] != "getLock1" {
 				t.Errorf("expected getLock1 to be first. Order was: %v", order)

@@ -2,8 +2,9 @@ package discovery
 
 import (
 	"context"
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/base64"
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -130,13 +131,13 @@ func (sh *SourceHost) ExpandQuery(q *sdp.Query) map[*sdp.Query][]Source {
 
 	var checkSources []Source
 
-	if IsWildcard(q.Type) {
+	if IsWildcard(q.GetType()) {
 		// If the query has a wildcard type, all non-hidden sources might try
 		// to respond
 		checkSources = sh.VisibleSources()
 	} else {
 		// If the type is specific, pull just sources for that type
-		checkSources = sh.SourcesByType(q.Type)
+		checkSources = sh.SourcesByType(q.GetType())
 	}
 
 	for _, src := range checkSources {
@@ -152,7 +153,7 @@ func (sh *SourceHost) ExpandQuery(q *sdp.Query) map[*sdp.Query][]Source {
 			// * The source supports all scopes, or
 			// * The query scope is a wildcard (and the source is not hidden), or
 			// * The query scope substring matches source scope
-			if IsWildcard(sourceScope) || (IsWildcard(q.Scope) && !isHidden) || strings.Contains(sourceScope, q.Scope) {
+			if IsWildcard(sourceScope) || (IsWildcard(q.GetScope()) && !isHidden) || strings.Contains(sourceScope, q.GetScope()) {
 				dest := sdp.Query{}
 				q.Copy(&dest)
 
@@ -160,7 +161,7 @@ func (sh *SourceHost) ExpandQuery(q *sdp.Query) map[*sdp.Query][]Source {
 
 				// Choose the more specific scope
 				if IsWildcard(sourceScope) {
-					dest.Scope = q.Scope
+					dest.Scope = q.GetScope()
 				} else {
 					dest.Scope = sourceScope
 				}
@@ -208,7 +209,7 @@ func (sh *SourceHost) ClearAllSources() {
 // queryHash Calculates a hash for a given query which can be used to
 // determine if two queries are identical
 func queryHash(req *sdp.Query) (string, error) {
-	hash := sha1.New()
+	hash := sha256.New()
 
 	// Marshall to bytes so that we can use sha1 to compare the raw binary
 	b, err := proto.Marshal(req)
@@ -227,7 +228,10 @@ func (sh *SourceHost) StartPurger(ctx context.Context) {
 		if c, ok := s.(CachingSource); ok {
 			cache := c.Cache()
 			if cache != nil {
-				cache.StartPurger(ctx)
+				err := cache.StartPurger(ctx)
+				if err != nil {
+					sentry.CaptureException(fmt.Errorf("failed to start purger for source %s: %w", s.Name(), err))
+				}
 			}
 		}
 	}

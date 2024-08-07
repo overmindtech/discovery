@@ -126,8 +126,16 @@ func TimeQueries(numQueries int, linkDepth int, numParallel int) TimedResults {
 	e.AddSources(&SlowSource{
 		QueryDuration: 100 * time.Millisecond,
 	})
-	e.Start()
-	defer e.Stop()
+	err = e.Start()
+	if err != nil {
+		panic(fmt.Sprintf("Error starting Engine: %v", err))
+	}
+	defer func() {
+		err = e.Stop()
+		if err != nil {
+			panic(fmt.Sprintf("Error stopping Engine: %v", err))
+		}
+	}()
 
 	// Calculate how many items to expect and the expected duration
 	var expectedItems int
