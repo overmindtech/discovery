@@ -47,7 +47,10 @@ func newStartedEngine(t *testing.T, name string, no *auth.NATSOptions, sources .
 	}
 
 	t.Cleanup(func() {
-		e.Stop()
+		err = e.Stop()
+		if err != nil {
+			t.Errorf("Error stopping Engine: %v", err)
+		}
 	})
 
 	return e
@@ -117,7 +120,7 @@ func TestTrackQuery(t *testing.T) {
 		wg.Wait()
 
 		if len(e.trackedQueries) != 1000 {
-			t.Errorf("Expected 1000 tracked querys, got %v", len(e.trackedQueries))
+			t.Errorf("Expected 1000 tracked queries, got %v", len(e.trackedQueries))
 		}
 	})
 }
@@ -160,7 +163,7 @@ func TestDeleteTrackedQuery(t *testing.T) {
 	wg.Wait()
 
 	if len(e.trackedQueries) != 0 {
-		t.Errorf("Expected 0 tracked querys, got %v", len(e.trackedQueries))
+		t.Errorf("Expected 0 tracked queries, got %v", len(e.trackedQueries))
 	}
 }
 
@@ -314,16 +317,18 @@ func TestNatsCancel(t *testing.T) {
 		errs := make(chan *sdp.QueryError, 1000)
 
 		err := progress.Start(context.Background(), conn, items, errs)
-
 		if err != nil {
 			t.Error(err)
 		}
 
 		time.Sleep(250 * time.Millisecond)
 
-		conn.Publish(context.Background(), "cancel.all", &sdp.CancelQuery{
+		err = conn.Publish(context.Background(), "cancel.all", &sdp.CancelQuery{
 			UUID: u[:],
 		})
+		if err != nil {
+			t.Error(err)
+		}
 
 		// Read and discard all items and errors until they are closed
 		for range items {
@@ -526,13 +531,15 @@ func TestNATSFailureRestart(t *testing.T) {
 
 	// Connect successfully
 	err = e.Start()
-
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	t.Cleanup(func() {
-		e.Stop()
+		err = e.Stop()
+		if err != nil {
+			t.Fatal(err)
+		}
 	})
 
 	// Lose the connection

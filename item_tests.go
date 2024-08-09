@@ -40,7 +40,7 @@ Type names should match RFC1123 (lower case). This means the name must:
 		t.Errorf("Item %v has an empty UniqueAttribute", i.GloballyUniqueName())
 	}
 
-	attrMap := i.GetAttributes().AttrStruct.AsMap()
+	attrMap := i.GetAttributes().GetAttrStruct().AsMap()
 
 	if len(attrMap) == 0 {
 		t.Errorf("Attributes for item %v are empty", i.GloballyUniqueName())
@@ -59,7 +59,7 @@ Type names should match RFC1123 (lower case). This means the name must:
 	}
 
 	for index, linkedItem := range i.GetLinkedItems() {
-		item := linkedItem.Item
+		item := linkedItem.GetItem()
 		if item.GetType() == "" {
 			t.Errorf("LinkedItem %v of item %v has empty type", index, i.GloballyUniqueName())
 		}
@@ -73,7 +73,7 @@ Type names should match RFC1123 (lower case). This means the name must:
 	}
 
 	for index, linkedItemQuery := range i.GetLinkedItemQueries() {
-		query := linkedItemQuery.Query
+		query := linkedItemQuery.GetQuery()
 		if query.GetType() == "" {
 			t.Errorf("LinkedItemQueries %v of item %v has empty type", index, i.GloballyUniqueName())
 		}

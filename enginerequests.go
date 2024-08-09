@@ -51,10 +51,10 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 
 	// If there is no deadline OR further in the future than MaxRequestTimeout, clamp the deadline to MaxRequestTimeout
 	maxRequestDeadline := time.Now().Add(e.MaxRequestTimeout)
-	if query.Deadline == nil || query.Deadline.AsTime().After(maxRequestDeadline) {
+	if query.GetDeadline() == nil || query.GetDeadline().AsTime().After(maxRequestDeadline) {
 		query.Deadline = timestamppb.New(maxRequestDeadline)
 		deadlineOverride = true
-		log.WithContext(ctx).WithField("ovm.deadline", query.Deadline.AsTime()).Debug("capping deadline to MaxRequestTimeout")
+		log.WithContext(ctx).WithField("ovm.deadline", query.GetDeadline().AsTime()).Debug("capping deadline to MaxRequestTimeout")
 	}
 
 	// Add the query timeout to the context stack
@@ -64,24 +64,24 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 	numExpandedQueries := len(e.sh.ExpandQuery(query))
 
 	// Extract and parse the UUID
-	u, uuidErr := uuid.FromBytes(query.UUID)
+	u, uuidErr := uuid.FromBytes(query.GetUUID())
 
 	span.SetAttributes(
 		attribute.Int("ovm.discovery.numExpandedQueries", numExpandedQueries),
 		attribute.String("ovm.sdp.uuid", u.String()),
-		attribute.String("ovm.sdp.type", query.Type),
-		attribute.String("ovm.sdp.method", query.Method.String()),
-		attribute.String("ovm.sdp.query", query.Query),
-		attribute.String("ovm.sdp.scope", query.Scope),
-		attribute.String("ovm.sdp.deadline", query.Deadline.AsTime().String()),
+		attribute.String("ovm.sdp.type", query.GetType()),
+		attribute.String("ovm.sdp.method", query.GetMethod().String()),
+		attribute.String("ovm.sdp.query", query.GetQuery()),
+		attribute.String("ovm.sdp.scope", query.GetScope()),
+		attribute.String("ovm.sdp.deadline", query.GetDeadline().AsTime().String()),
 		attribute.Bool("ovm.sdp.deadlineOverridden", deadlineOverride),
-		attribute.Bool("ovm.sdp.queryIgnoreCache", query.IgnoreCache),
+		attribute.Bool("ovm.sdp.queryIgnoreCache", query.GetIgnoreCache()),
 	)
 
-	if query.RecursionBehaviour != nil {
+	if query.GetRecursionBehaviour() != nil {
 		span.SetAttributes(
-			attribute.Int("ovm.sdp.linkDepth", int(query.RecursionBehaviour.LinkDepth)),
-			attribute.Bool("ovm.sdp.followOnlyBlastPropagation", query.RecursionBehaviour.FollowOnlyBlastPropagation),
+			attribute.Int("ovm.sdp.linkDepth", int(query.GetRecursionBehaviour().GetLinkDepth())),
+			attribute.Bool("ovm.sdp.followOnlyBlastPropagation", query.GetRecursionBehaviour().GetFollowOnlyBlastPropagation()),
 		)
 	}
 
@@ -129,7 +129,7 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 
 	// If all failed then return an error
 	if err != nil {
-		if err == context.Canceled {
+		if errors.Is(err, context.Canceled) {
 			responder.CancelWithContext(ctx)
 		} else {
 			responder.ErrorWithContext(ctx)
@@ -201,7 +201,7 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 		errs <- &sdp.QueryError{
 			ErrorType:   sdp.QueryError_NOSCOPE,
 			ErrorString: "no matching sources found",
-			Scope:       query.Scope,
+			Scope:       query.GetScope(),
 		}
 
 		return errors.New("no matching sources found")
@@ -220,7 +220,7 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 		q, sources := q, sources
 
 		var p *pool.Pool
-		if q.Method == sdp.QueryMethod_LIST {
+		if q.GetMethod() == sdp.QueryMethod_LIST {
 			p = e.listExecutionPool
 			listExecutionPoolCount.Add(1)
 		} else {
@@ -241,7 +241,7 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 				defer LogRecoverToReturn(ctx, "ExecuteQuery inner")
 				defer wg.Done()
 				defer func() {
-					if q.Method == sdp.QueryMethod_LIST {
+					if q.GetMethod() == sdp.QueryMethod_LIST {
 						listExecutionPoolCount.Add(-1)
 					} else {
 						getExecutionPoolCount.Add(-1)
@@ -256,7 +256,7 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 
 				for _, i := range queryItems {
 					// Assign the source query
-					if i.Metadata != nil {
+					if i.GetMetadata() != nil {
 						i.Metadata.SourceQuery = query
 					}
 
@@ -295,7 +295,7 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 // convenience, but this should always be of length 1 or 0
 func (e *Engine) Execute(ctx context.Context, q *sdp.Query, relevantSources []Source) ([]*sdp.Item, []*sdp.QueryError) {
 	sources := relevantSources
-	if q.Method == sdp.QueryMethod_SEARCH {
+	if q.GetMethod() == sdp.QueryMethod_SEARCH {
 		sources = make([]Source, 0)
 
 		// Filter further by searchability
@@ -311,7 +311,7 @@ func (e *Engine) Execute(ctx context.Context, q *sdp.Query, relevantSources []So
 
 func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources []Source) ([]*sdp.Item, []*sdp.QueryError) {
 	ctx, span := tracer.Start(ctx, "CallSources", trace.WithAttributes(
-		attribute.String("ovm.source.queryMethod", q.Method.String()),
+		attribute.String("ovm.source.queryMethod", q.GetMethod().String()),
 	))
 	defer span.End()
 
@@ -321,12 +321,12 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 
 		return nil, []*sdp.QueryError{
 			{
-				UUID:          q.UUID,
+				UUID:          q.GetUUID(),
 				ErrorType:     sdp.QueryError_OTHER,
 				ErrorString:   ctx.Err().Error(),
-				Scope:         q.Scope,
+				Scope:         q.GetScope(),
 				ResponderName: e.Name,
-				ItemType:      q.Type,
+				ItemType:      q.GetType(),
 			},
 		}
 	}
@@ -338,31 +338,31 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 	// rather run the List first, populate the cache, then have the Get just
 	// grab the value from the cache. To this end we use a GetListMutex to allow
 	// a List to block all subsequent Get queries until it is done
-	switch q.Method {
+	switch q.GetMethod() {
 	case sdp.QueryMethod_GET:
-		e.gfm.GetLock(q.Scope, q.Type)
-		defer e.gfm.GetUnlock(q.Scope, q.Type)
+		e.gfm.GetLock(q.GetScope(), q.GetType())
+		defer e.gfm.GetUnlock(q.GetScope(), q.GetType())
 	case sdp.QueryMethod_LIST:
-		e.gfm.ListLock(q.Scope, q.Type)
-		defer e.gfm.ListUnlock(q.Scope, q.Type)
+		e.gfm.ListLock(q.GetScope(), q.GetType())
+		defer e.gfm.ListUnlock(q.GetScope(), q.GetType())
 	case sdp.QueryMethod_SEARCH:
 		// We don't need to lock for a search since they are independent and
 		// will only ever have a cache hit if the query is identical
 	}
 
 	span.SetAttributes(
-		attribute.String("ovm.source.queryType", q.Type),
-		attribute.String("ovm.source.queryScope", q.Scope),
+		attribute.String("ovm.source.queryType", q.GetType()),
+		attribute.String("ovm.source.queryScope", q.GetScope()),
 	)
 
 	for _, src := range relevantSources {
 		if func() bool {
 			// start querying the source after a cache miss
 			ctx, span := tracer.Start(ctx, src.Name(), trace.WithAttributes(
-				attribute.String("ovm.source.method", q.Method.String()),
-				attribute.String("ovm.source.queryMethod", q.Method.String()),
-				attribute.String("ovm.source.queryType", q.Type),
-				attribute.String("ovm.source.queryScope", q.Scope),
+				attribute.String("ovm.source.method", q.GetMethod().String()),
+				attribute.String("ovm.source.queryMethod", q.GetMethod().String()),
+				attribute.String("ovm.source.queryType", q.GetType()),
+				attribute.String("ovm.source.queryScope", q.GetScope()),
 				attribute.String("ovm.source.name", src.Name())))
 			defer span.End()
 
@@ -389,20 +389,20 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 
 			start := time.Now()
 
-			switch q.Method {
+			switch q.GetMethod() {
 			case sdp.QueryMethod_GET:
 				var newItem *sdp.Item
 
-				newItem, err = src.Get(ctx, q.Scope, q.Query, q.IgnoreCache)
+				newItem, err = src.Get(ctx, q.GetScope(), q.GetQuery(), q.GetIgnoreCache())
 
 				if err == nil {
 					resultItems = []*sdp.Item{newItem}
 				}
 			case sdp.QueryMethod_LIST:
-				resultItems, err = src.List(ctx, q.Scope, q.IgnoreCache)
+				resultItems, err = src.List(ctx, q.GetScope(), q.GetIgnoreCache())
 			case sdp.QueryMethod_SEARCH:
 				if searchableSrc, ok := src.(SearchableSource); ok {
-					resultItems, err = searchableSrc.Search(ctx, q.Scope, q.Query, q.IgnoreCache)
+					resultItems, err = searchableSrc.Search(ctx, q.GetScope(), q.GetQuery(), q.GetIgnoreCache())
 				} else {
 					err = &sdp.QueryError{
 						ErrorType:   sdp.QueryError_NOTFOUND,
@@ -426,16 +426,17 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 			if err != nil {
 				span.SetAttributes(attribute.String("ovm.source.error", err.Error()))
 
-				if sdpErr, ok := err.(*sdp.QueryError); ok {
+				var sdpErr *sdp.QueryError
+				if errors.As(err, &sdpErr) {
 					// Add details if they aren't populated
-					scope := sdpErr.Scope
+					scope := sdpErr.GetScope()
 					if scope == "" {
-						scope = q.Scope
+						scope = q.GetScope()
 					}
 					errs = append(errs, &sdp.QueryError{
-						UUID:          q.UUID,
-						ErrorType:     sdpErr.ErrorType,
-						ErrorString:   sdpErr.ErrorString,
+						UUID:          q.GetUUID(),
+						ErrorType:     sdpErr.GetErrorType(),
+						ErrorString:   sdpErr.GetErrorString(),
 						Scope:         scope,
 						SourceName:    src.Name(),
 						ItemType:      src.Type(),
@@ -443,12 +444,12 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 					})
 				} else {
 					errs = append(errs, &sdp.QueryError{
-						UUID:          q.UUID,
+						UUID:          q.GetUUID(),
 						ErrorType:     sdp.QueryError_OTHER,
 						ErrorString:   err.Error(),
-						Scope:         q.Scope,
+						Scope:         q.GetScope(),
 						SourceName:    src.Name(),
-						ItemType:      q.Type,
+						ItemType:      q.GetType(),
 						ResponderName: e.Name,
 					})
 				}
@@ -481,7 +482,7 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 
 			items = append(items, resultItems...)
 
-			if q.Method == sdp.QueryMethod_GET {
+			if q.GetMethod() == sdp.QueryMethod_GET {
 				// If it's a get, we just return the first thing that works
 				if len(resultItems) > 0 {
 					return true
@@ -506,8 +507,9 @@ func considerFailed(err error) bool {
 	if err == nil {
 		return false
 	} else {
-		if sdperr, ok := err.(*sdp.QueryError); ok {
-			if sdperr.ErrorType == sdp.QueryError_NOTFOUND {
+		var sdpErr *sdp.QueryError
+		if errors.As(err, &sdpErr) {
+			if sdpErr.GetErrorType() == sdp.QueryError_NOTFOUND {
 				return false
 			} else {
 				return true

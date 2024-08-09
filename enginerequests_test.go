@@ -63,7 +63,7 @@ func TestExecuteQuery(t *testing.T) {
 
 		item := items[0]
 
-		if item.Metadata.SourceQuery != q {
+		if item.GetMetadata().GetSourceQuery() != q {
 			t.Error("source query mismatch")
 		}
 	})
@@ -86,8 +86,8 @@ func TestExecuteQuery(t *testing.T) {
 		}
 
 		if len(errs) == 1 {
-			if errs[0].ErrorType != sdp.QueryError_NOSCOPE {
-				t.Errorf("expected error type to be NOSCOPE, got %v", errs[0].ErrorType)
+			if errs[0].GetErrorType() != sdp.QueryError_NOSCOPE {
+				t.Errorf("expected error type to be NOSCOPE, got %v", errs[0].GetErrorType())
 			}
 		} else {
 			t.Errorf("expected 1 error, got %v", len(errs))
@@ -113,8 +113,8 @@ func TestExecuteQuery(t *testing.T) {
 		}
 
 		if len(errs) == 1 {
-			if errs[0].ErrorType != sdp.QueryError_NOSCOPE {
-				t.Errorf("expected error type to be NOSCOPE, got %v", errs[0].ErrorType)
+			if errs[0].GetErrorType() != sdp.QueryError_NOSCOPE {
+				t.Errorf("expected error type to be NOSCOPE, got %v", errs[0].GetErrorType())
 			}
 		} else {
 			t.Errorf("expected 1 error, got %v", len(errs))
