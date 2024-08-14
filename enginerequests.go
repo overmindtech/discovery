@@ -363,7 +363,9 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 				attribute.String("ovm.source.queryMethod", q.GetMethod().String()),
 				attribute.String("ovm.source.queryType", q.GetType()),
 				attribute.String("ovm.source.queryScope", q.GetScope()),
-				attribute.String("ovm.source.name", src.Name())))
+				attribute.String("ovm.source.name", src.Name()),
+				attribute.String("ovm.source.query", q.GetQuery()),
+			))
 			defer span.End()
 
 			// Ensure that the span is closed when the context is done. This is based on
