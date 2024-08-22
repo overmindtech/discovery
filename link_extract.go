@@ -4,7 +4,6 @@ import (
 	"net"
 	"net/url"
 	"regexp"
-	"strings"
 
 	"github.com/overmindtech/sdp-go"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -139,11 +138,10 @@ func extractLinksFromStringValue(val string) []*sdp.LinkedItemQuery {
 	return nil
 }
 
-var (
-	// Compile a regex pattern to match the general structure of a DNS name.
-	// Limits each label to 1-63 characters and matches only allowed characters.
-	dnsNameRegex = regexp.MustCompile(`^(?i)[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`)
-)
+// Compile a regex pattern to match the general structure of a DNS name. Limits
+// each label to 1-63 characters and matches only allowed characters and ensure
+// that the name has at least three sections i.e. two dots.
+var dnsNameRegex = regexp.MustCompile(`^(?i)([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?\.){2,}[a-z]{2,}$`)
 
 // This function returns true if the given string is a valid DNS name with at
 // least three labels (sections)
@@ -156,22 +154,6 @@ func isLikelyDNSName(name string) bool {
 	// Check if the name matches the regex pattern.
 	if !dnsNameRegex.MatchString(name) {
 		return false
-	}
-
-	// Split the name into labels by dot.
-	labels := strings.Split(name, ".")
-
-	if len(labels) < 3 {
-		// We don't want to match names with less than 3 labels since they
-		// aren't likely to be real DNS names
-		return false
-	}
-
-	for _, label := range labels {
-		// Each label must be between 1 and 63 characters.
-		if len(label) < 1 || len(label) > 63 {
-			return false
-		}
 	}
 
 	return true

@@ -417,8 +417,8 @@ version: 5
 	return attrs
 }
 
-// BenchmarkExtractLinksFromAttributes-10    	    6944	    159392 ns/op	  124056 B/op	    1694 allocs/op
-// BenchmarkExtractLinksFromAttributes-10    	   10000	    102911 ns/op	   53291 B/op	     622 allocs/op
+// Current performance:
+// BenchmarkExtractLinksFromAttributes-10    	   12098	     98305 ns/op	   53266 B/op	     621 allocs/op
 func BenchmarkExtractLinksFromAttributes(b *testing.B) {
 	attrs := createTestData()
 
