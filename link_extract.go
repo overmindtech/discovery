@@ -152,9 +152,5 @@ func isLikelyDNSName(name string) bool {
 	}
 
 	// Check if the name matches the regex pattern.
-	if !dnsNameRegex.MatchString(name) {
-		return false
-	}
-
-	return true
+	return dnsNameRegex.MatchString(name) {
 }
