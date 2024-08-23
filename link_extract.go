@@ -147,7 +147,7 @@ var dnsNameRegex = regexp.MustCompile(`^(?i)([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?\
 // least three labels (sections)
 func isLikelyDNSName(name string) bool {
 	// Quick length check before the regex.
-	if len(name) < 1 || len(name) > 253 {
+	if len(name) < 5 || len(name) > 253 {
 		return false
 	}
 
