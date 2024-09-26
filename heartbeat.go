@@ -21,7 +21,7 @@ var ErrNoHealthcheckDefined = errors.New("no healthcheck defined")
 // `StartSendingHeartbeats` has been called manually. Users can also call this
 // method to immediately send a heartbeat if required
 func (e *Engine) SendHeartbeat(ctx context.Context) error {
-	if e.HeartbeatOptions.HealthCheck == nil {
+	if e.HeartbeatOptions == nil || e.HeartbeatOptions.HealthCheck == nil {
 		return ErrNoHealthcheckDefined
 	}
 
