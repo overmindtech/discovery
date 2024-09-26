@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/overmindtech/sdp-go"
@@ -21,6 +22,25 @@ import (
 const DefaultMaxRequestTimeout = 1 * time.Minute
 const DefaultConnectionWatchInterval = 3 * time.Second
 
+// The clint that will be used to send heartbeats. This will usually be an
+// `sdpconnect.ManagementServiceClient`
+type HeartbeatClient interface {
+	SubmitSourceHeartbeat(context.Context, *connect.Request[sdp.SubmitSourceHeartbeatRequest]) (*connect.Response[sdp.SubmitSourceHeartbeatResponse], error)
+}
+
+type HeartbeatOptions struct {
+	// The client that will be used to send heartbeats
+	ManagementClient HeartbeatClient
+
+	// The function that should be run to check if the source is healthy. It
+	// will be executed each time a heartbeat is sent and should return an error
+	// if the source is unhealthy.
+	HealthCheck func() error
+
+	// How frequently to send a heartbeat
+	Frequency time.Duration
+}
+
 // Engine is the main discovery engine. This is where all of the Sources and
 // sources are stored and is responsible for calling out to the right sources to
 // discover everything
@@ -30,6 +50,18 @@ const DefaultConnectionWatchInterval = 3 * time.Second
 type Engine struct {
 	// Descriptive name of this engine. Used as responder name in SDP responses
 	Name string
+	// UUID iof this engine. This will be used to identify it for heartbeats. If
+	// this is empty, a random UUID will be generated when the engine is started
+	UUID uuid.UUID
+	// The version of the source that should be reported in the heartbeat
+	Version string
+	// The of source, this will be reported to Overmind as part of the
+	// heartbeat. e.g. "aws" or "kubernetes"
+	Type string
+	// Whether this source is managed by Overmind. This is inly used for
+	// reporting so that you can tell the difference between managed sources and
+	// ones you're running locally
+	Managed sdp.SourceManaged
 
 	NATSOptions   *auth.NATSOptions // Options for connecting to NATS
 	NATSQueueName string            // The name of the queue to use when subscribing
@@ -47,6 +79,10 @@ type Engine struct {
 	// How often to check for closed connections and try to recover
 	ConnectionWatchInterval time.Duration
 	connectionWatcher       NATSWatcher
+
+	// The configuration for the heartbeat for this engine. If this is nil the
+	// engine won't send heartbeats when started
+	HeartbeatOptions *HeartbeatOptions
 
 	// Internal throttle used to limit MaxParallelExecutions. This reads
 	// MaxParallelExecutions and is populated when the engine is started. This
@@ -83,10 +119,12 @@ type Engine struct {
 	// Prevents the engine being restarted many times in parallel
 	restartMutex sync.Mutex
 
-	// Context to control cache purging. Purging will stop when the cache is cancelled
-	cacheContext context.Context
-	// Func that cancels cache purging
-	cacheCancel context.CancelFunc
+	// Context to background jobs like cache purging and heartbeats. These will
+	// stop when the context is cancelled
+	backgroundJobContext context.Context
+	backgroundJobCancel  context.CancelFunc
+	heartbeatContext     context.Context
+	heartbeatCancel      context.CancelFunc
 }
 
 func NewEngine() (*Engine, error) {
@@ -262,10 +300,16 @@ func (e *Engine) Start() error {
 	e.listExecutionPool = pool.New().WithMaxGoroutines(e.MaxParallelExecutions)
 	e.getExecutionPool = pool.New().WithMaxGoroutines(e.MaxParallelExecutions)
 
-	e.cacheContext, e.cacheCancel = context.WithCancel(context.Background())
+	e.backgroundJobContext, e.backgroundJobCancel = context.WithCancel(context.Background())
 
-	// Start purging caches
-	e.sh.StartPurger(e.cacheContext)
+	// Start background jobs
+	e.sh.StartPurger(e.backgroundJobContext)
+	e.StartSendingHeartbeats(e.backgroundJobContext)
+
+	// Decide your own UUID if not provided
+	if e.UUID == uuid.Nil {
+		e.UUID = uuid.New()
+	}
 
 	return e.connect()
 }
@@ -313,7 +357,13 @@ func (e *Engine) Stop() error {
 	}
 
 	// Stop purging and clear the cache
-	e.cacheCancel()
+	if e.backgroundJobCancel != nil {
+		e.backgroundJobCancel()
+	}
+	if e.heartbeatCancel != nil {
+		e.heartbeatCancel()
+	}
+
 	e.sh.ClearCaches()
 
 	return nil
