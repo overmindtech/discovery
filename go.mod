@@ -9,7 +9,7 @@ require (
 	github.com/getsentry/sentry-go v0.29.0
 	github.com/google/uuid v1.6.0
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
-	github.com/nats-io/nats-server/v2 v2.10.20
+	github.com/nats-io/nats-server/v2 v2.10.21
 	github.com/nats-io/nats.go v1.37.0
 	github.com/overmindtech/sdp-go v0.94.0
 	github.com/overmindtech/sdpcache v1.6.4
