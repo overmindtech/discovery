@@ -357,8 +357,13 @@ func (e *Engine) Stop() error {
 	}
 
 	// Stop purging and clear the cache
-	e.backgroundJobCancel()
-	e.heartbeatCancel()
+	if e.backgroundJobCancel != nil {
+		e.backgroundJobCancel()
+	}
+	if e.heartbeatCancel != nil {
+		e.heartbeatCancel()
+	}
+
 	e.sh.ClearCaches()
 
 	return nil
