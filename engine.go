@@ -123,6 +123,8 @@ type Engine struct {
 	// stop when the context is cancelled
 	backgroundJobContext context.Context
 	backgroundJobCancel  context.CancelFunc
+	heartbeatContext     context.Context
+	heartbeatCancel      context.CancelFunc
 }
 
 func NewEngine() (*Engine, error) {
@@ -302,7 +304,7 @@ func (e *Engine) Start() error {
 
 	// Start background jobs
 	e.sh.StartPurger(e.backgroundJobContext)
-	e.startSendingHeartbeats(e.backgroundJobContext)
+	e.StartSendingHeartbeats(e.backgroundJobContext)
 
 	// Decide your own UUID if not provided
 	if e.UUID == uuid.Nil {
@@ -356,6 +358,7 @@ func (e *Engine) Stop() error {
 
 	// Stop purging and clear the cache
 	e.backgroundJobCancel()
+	e.heartbeatCancel()
 	e.sh.ClearCaches()
 
 	return nil

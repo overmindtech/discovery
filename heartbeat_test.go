@@ -161,7 +161,7 @@ func TestHeartbeats(t *testing.T) {
 
 		ctx, cancel := context.WithCancel(context.Background())
 
-		go e.startSendingHeartbeats(ctx)
+		e.StartSendingHeartbeats(ctx)
 
 		start := time.Now()
 		// Get one

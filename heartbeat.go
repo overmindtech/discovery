@@ -78,25 +78,36 @@ func (e *Engine) sendHeartbeat(ctx context.Context) error {
 	return err
 }
 
-// Starts sending heartbeats at the specified frequency. This function will block
-// until the context is cancelled.
-func (e *Engine) startSendingHeartbeats(ctx context.Context) {
-	if e.HeartbeatOptions == nil || e.HeartbeatOptions.Frequency == 0 {
+// Starts sending heartbeats at the specified frequency. These will be sent in
+// the background and this function will return immediately. Heartbeats are
+// automatically started when the engine started, but if a sources has startup
+// steps that take a long time, or are liable to fail, the user may want to
+// start the heartbeats first so that users can see that the source has failed
+// to start.
+//
+// If this is called multiple times, nothing will happen. Heartbeats will be
+// stopped when the engine is stopped, or when the provided context is canceled.
+func (e *Engine) StartSendingHeartbeats(ctx context.Context) {
+	if e.HeartbeatOptions == nil || e.HeartbeatOptions.Frequency == 0 || e.heartbeatContext != nil {
 		return
 	}
 
-	ticker := time.NewTicker(e.HeartbeatOptions.Frequency)
-	defer ticker.Stop()
+	e.heartbeatContext, e.heartbeatCancel = context.WithCancel(ctx)
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			err := e.sendHeartbeat(ctx)
-			if err != nil {
-				log.WithError(err).Error("Failed to send heartbeat")
+	go func() {
+		ticker := time.NewTicker(e.HeartbeatOptions.Frequency)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-e.heartbeatContext.Done():
+				return
+			case <-ticker.C:
+				err := e.sendHeartbeat(e.heartbeatContext)
+				if err != nil {
+					log.WithError(err).Error("Failed to send heartbeat")
+				}
 			}
 		}
-	}
+	}()
 }
