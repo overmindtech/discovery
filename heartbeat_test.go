@@ -161,13 +161,14 @@ func TestHeartbeats(t *testing.T) {
 
 		ctx, cancel := context.WithCancel(context.Background())
 
-		e.StartSendingHeartbeats(ctx)
-
 		start := time.Now()
-		// Get one
+
 		responses <- &connect.Response[sdp.SubmitSourceHeartbeatResponse]{
 			Msg: &sdp.SubmitSourceHeartbeatResponse{},
 		}
+		e.StartSendingHeartbeats(ctx)
+
+		// Get the initial heartbeat
 		<-requests
 
 		// Get two
@@ -179,11 +180,11 @@ func TestHeartbeats(t *testing.T) {
 		cancel()
 
 		// Make sure that took the expected amount of time
-		if elapsed := time.Since(start); elapsed < time.Millisecond*500 {
+		if elapsed := time.Since(start); elapsed < time.Millisecond*250 {
 			t.Errorf("expected to take at least 500ms, took %v", elapsed)
 		}
 
-		if elapsed := time.Since(start); elapsed > time.Millisecond*750 {
+		if elapsed := time.Since(start); elapsed > time.Millisecond*500 {
 			t.Errorf("expected to take at most 750ms, took %v", elapsed)
 		}
 	})

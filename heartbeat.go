@@ -90,6 +90,10 @@ func (e *Engine) SendHeartbeat(ctx context.Context) error {
 //
 // If this is called multiple times, nothing will happen. Heartbeats will be
 // stopped when the engine is stopped, or when the provided context is canceled.
+//
+// This will send one heartbeat initially when the method is called, and will
+// then run in a background goroutine that sends heartbeats at the specified
+// frequency, and will stop when the provided context is canceled.
 func (e *Engine) StartSendingHeartbeats(ctx context.Context) {
 	if e.HeartbeatOptions == nil || e.HeartbeatOptions.Frequency == 0 || e.heartbeatCancel != nil {
 		return
@@ -101,7 +105,7 @@ func (e *Engine) StartSendingHeartbeats(ctx context.Context) {
 	// Send one heartbeat at the beginning
 	err := e.SendHeartbeat(heartbeatContext)
 	if err != nil {
-		log.WithError(err).Error("Failed to send initial heartbeat")
+		log.WithError(err).Error("Failed to send heartbeat")
 	}
 
 	go func() {
