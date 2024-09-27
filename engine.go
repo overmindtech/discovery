@@ -123,7 +123,6 @@ type Engine struct {
 	// stop when the context is cancelled
 	backgroundJobContext context.Context
 	backgroundJobCancel  context.CancelFunc
-	heartbeatContext     context.Context
 	heartbeatCancel      context.CancelFunc
 }
 
