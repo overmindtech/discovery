@@ -301,14 +301,14 @@ func (e *Engine) Start() error {
 
 	e.backgroundJobContext, e.backgroundJobCancel = context.WithCancel(context.Background())
 
-	// Start background jobs
-	e.sh.StartPurger(e.backgroundJobContext)
-	e.StartSendingHeartbeats(e.backgroundJobContext)
-
 	// Decide your own UUID if not provided
 	if e.UUID == uuid.Nil {
 		e.UUID = uuid.New()
 	}
+
+	// Start background jobs
+	e.sh.StartPurger(e.backgroundJobContext)
+	e.StartSendingHeartbeats(e.backgroundJobContext)
 
 	return e.connect()
 }
