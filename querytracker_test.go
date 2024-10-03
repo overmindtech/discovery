@@ -37,6 +37,10 @@ func (s *SpeedTestSource) Scopes() []string {
 	return []string{"test"}
 }
 
+func (s *SpeedTestSource) Metadata() sdp.AdapterMetadata {
+	return sdp.AdapterMetadata{}
+}
+
 func (s *SpeedTestSource) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
 	select {
 	case <-time.After(s.QueryDelay):

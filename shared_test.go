@@ -110,6 +110,13 @@ func (s *TestSource) DefaultCacheDuration() time.Duration {
 	return 100 * time.Millisecond
 }
 
+func (s *TestSource) Metadata() sdp.AdapterMetadata {
+	return sdp.AdapterMetadata{
+		Type:            s.Type(),
+		DescriptiveName: "Person",
+	}
+}
+
 func (s *TestSource) ensureCache() {
 	s.cacheInitMu.Lock()
 	defer s.cacheInitMu.Unlock()

@@ -28,6 +28,10 @@ func (s *SlowSource) DefaultCacheDuration() time.Duration {
 	return 10 * time.Minute
 }
 
+func (s *SlowSource) Metadata() sdp.AdapterMetadata {
+	return sdp.AdapterMetadata{}
+}
+
 func (s *SlowSource) Scopes() []string {
 	return []string{"test"}
 }

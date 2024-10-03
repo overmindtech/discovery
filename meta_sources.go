@@ -23,6 +23,10 @@ func (t *TypeSource) Name() string {
 	return "overmind-type-metasource"
 }
 
+func (t *TypeSource) Metadata() sdp.AdapterMetadata {
+	return sdp.AdapterMetadata{}
+}
+
 func newTypeItem(typ string) *sdp.Item {
 	return &sdp.Item{
 		Type:            "overmind-type",
@@ -119,6 +123,10 @@ func (t *ScopeSource) Type() string {
 
 func (t *ScopeSource) Name() string {
 	return "overmind-scope-metasource"
+}
+
+func (t *ScopeSource) Metadata() sdp.AdapterMetadata {
+	return sdp.AdapterMetadata{}
 }
 
 func newScopeItem(scope string) *sdp.Item {
@@ -225,6 +233,10 @@ func (s *SourcesSource) Type() string {
 
 func (s *SourcesSource) Name() string {
 	return "overmind-source-metasource"
+}
+
+func (s *SourcesSource) Metadata() sdp.AdapterMetadata {
+	return sdp.AdapterMetadata{}
 }
 
 func (s *SourcesSource) Scopes() []string {

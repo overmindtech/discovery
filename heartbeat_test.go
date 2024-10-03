@@ -116,20 +116,6 @@ func TestHeartbeats(t *testing.T) {
 		if !slices.Contains(reqAvailableScopes, "test2") {
 			t.Errorf("expected scope 'test2' to be present in the response")
 		}
-
-		reqAvailableTypes := req.Msg.GetAvailableTypes()
-
-		if len(reqAvailableTypes) != 2 {
-			t.Errorf("expected 2 types, got %v", len(reqAvailableTypes))
-		}
-
-		if !slices.Contains(reqAvailableTypes, "test-type") {
-			t.Errorf("expected type 'test-type' to be present in the response")
-		}
-
-		if !slices.Contains(reqAvailableTypes, "test-type2") {
-			t.Errorf("expected type 'test-type2' to be present in the response")
-		}
 	})
 
 	t.Run("sendHeartbeat when unhealthy", func(t *testing.T) {

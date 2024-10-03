@@ -2,6 +2,8 @@ package discovery
 
 import (
 	"context"
+	"encoding/json"
+	"os"
 
 	"github.com/overmindtech/sdp-go"
 	"github.com/overmindtech/sdpcache"
@@ -39,6 +41,29 @@ type Source interface {
 	// return an item for a GET query. In this instance only one item can be
 	// sen on, so the one with the higher weight value will win.
 	Weight() int
+	Metadata() sdp.AdapterMetadata // A struct that contains information about the adapter
+}
+
+func AdapterMetadataToJSONFile(components []sdp.AdapterMetadata, targetLocation string) error {
+	// create the target location folder if it doesn't exist
+	err := os.MkdirAll(targetLocation, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	for i := range components {
+		component := &components[i]
+		// convert the component to JSON
+		bytes, err := json.Marshal(component)
+		if err != nil {
+			return err
+		}
+		// write the JSON to a file
+		err = os.WriteFile(targetLocation+"/"+component.GetType()+".json", bytes, 0600)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // CachingSource Is a source of items that supports caching

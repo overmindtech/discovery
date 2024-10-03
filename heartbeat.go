@@ -41,21 +41,18 @@ func (e *Engine) SendHeartbeat(ctx context.Context) error {
 	}
 
 	// Get available types and scopes
-	availableTypesMap := make(map[string]bool)
 	availableScopesMap := make(map[string]bool)
+	adapterMetadata := []*sdp.AdapterMetadata{}
 	for _, source := range e.sh.VisibleSources() {
-		availableTypesMap[source.Type()] = true
 		for _, scope := range source.Scopes() {
 			availableScopesMap[scope] = true
 		}
+		metaData := source.Metadata()
+		adapterMetadata = append(adapterMetadata, &metaData)
 	}
 
 	// Extract slices from maps
-	availableTypes := make([]string, 0)
 	availableScopes := make([]string, 0)
-	for t := range availableTypesMap {
-		availableTypes = append(availableTypes, t)
-	}
 	for s := range availableScopesMap {
 		availableScopes = append(availableScopes, s)
 	}
@@ -70,8 +67,8 @@ func (e *Engine) SendHeartbeat(ctx context.Context) error {
 			Version:          e.Version,
 			Name:             e.Name,
 			Type:             e.Type,
-			AvailableTypes:   availableTypes,
 			AvailableScopes:  availableScopes,
+			AdapterMetadata:  adapterMetadata,
 			Managed:          e.Managed,
 			Error:            heartbeatError,
 			NextHeartbeatMax: durationpb.New(nextHeartbeat),
