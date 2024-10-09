@@ -45,16 +45,16 @@ func TestHeartbeats(t *testing.T) {
 		},
 	}
 
-	e.AddSources(
-		&TestSource{
+	e.AddAdapters(
+		&TestAdapter{
 			ReturnScopes: []string{"test"},
 			ReturnType:   "test-type",
 		},
-		&TestSource{
+		&TestAdapter{
 			ReturnScopes: []string{"test"},
 			ReturnType:   "test-type2",
 		},
-		&TestSource{
+		&TestAdapter{
 			ReturnScopes: []string{"test2"},
 			ReturnType:   "test-type",
 		},
@@ -115,6 +115,12 @@ func TestHeartbeats(t *testing.T) {
 
 		if !slices.Contains(reqAvailableScopes, "test2") {
 			t.Errorf("expected scope 'test2' to be present in the response")
+		}
+
+		reqAdapterMetadata := req.Msg.GetAdapterMetadata()
+
+		if len(reqAdapterMetadata) != 3 {
+			t.Errorf("expected 3 adapter metadata, got %v", len(reqAdapterMetadata))
 		}
 	})
 

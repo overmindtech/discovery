@@ -20,13 +20,13 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// AllSourcesFailedError Will be returned when all sources have failed
-type AllSourcesFailedError struct {
-	NumSources int
+// AllAdaptersFailedError Will be returned when all adapters have failed
+type AllAdaptersFailedError struct {
+	NumAdapters int
 }
 
-func (e AllSourcesFailedError) Error() string {
-	return fmt.Sprintf("all sources (%v) failed", e.NumSources)
+func (e AllAdaptersFailedError) Error() string {
+	return fmt.Sprintf("all adapters (%v) failed", e.NumAdapters)
 }
 
 // NewItemSubject Generates a random subject name for returning items e.g.
@@ -86,7 +86,7 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 	}
 
 	if numExpandedQueries == 0 {
-		// If we don't have any relevant sources, exit
+		// If we don't have any relevant adapters, exit
 		return
 	}
 
@@ -169,7 +169,7 @@ var listExecutionPoolCount atomic.Int32
 var getExecutionPoolCount atomic.Int32
 
 // ExecuteQuery Executes a single Query and returns the results without any
-// linking. Will return an error if all sources fail, or the Query couldn't be
+// linking. Will return an error if all adapters fail, or the Query couldn't be
 // run.
 //
 // Items and errors will be sent to the supplied channels as they are found.
@@ -194,33 +194,33 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 	expanded := e.sh.ExpandQuery(query)
 
 	span.SetAttributes(
-		attribute.Int("ovm.source.numExpandedQueries", len(expanded)),
+		attribute.Int("ovm.adapter.numExpandedQueries", len(expanded)),
 	)
 
 	if len(expanded) == 0 {
 		errs <- &sdp.QueryError{
 			ErrorType:   sdp.QueryError_NOSCOPE,
-			ErrorString: "no matching sources found",
+			ErrorString: "no matching adapters found",
 			Scope:       query.GetScope(),
 		}
 
-		return errors.New("no matching sources found")
+		return errors.New("no matching adapters found")
 	}
 
-	// These are used to calculate whether all sources have failed or not
-	var numSources atomic.Int32
+	// These are used to calculate whether all adapters have failed or not
+	var numAdapters atomic.Int32
 	var numErrs int
 
 	// Since we need to wait for only the processing of this query's executions, we need a separate WaitGroup here
 	// Overall MaxParallelExecutions evaluation is handled by e.executionPool
 	wg := sync.WaitGroup{}
-	for q, sources := range expanded {
+	for q, adapters := range expanded {
 		wg.Add(1)
 		// localize values for the closure below
-		q, sources := q, sources
+		localQ, localAdapters := q, adapters
 
 		var p *pool.Pool
-		if q.GetMethod() == sdp.QueryMethod_LIST {
+		if localQ.GetMethod() == sdp.QueryMethod_LIST {
 			p = e.listExecutionPool
 			listExecutionPoolCount.Add(1)
 		} else {
@@ -241,7 +241,7 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 				defer LogRecoverToReturn(ctx, "ExecuteQuery inner")
 				defer wg.Done()
 				defer func() {
-					if q.GetMethod() == sdp.QueryMethod_LIST {
+					if localQ.GetMethod() == sdp.QueryMethod_LIST {
 						listExecutionPoolCount.Add(-1)
 					} else {
 						getExecutionPoolCount.Add(-1)
@@ -249,10 +249,10 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 				}()
 				var queryItems []*sdp.Item
 				var queryErrors []*sdp.QueryError
-				numSources.Add(1)
+				numAdapters.Add(1)
 
-				// query all sources
-				queryItems, queryErrors = e.Execute(ctx, q, sources)
+				// query all adapters
+				queryItems, queryErrors = e.Execute(ctx, localQ, localAdapters)
 
 				for _, i := range queryItems {
 					// Assign the source query
@@ -266,7 +266,7 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 				}
 
 				for _, e := range queryErrors {
-					if q != nil {
+					if localQ != nil {
 						numErrs++
 
 						if errs != nil {
@@ -281,37 +281,37 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 	wg.Wait()
 
 	// If all failed then return first error
-	if numSourcesInt := numSources.Load(); numErrs == int(numSourcesInt) {
-		return AllSourcesFailedError{
-			NumSources: int(numSourcesInt),
+	if numAdaptersInt := numAdapters.Load(); numErrs == int(numAdaptersInt) {
+		return AllAdaptersFailedError{
+			NumAdapters: int(numAdaptersInt),
 		}
 	}
 
 	return nil
 }
 
-// Execute Runs the query against known sources in priority order. If nothing was
+// Execute Runs the query against known adapters in priority order. If nothing was
 // found, returns the first error. This returns a slice if items for
 // convenience, but this should always be of length 1 or 0
-func (e *Engine) Execute(ctx context.Context, q *sdp.Query, relevantSources []Source) ([]*sdp.Item, []*sdp.QueryError) {
-	sources := relevantSources
+func (e *Engine) Execute(ctx context.Context, q *sdp.Query, relevantAdapters []Adapter) ([]*sdp.Item, []*sdp.QueryError) {
+	adapters := relevantAdapters
 	if q.GetMethod() == sdp.QueryMethod_SEARCH {
-		sources = make([]Source, 0)
+		adapters = make([]Adapter, 0)
 
 		// Filter further by searchability
-		for _, source := range relevantSources {
-			if searchable, ok := source.(SearchableSource); ok {
-				sources = append(sources, searchable)
+		for _, adapter := range relevantAdapters {
+			if searchable, ok := adapter.(SearchableAdapter); ok {
+				adapters = append(adapters, searchable)
 			}
 		}
 	}
 
-	return e.callSources(ctx, q, sources)
+	return e.callAdapters(ctx, q, adapters)
 }
 
-func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources []Source) ([]*sdp.Item, []*sdp.QueryError) {
-	ctx, span := tracer.Start(ctx, "CallSources", trace.WithAttributes(
-		attribute.String("ovm.source.queryMethod", q.GetMethod().String()),
+func (e *Engine) callAdapters(ctx context.Context, q *sdp.Query, relevantAdapters []Adapter) ([]*sdp.Item, []*sdp.QueryError) {
+	ctx, span := tracer.Start(ctx, "CallAdapters", trace.WithAttributes(
+		attribute.String("ovm.adapter.queryMethod", q.GetMethod().String()),
 	))
 	defer span.End()
 
@@ -351,25 +351,25 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 	}
 
 	span.SetAttributes(
-		attribute.String("ovm.source.queryType", q.GetType()),
-		attribute.String("ovm.source.queryScope", q.GetScope()),
+		attribute.String("ovm.adapter.queryType", q.GetType()),
+		attribute.String("ovm.adapter.queryScope", q.GetScope()),
 	)
 
-	for _, src := range relevantSources {
+	for _, adapter := range relevantAdapters {
 		if func() bool {
-			// start querying the source after a cache miss
-			ctx, span := tracer.Start(ctx, src.Name(), trace.WithAttributes(
-				attribute.String("ovm.source.method", q.GetMethod().String()),
-				attribute.String("ovm.source.queryMethod", q.GetMethod().String()),
-				attribute.String("ovm.source.queryType", q.GetType()),
-				attribute.String("ovm.source.queryScope", q.GetScope()),
-				attribute.String("ovm.source.name", src.Name()),
-				attribute.String("ovm.source.query", q.GetQuery()),
+			// start querying the adapter after a cache miss
+			ctx, span := tracer.Start(ctx, adapter.Name(), trace.WithAttributes(
+				attribute.String("ovm.adapter.method", q.GetMethod().String()),
+				attribute.String("ovm.adapter.queryMethod", q.GetMethod().String()),
+				attribute.String("ovm.adapter.queryType", q.GetType()),
+				attribute.String("ovm.adapter.queryScope", q.GetScope()),
+				attribute.String("ovm.adapter.name", adapter.Name()),
+				attribute.String("ovm.adapter.query", q.GetQuery()),
 			))
 			defer span.End()
 
 			// Ensure that the span is closed when the context is done. This is based on
-			// the assumption that some sources may not respect the context deadline and
+			// the assumption that some adapters may not respect the context deadline and
 			// may run indefinitely. This ensures that we at least get notified about
 			// it.
 			go func() {
@@ -387,7 +387,7 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 
 			var resultItems []*sdp.Item
 			var err error
-			var sourceDuration time.Duration
+			var adapterDuration time.Duration
 
 			start := time.Now()
 
@@ -395,30 +395,30 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 			case sdp.QueryMethod_GET:
 				var newItem *sdp.Item
 
-				newItem, err = src.Get(ctx, q.GetScope(), q.GetQuery(), q.GetIgnoreCache())
+				newItem, err = adapter.Get(ctx, q.GetScope(), q.GetQuery(), q.GetIgnoreCache())
 
 				if err == nil {
 					resultItems = []*sdp.Item{newItem}
 				}
 			case sdp.QueryMethod_LIST:
-				resultItems, err = src.List(ctx, q.GetScope(), q.GetIgnoreCache())
+				resultItems, err = adapter.List(ctx, q.GetScope(), q.GetIgnoreCache())
 			case sdp.QueryMethod_SEARCH:
-				if searchableSrc, ok := src.(SearchableSource); ok {
-					resultItems, err = searchableSrc.Search(ctx, q.GetScope(), q.GetQuery(), q.GetIgnoreCache())
+				if searchableAdapter, ok := adapter.(SearchableAdapter); ok {
+					resultItems, err = searchableAdapter.Search(ctx, q.GetScope(), q.GetQuery(), q.GetIgnoreCache())
 				} else {
 					err = &sdp.QueryError{
 						ErrorType:   sdp.QueryError_NOTFOUND,
-						ErrorString: "source is not searchable",
+						ErrorString: "adapter is not searchable",
 					}
 				}
 			}
 
-			sourceDuration = time.Since(start)
+			adapterDuration = time.Since(start)
 
 			span.SetAttributes(
-				attribute.Int("ovm.source.numItems", len(resultItems)),
-				attribute.Bool("ovm.source.cache", false),
-				attribute.String("ovm.source.duration", sourceDuration.String()),
+				attribute.Int("ovm.adapter.numItems", len(resultItems)),
+				attribute.Bool("ovm.adapter.cache", false),
+				attribute.String("ovm.adapter.duration", adapterDuration.String()),
 			)
 
 			if considerFailed(err) {
@@ -426,7 +426,7 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 			}
 
 			if err != nil {
-				span.SetAttributes(attribute.String("ovm.source.error", err.Error()))
+				span.SetAttributes(attribute.String("ovm.adapter.error", err.Error()))
 
 				var sdpErr *sdp.QueryError
 				if errors.As(err, &sdpErr) {
@@ -440,8 +440,8 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 						ErrorType:     sdpErr.GetErrorType(),
 						ErrorString:   sdpErr.GetErrorString(),
 						Scope:         scope,
-						SourceName:    src.Name(),
-						ItemType:      src.Type(),
+						SourceName:    adapter.Name(),
+						ItemType:      adapter.Type(),
 						ResponderName: e.Name,
 					})
 				} else {
@@ -450,7 +450,7 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 						ErrorType:     sdp.QueryError_OTHER,
 						ErrorString:   err.Error(),
 						Scope:         q.GetScope(),
-						SourceName:    src.Name(),
+						SourceName:    adapter.Name(),
 						ItemType:      q.GetType(),
 						ResponderName: e.Name,
 					})
@@ -470,14 +470,14 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 				// Store metadata
 				item.Metadata = &sdp.Metadata{
 					Timestamp:             timestamppb.New(time.Now()),
-					SourceDuration:        durationpb.New(sourceDuration),
-					SourceDurationPerItem: durationpb.New(time.Duration(sourceDuration.Nanoseconds() / int64(len(resultItems)))),
-					SourceName:            src.Name(),
+					SourceDuration:        durationpb.New(adapterDuration),
+					SourceDurationPerItem: durationpb.New(time.Duration(adapterDuration.Nanoseconds() / int64(len(resultItems)))),
+					SourceName:            adapter.Name(),
 					SourceQuery:           q,
 				}
 
-				// Mark the item as hidden if the source is a hidden source
-				if hs, ok := src.(HiddenSource); ok {
+				// Mark the item as hidden if the adapter is hidden
+				if hs, ok := adapter.(HiddenAdapter); ok {
 					item.Metadata.Hidden = hs.Hidden()
 				}
 			}
@@ -493,7 +493,7 @@ func (e *Engine) callSources(ctx context.Context, q *sdp.Query, relevantSources 
 
 			return false
 		}() {
-			// `get` queries only return the first source results
+			// `get` queries only return the first adapter results
 			break
 		}
 	}

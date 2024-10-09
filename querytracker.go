@@ -26,7 +26,7 @@ type QueryTracker struct {
 
 // Execute Executes a given item query and publishes results and errors on the
 // relevant nats subjects. Returns the full list of items, errors, and a final
-// error. The final error will be populated if all sources failed, or some other
+// error. The final error will be populated if all adapters failed, or some other
 // error was encountered while trying run the query
 //
 // If the context is cancelled, all query work will stop

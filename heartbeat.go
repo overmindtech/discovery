@@ -43,11 +43,11 @@ func (e *Engine) SendHeartbeat(ctx context.Context) error {
 	// Get available types and scopes
 	availableScopesMap := make(map[string]bool)
 	adapterMetadata := []*sdp.AdapterMetadata{}
-	for _, source := range e.sh.VisibleSources() {
-		for _, scope := range source.Scopes() {
+	for _, adapter := range e.sh.VisibleAdapters() {
+		for _, scope := range adapter.Scopes() {
 			availableScopesMap[scope] = true
 		}
-		metaData := source.Metadata()
+		metaData := adapter.Metadata()
 		adapterMetadata = append(adapterMetadata, &metaData)
 	}
 
@@ -80,9 +80,9 @@ func (e *Engine) SendHeartbeat(ctx context.Context) error {
 
 // Starts sending heartbeats at the specified frequency. These will be sent in
 // the background and this function will return immediately. Heartbeats are
-// automatically started when the engine started, but if a sources has startup
+// automatically started when the engine started, but if an adapter has startup
 // steps that take a long time, or are liable to fail, the user may want to
-// start the heartbeats first so that users can see that the source has failed
+// start the heartbeats first so that users can see that the adapter has failed
 // to start.
 //
 // If this is called multiple times, nothing will happen. Heartbeats will be

@@ -17,7 +17,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func newStartedEngine(t *testing.T, name string, no *auth.NATSOptions, sources ...Source) *Engine {
+func newStartedEngine(t *testing.T, name string, no *auth.NATSOptions, adapters ...Adapter) *Engine {
 	e, err := NewEngine()
 	if err != nil {
 		t.Fatalf("Error initializing Engine: %v", err)
@@ -39,7 +39,7 @@ func newStartedEngine(t *testing.T, name string, no *auth.NATSOptions, sources .
 	e.NATSQueueName = "test"
 	e.MaxParallelExecutions = 10
 
-	e.AddSources(sources...)
+	e.AddAdapters(adapters...)
 
 	err = e.Start()
 	if err != nil {
@@ -186,11 +186,11 @@ func TestNats(t *testing.T) {
 	e.NATSQueueName = "test"
 	e.MaxParallelExecutions = 10
 
-	src := TestSource{}
+	src := TestAdapter{}
 
-	e.AddSources(
+	e.AddAdapters(
 		&src,
-		&TestSource{
+		&TestAdapter{
 			ReturnScopes: []string{
 				sdp.WILDCARD,
 			},
@@ -282,13 +282,13 @@ func TestNatsCancel(t *testing.T) {
 	e.NATSQueueName = "test"
 	e.MaxParallelExecutions = 1
 
-	src := SpeedTestSource{
+	src := SpeedTestAdapter{
 		QueryDelay:   2 * time.Second,
 		ReturnType:   "person",
 		ReturnScopes: []string{"test"},
 	}
 
-	e.AddSources(&src)
+	e.AddAdapters(&src)
 
 	t.Run("Starting", func(t *testing.T) {
 		err := e.Start()
@@ -589,11 +589,11 @@ func TestNatsAuth(t *testing.T) {
 	e.NATSQueueName = "test"
 	e.MaxParallelExecutions = 10
 
-	src := TestSource{}
+	src := TestAdapter{}
 
-	e.AddSources(
+	e.AddAdapters(
 		&src,
-		&TestSource{
+		&TestAdapter{
 			ReturnScopes: []string{
 				sdp.WILDCARD,
 			},

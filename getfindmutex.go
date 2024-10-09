@@ -9,7 +9,7 @@ import (
 // only one List lock. A waiting List lock (even if it hasn't been locked, just
 // if someone is waiting) blocks all other get locks until it unlocks.
 //
-// The intended usage of this is that it will allow a source which is trying to
+// The intended usage of this is that it will allow an adapter which is trying to
 // process many queries at once, to process a LIST query before any GET
 // queries, since it's likely that once LIST has been run, subsequent GET
 // queries will be able to be served from cache

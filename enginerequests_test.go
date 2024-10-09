@@ -13,7 +13,7 @@ import (
 )
 
 func TestExecuteQuery(t *testing.T) {
-	src := TestSource{
+	src := TestAdapter{
 		ReturnType:   "person",
 		ReturnScopes: []string{"test"},
 	}
@@ -50,7 +50,7 @@ func TestExecuteQuery(t *testing.T) {
 		}
 
 		if x := len(src.GetCalls); x != 1 {
-			t.Errorf("expected source's Get() to have been called 1 time, got %v", x)
+			t.Errorf("expected adapter's Get() to have been called 1 time, got %v", x)
 		}
 
 		if len(items) == 0 {
@@ -64,7 +64,7 @@ func TestExecuteQuery(t *testing.T) {
 		item := items[0]
 
 		if item.GetMetadata().GetSourceQuery() != q {
-			t.Error("source query mismatch")
+			t.Error("adapter query mismatch")
 		}
 	})
 
@@ -175,7 +175,7 @@ func TestExecuteQuery(t *testing.T) {
 }
 
 func TestHandleQuery(t *testing.T) {
-	personSource := TestSource{
+	personAdapter := TestAdapter{
 		ReturnType: "person",
 		ReturnScopes: []string{
 			"test1",
@@ -183,7 +183,7 @@ func TestHandleQuery(t *testing.T) {
 		},
 	}
 
-	dogSource := TestSource{
+	dogAdapter := TestAdapter{
 		ReturnType: "dog",
 		ReturnScopes: []string{
 			"test1",
@@ -192,12 +192,12 @@ func TestHandleQuery(t *testing.T) {
 		},
 	}
 
-	e := newStartedEngine(t, "TestHandleQuery", nil, &personSource, &dogSource)
+	e := newStartedEngine(t, "TestHandleQuery", nil, &personAdapter, &dogAdapter)
 
 	t.Run("Wildcard type should be expanded", func(t *testing.T) {
 		t.Cleanup(func() {
-			personSource.ClearCalls()
-			dogSource.ClearCalls()
+			personAdapter.ClearCalls()
+			dogAdapter.ClearCalls()
 		})
 
 		req := sdp.Query{
@@ -213,20 +213,20 @@ func TestHandleQuery(t *testing.T) {
 		// Run the handler
 		e.HandleQuery(context.Background(), &req)
 
-		// I'm expecting both sources to get a query since the type was *
-		if l := len(personSource.GetCalls); l != 1 {
+		// I'm expecting both adapter to get a query since the type was *
+		if l := len(personAdapter.GetCalls); l != 1 {
 			t.Errorf("expected person backend to have 1 Get call, got %v", l)
 		}
 
-		if l := len(dogSource.GetCalls); l != 1 {
+		if l := len(dogAdapter.GetCalls); l != 1 {
 			t.Errorf("expected dog backend to have 1 Get call, got %v", l)
 		}
 	})
 
 	t.Run("Wildcard scope should be expanded", func(t *testing.T) {
 		t.Cleanup(func() {
-			personSource.ClearCalls()
-			dogSource.ClearCalls()
+			personAdapter.ClearCalls()
+			dogAdapter.ClearCalls()
 		})
 
 		req := sdp.Query{
@@ -242,27 +242,27 @@ func TestHandleQuery(t *testing.T) {
 		// Run the handler
 		e.HandleQuery(context.Background(), &req)
 
-		if l := len(personSource.GetCalls); l != 2 {
+		if l := len(personAdapter.GetCalls); l != 2 {
 			t.Errorf("expected person backend to have 2 Get calls, got %v", l)
 		}
 
-		if l := len(dogSource.GetCalls); l != 0 {
+		if l := len(dogAdapter.GetCalls); l != 0 {
 			t.Errorf("expected dog backend to have 0 Get calls, got %v", l)
 		}
 	})
 
 }
 
-func TestWildcardSourceExpansion(t *testing.T) {
+func TestWildcardAdapterExpansion(t *testing.T) {
 
-	personSource := TestSource{
+	personAdapter := TestAdapter{
 		ReturnType: "person",
 		ReturnScopes: []string{
 			sdp.WILDCARD,
 		},
 	}
 
-	e := newStartedEngine(t, "TestWildcardSourceExpansion", nil, &personSource)
+	e := newStartedEngine(t, "TestWildcardAdapterExpansion", nil, &personAdapter)
 
 	t.Run("query scope should be preserved", func(t *testing.T) {
 		req := sdp.Query{
@@ -278,11 +278,11 @@ func TestWildcardSourceExpansion(t *testing.T) {
 		// Run the handler
 		e.HandleQuery(context.Background(), &req)
 
-		if len(personSource.GetCalls) != 1 {
-			t.Errorf("expected 1 get call got %v", len(personSource.GetCalls))
+		if len(personAdapter.GetCalls) != 1 {
+			t.Errorf("expected 1 get call got %v", len(personAdapter.GetCalls))
 		}
 
-		call := personSource.GetCalls[0]
+		call := personAdapter.GetCalls[0]
 
 		if expected := "something.specific"; call[0] != expected {
 			t.Errorf("expected scope to be %v, got %v", expected, call[0])
@@ -303,7 +303,7 @@ func TestSendQuerySync(t *testing.T) {
 	ctx, span := tracing.Tracer().Start(ctx, "TestSendQuerySync")
 	defer span.End()
 
-	src := TestSource{
+	src := TestAdapter{
 		ReturnType: "person",
 		ReturnScopes: []string{
 			"test",
@@ -358,8 +358,8 @@ func TestSendQuerySync(t *testing.T) {
 }
 
 func TestExpandQuery(t *testing.T) {
-	t.Run("with a single source with a single scope", func(t *testing.T) {
-		simple := TestSource{
+	t.Run("with a single adapter with a single scope", func(t *testing.T) {
+		simple := TestAdapter{
 			ReturnScopes: []string{
 				"test1",
 			},
@@ -378,8 +378,8 @@ func TestExpandQuery(t *testing.T) {
 		}
 	})
 
-	t.Run("with a single source with many scopes", func(t *testing.T) {
-		many := TestSource{
+	t.Run("with a single adapter with many scopes", func(t *testing.T) {
+		many := TestAdapter{
 			ReturnName: "many",
 			ReturnScopes: []string{
 				"test1",
@@ -401,15 +401,15 @@ func TestExpandQuery(t *testing.T) {
 		}
 	})
 
-	t.Run("with many sources with single scopes", func(t *testing.T) {
-		sx := TestSource{
+	t.Run("with many adapters with single scopes", func(t *testing.T) {
+		sx := TestAdapter{
 			ReturnName: "sx",
 			ReturnScopes: []string{
 				"test1",
 			},
 		}
 
-		sy := TestSource{
+		sy := TestAdapter{
 			ReturnName: "sy",
 			ReturnScopes: []string{
 				"test2",
@@ -433,8 +433,8 @@ func TestExpandQuery(t *testing.T) {
 		}
 	})
 
-	t.Run("with many sources with many scopes", func(t *testing.T) {
-		sx := TestSource{
+	t.Run("with many adapters with many scopes", func(t *testing.T) {
+		sx := TestAdapter{
 			ReturnName: "sx",
 			ReturnScopes: []string{
 				"test1",
@@ -443,7 +443,7 @@ func TestExpandQuery(t *testing.T) {
 			},
 		}
 
-		sy := TestSource{
+		sy := TestAdapter{
 			ReturnName: "sy",
 			ReturnScopes: []string{
 				"test4",
@@ -470,8 +470,8 @@ func TestExpandQuery(t *testing.T) {
 		}
 	})
 
-	t.Run("with many sources with many scopes which overlap GET", func(t *testing.T) {
-		sx := TestSource{
+	t.Run("with many adapters with many scopes which overlap GET", func(t *testing.T) {
+		sx := TestAdapter{
 			ReturnName: "sx",
 			ReturnScopes: []string{
 				"test1",
@@ -481,7 +481,7 @@ func TestExpandQuery(t *testing.T) {
 			ReturnWeight: 10,
 		}
 
-		sy := TestSource{
+		sy := TestAdapter{
 			ReturnName: "sy",
 			ReturnScopes: []string{
 				"test2",
@@ -509,8 +509,8 @@ func TestExpandQuery(t *testing.T) {
 		}
 	})
 
-	t.Run("with many sources with many scopes which overlap LIST", func(t *testing.T) {
-		sx := TestSource{
+	t.Run("with many adapters with many scopes which overlap LIST", func(t *testing.T) {
+		sx := TestAdapter{
 			ReturnName: "sx",
 			ReturnScopes: []string{
 				"test1",
@@ -519,7 +519,7 @@ func TestExpandQuery(t *testing.T) {
 			},
 		}
 
-		sy := TestSource{
+		sy := TestAdapter{
 			ReturnName: "sy",
 			ReturnScopes: []string{
 				"test2",
@@ -546,8 +546,8 @@ func TestExpandQuery(t *testing.T) {
 		}
 	})
 
-	t.Run("with a single wildcard source", func(t *testing.T) {
-		sx := TestSource{
+	t.Run("with a single wildcard adapter", func(t *testing.T) {
+		sx := TestAdapter{
 			ReturnName: "sx",
 			ReturnScopes: []string{
 				sdp.WILDCARD,
@@ -568,22 +568,22 @@ func TestExpandQuery(t *testing.T) {
 		}
 	})
 
-	t.Run("with a many wildcard sources", func(t *testing.T) {
-		sx := TestSource{
+	t.Run("with a many wildcard adapters", func(t *testing.T) {
+		sx := TestAdapter{
 			ReturnName: "sx",
 			ReturnScopes: []string{
 				sdp.WILDCARD,
 			},
 		}
 
-		sy := TestSource{
+		sy := TestAdapter{
 			ReturnName: "sy",
 			ReturnScopes: []string{
 				sdp.WILDCARD,
 			},
 		}
 
-		sz := TestSource{
+		sz := TestAdapter{
 			ReturnName: "sz",
 			ReturnScopes: []string{
 				sdp.WILDCARD,
@@ -612,22 +612,22 @@ func TestExpandQuery(t *testing.T) {
 		}
 	})
 
-	t.Run("with a many wildcard sources and static sources", func(t *testing.T) {
-		sx := TestSource{
+	t.Run("with a many wildcard adapters and static adapters", func(t *testing.T) {
+		sx := TestAdapter{
 			ReturnName: "sx",
 			ReturnScopes: []string{
 				sdp.WILDCARD,
 			},
 		}
 
-		sy := TestSource{
+		sy := TestAdapter{
 			ReturnName: "sy",
 			ReturnScopes: []string{
 				"test1",
 			},
 		}
 
-		sz := TestSource{
+		sz := TestAdapter{
 			ReturnName: "sz",
 			ReturnScopes: []string{
 				"test2",

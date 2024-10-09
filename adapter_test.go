@@ -8,23 +8,23 @@ import (
 	"github.com/overmindtech/sdp-go"
 )
 
-func TestEngineAddSources(t *testing.T) {
+func TestEngineAddAdapters(t *testing.T) {
 	e, err := NewEngine()
 	if err != nil {
 		t.Fatalf("Error initializing Engine: %v", err)
 	}
 
-	src := TestSource{}
+	src := TestAdapter{}
 
-	e.AddSources(&src)
+	e.AddAdapters(&src)
 
-	if x := len(e.sh.Sources()); x != 4 {
-		t.Fatalf("Expected 4 source, got %v", x)
+	if x := len(e.sh.Adapters()); x != 4 {
+		t.Fatalf("Expected 4 adapters, got %v", x)
 	}
 }
 
 func TestGet(t *testing.T) {
-	src := TestSource{
+	src := TestAdapter{
 		ReturnName: "orange",
 		ReturnScopes: []string{
 			"test",
@@ -73,7 +73,7 @@ func TestGet(t *testing.T) {
 		})
 
 		if err == nil {
-			t.Error("expected all sources failed")
+			t.Error("expected all adapters failed")
 		}
 
 		if len(errs) == 1 {
@@ -86,8 +86,8 @@ func TestGet(t *testing.T) {
 			if errs[0].GetScope() != "empty" {
 				t.Errorf("expected Scope to be '%v', got '%v'", "empty", errs[0].GetScope())
 			}
-			if errs[0].GetSourceName() != "testSource-orange" {
-				t.Errorf("expected SourceName to be '%v', got '%v'", "testSource-orange", errs[0].GetSourceName())
+			if errs[0].GetSourceName() != "testAdapter-orange" {
+				t.Errorf("expected Adapter name to be '%v', got '%v'", "testAdapter-orange", errs[0].GetSourceName())
 			}
 			if errs[0].GetItemType() != "person" {
 				t.Errorf("expected ItemType to be '%v', got '%v'", "person", errs[0].GetItemType())
@@ -235,7 +235,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	src := TestSource{}
+	src := TestAdapter{}
 
 	e := newStartedEngine(t, "TestList", nil, &src)
 
@@ -260,7 +260,7 @@ func TestList(t *testing.T) {
 }
 
 func TestSearch(t *testing.T) {
-	src := TestSource{}
+	src := TestAdapter{}
 
 	e := newStartedEngine(t, "TestSearch", nil, &src)
 
@@ -286,7 +286,7 @@ func TestSearch(t *testing.T) {
 }
 
 func TestListSearchCaching(t *testing.T) {
-	src := TestSource{
+	src := TestAdapter{
 		ReturnScopes: []string{
 			"test",
 			"empty",
@@ -558,7 +558,7 @@ func TestSearchGetCaching(t *testing.T) {
 	// We want to be sure that if an item has been found via a search and
 	// cached, the cache will be hit if a Get is run for that particular item
 
-	src := TestSource{
+	src := TestAdapter{
 		ReturnScopes: []string{
 			"test",
 		},

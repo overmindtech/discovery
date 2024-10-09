@@ -11,13 +11,13 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-type SpeedTestSource struct {
+type SpeedTestAdapter struct {
 	QueryDelay   time.Duration
 	ReturnType   string
 	ReturnScopes []string
 }
 
-func (s *SpeedTestSource) Type() string {
+func (s *SpeedTestAdapter) Type() string {
 	if s.ReturnType != "" {
 		return s.ReturnType
 	}
@@ -25,11 +25,11 @@ func (s *SpeedTestSource) Type() string {
 	return "person"
 }
 
-func (s *SpeedTestSource) Name() string {
-	return "SpeedTestSource"
+func (s *SpeedTestAdapter) Name() string {
+	return "SpeedTestAdapter"
 }
 
-func (s *SpeedTestSource) Scopes() []string {
+func (s *SpeedTestAdapter) Scopes() []string {
 	if len(s.ReturnScopes) > 0 {
 		return s.ReturnScopes
 	}
@@ -37,11 +37,11 @@ func (s *SpeedTestSource) Scopes() []string {
 	return []string{"test"}
 }
 
-func (s *SpeedTestSource) Metadata() sdp.AdapterMetadata {
+func (s *SpeedTestAdapter) Metadata() sdp.AdapterMetadata {
 	return sdp.AdapterMetadata{}
 }
 
-func (s *SpeedTestSource) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
+func (s *SpeedTestAdapter) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
 	select {
 	case <-time.After(s.QueryDelay):
 		return &sdp.Item{
@@ -80,18 +80,18 @@ func (s *SpeedTestSource) Get(ctx context.Context, scope string, query string, i
 
 }
 
-func (s *SpeedTestSource) List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error) {
+func (s *SpeedTestAdapter) List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error) {
 	item, err := s.Get(ctx, scope, "dylan", ignoreCache)
 
 	return []*sdp.Item{item}, err
 }
 
-func (s *SpeedTestSource) Weight() int {
+func (s *SpeedTestAdapter) Weight() int {
 	return 10
 }
 
 func TestExecute(t *testing.T) {
-	src := TestSource{
+	src := TestAdapter{
 		ReturnType: "person",
 		ReturnScopes: []string{
 			"test",
@@ -171,7 +171,7 @@ func TestExecute(t *testing.T) {
 }
 
 func TestTimeout(t *testing.T) {
-	src := SpeedTestSource{
+	src := SpeedTestAdapter{
 		QueryDelay: 100 * time.Millisecond,
 	}
 	e := newStartedEngine(t, "TestTimeout", nil, &src)

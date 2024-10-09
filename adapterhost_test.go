@@ -9,55 +9,55 @@ import (
 type ExpectExpand struct {
 	NumQueries int
 
-	// Note that this is not the number of unique sources, but teh number of
-	// sources total. So if a source would be hit twice this will be 2
-	NumSources int
+	// Note that this is not the number of unique adapters, but teh number of
+	// adapters total. So if a adapter would be hit twice this will be 2
+	NumAdapters int
 }
 
-func (e *ExpectExpand) Validate(t *testing.T, m map[*sdp.Query][]Source) {
+func (e *ExpectExpand) Validate(t *testing.T, m map[*sdp.Query][]Adapter) {
 	t.Helper()
 
-	numSources := 0
+	numAdapters := 0
 	numQueries := 0
 
 	for _, v := range m {
 		numQueries++
-		numSources = numSources + len(v)
+		numAdapters = numAdapters + len(v)
 	}
 
 	if e.NumQueries != numQueries {
 		t.Errorf("Expected %v queries, got %v: %v", e.NumQueries, numQueries, m)
 	}
 
-	if e.NumSources != numSources {
-		t.Errorf("Expected %v sources, got %v: %v", e.NumSources, numSources, m)
+	if e.NumAdapters != numAdapters {
+		t.Errorf("Expected %v adapters, got %v: %v", e.NumAdapters, numAdapters, m)
 	}
 }
 
-func TestSourceHostExpandQuery(t *testing.T) {
-	sh := NewSourceHost()
+func TestAdapterHostExpandQuery(t *testing.T) {
+	sh := NewAdapterHost()
 
-	sh.AddSources(
-		&TestSource{
+	sh.AddAdapters(
+		&TestAdapter{
 			ReturnScopes: []string{"test"},
 			ReturnType:   "person",
 		},
-		&TestSource{
+		&TestAdapter{
 			ReturnScopes: []string{"test"},
 			ReturnType:   "fish",
 		},
-		&TestSource{
+		&TestAdapter{
 			ReturnScopes: []string{sdp.WILDCARD},
 			ReturnType:   "person",
 		},
-		&TestSource{
+		&TestAdapter{
 			ReturnScopes: []string{
 				"multiA",
 				"multiB",
 			},
 			ReturnType: "chair",
 		},
-		&TestSource{
+		&TestAdapter{
 			ReturnScopes: []string{"test"},
 			ReturnType:   "hidden_person",
 			IsHidden:     true,
@@ -71,8 +71,8 @@ func TestSourceHostExpandQuery(t *testing.T) {
 		}
 
 		ee := ExpectExpand{
-			NumQueries: 1,
-			NumSources: 1,
+			NumQueries:  1,
+			NumAdapters: 1,
 		}
 
 		ee.Validate(t, sh.ExpandQuery(&req))
@@ -85,8 +85,8 @@ func TestSourceHostExpandQuery(t *testing.T) {
 		}
 
 		ee := ExpectExpand{
-			NumQueries: 0,
-			NumSources: 0,
+			NumQueries:  0,
+			NumAdapters: 0,
 		}
 
 		ee.Validate(t, sh.ExpandQuery(&req))
@@ -99,8 +99,8 @@ func TestSourceHostExpandQuery(t *testing.T) {
 		}
 
 		ee := ExpectExpand{
-			NumQueries: 1,
-			NumSources: 2,
+			NumQueries:  1,
+			NumAdapters: 2,
 		}
 
 		ee.Validate(t, sh.ExpandQuery(&req))
@@ -113,8 +113,8 @@ func TestSourceHostExpandQuery(t *testing.T) {
 		}
 
 		ee := ExpectExpand{
-			NumQueries: 1,
-			NumSources: 1,
+			NumQueries:  1,
+			NumAdapters: 1,
 		}
 
 		ee.Validate(t, sh.ExpandQuery(&req))
@@ -127,8 +127,8 @@ func TestSourceHostExpandQuery(t *testing.T) {
 		}
 
 		ee := ExpectExpand{
-			NumQueries: 2,
-			NumSources: 2,
+			NumQueries:  2,
+			NumAdapters: 2,
 		}
 
 		ee.Validate(t, sh.ExpandQuery(&req))
@@ -139,8 +139,8 @@ func TestSourceHostExpandQuery(t *testing.T) {
 		}
 
 		ee = ExpectExpand{
-			NumQueries: 2,
-			NumSources: 2,
+			NumQueries:  2,
+			NumAdapters: 2,
 		}
 
 		ee.Validate(t, sh.ExpandQuery(&req))
@@ -153,8 +153,8 @@ func TestSourceHostExpandQuery(t *testing.T) {
 		}
 
 		ee := ExpectExpand{
-			NumQueries: 2,
-			NumSources: 3,
+			NumQueries:  2,
+			NumAdapters: 3,
 		}
 
 		ee.Validate(t, sh.ExpandQuery(&req))
@@ -167,8 +167,8 @@ func TestSourceHostExpandQuery(t *testing.T) {
 		}
 
 		ee := ExpectExpand{
-			NumQueries: 5,
-			NumSources: 5,
+			NumQueries:  5,
+			NumAdapters: 5,
 		}
 
 		ee.Validate(t, sh.ExpandQuery(&req))
@@ -181,20 +181,20 @@ func TestSourceHostExpandQuery(t *testing.T) {
 		}
 
 		ee := ExpectExpand{
-			NumQueries: 3,
-			NumSources: 3,
+			NumQueries:  3,
+			NumAdapters: 3,
 		}
 
 		ee.Validate(t, sh.ExpandQuery(&req))
 	})
 
-	t.Run("Listing hidden source with wildcard scope", func(t *testing.T) {
+	t.Run("Listing hidden adapter with wildcard scope", func(t *testing.T) {
 		req := sdp.Query{
 			Type:  "hidden_person",
 			Scope: sdp.WILDCARD,
 		}
 		if x := len(sh.ExpandQuery(&req)); x != 0 {
-			t.Errorf("expected to find 0 sources, found %v", x)
+			t.Errorf("expected to find 0 adapters, found %v", x)
 		}
 
 		req = sdp.Query{
@@ -202,19 +202,19 @@ func TestSourceHostExpandQuery(t *testing.T) {
 			Scope: "test",
 		}
 		if x := len(sh.ExpandQuery(&req)); x != 1 {
-			t.Errorf("expected to find 1 sources, found %v", x)
+			t.Errorf("expected to find 1 adapter, found %v", x)
 		}
 	})
 }
 
-func TestSourceHostAddSources(t *testing.T) {
-	sh := NewSourceHost()
+func TestAdapterHostAddAdapters(t *testing.T) {
+	sh := NewAdapterHost()
 
-	src := TestSource{}
+	src := TestAdapter{}
 
-	sh.AddSources(&src)
+	sh.AddAdapters(&src)
 
-	if x := len(sh.Sources()); x != 4 {
-		t.Fatalf("Expected 4 source, got %v", x)
+	if x := len(sh.Adapters()); x != 4 {
+		t.Fatalf("Expected 4 adapters, got %v", x)
 	}
 }
