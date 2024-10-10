@@ -22,7 +22,7 @@ Look at the tests for some simple examples of starting and running an engine, or
 
 ## Triggers
 
-Triggers allow source developers to have their source be triggered by the discover of other items on the NATS network. This allows for a pattern where a source is triggered by a relevant resource being discovered by another query, rather than by being queried directly. This can be used to write secondary sources that fire automatically e.g.
+Triggers allow source developers to have their source be triggered by the discover of other items on the NATS network. This allows for a pattern where a source is triggered by a relevant resource being discovered by another query, rather than by being queried directly. This can be used to write secondary adapters that fire automatically e.g.
 
 > When a package with the name "nginx" is found in any scope, the source should be triggered to try to find the config file for nginx in this scope, parse it, and return more detailed information.
 
@@ -54,15 +54,15 @@ var trigger = Trigger{
 
 When the above trigger fires it will result in the engine that it is assigned to processing a SEARCH query as defined above. Note that while only the `Type`, `Method` and `Query` attributes have been specified, the rest will be filled in automatically with data from the `Metadata.SourceQuery` of the originating item to ensure that the responses are sent to the user that originated the query.
 
-## Default Sources
+## Default Adapters
 
 ### `overmind-source`
 
-This source returns information about other sources as SDP items. Can be used to inventory what sources are available.
+This source returns information about other adapters as SDP items. Can be used to inventory what adapters are available.
 
 Methods:
 
-* [x] `Get()`: Returns sources by their descriptive name
+* [x] `Get()`: Returns adapters by their descriptive name
 * [x] `List()`
 * [ ] `Search()`
 

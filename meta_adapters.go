@@ -10,17 +10,21 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-type TypeSource struct {
-	// The SourceHost to query sources from
-	sh *SourceHost
+type TypeAdapter struct {
+	// The SourceHost to query adapters from
+	sh *AdapterHost
 }
 
-func (t *TypeSource) Type() string {
+func (t *TypeAdapter) Type() string {
 	return "overmind-type"
 }
 
-func (t *TypeSource) Name() string {
-	return "overmind-type-metasource"
+func (t *TypeAdapter) Name() string {
+	return "overmind-type-meta-source"
+}
+
+func (t *TypeAdapter) Metadata() sdp.AdapterMetadata {
+	return sdp.AdapterMetadata{}
 }
 
 func newTypeItem(typ string) *sdp.Item {
@@ -38,7 +42,7 @@ func newTypeItem(typ string) *sdp.Item {
 	}
 }
 
-func (t *TypeSource) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
+func (t *TypeAdapter) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
 	if !strings.Contains("global", scope) {
 		return nil, &sdp.QueryError{
 			ErrorType:   sdp.QueryError_NOSCOPE,
@@ -46,19 +50,19 @@ func (t *TypeSource) Get(ctx context.Context, scope string, query string, ignore
 		}
 	}
 
-	sources := t.sh.SourcesByType(query)
+	adapters := t.sh.AdaptersByType(query)
 
-	if len(sources) == 0 {
+	if len(adapters) == 0 {
 		return nil, &sdp.QueryError{
 			ErrorType:   sdp.QueryError_NOTFOUND,
 			ErrorString: fmt.Sprintf("type '%v' not found", query),
 		}
 	}
 
-	return newTypeItem(sources[0].Type()), nil
+	return newTypeItem(adapters[0].Type()), nil
 }
 
-func (t *TypeSource) List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error) {
+func (t *TypeAdapter) List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error) {
 	if !strings.Contains("global", scope) {
 		return nil, &sdp.QueryError{
 			ErrorType:   sdp.QueryError_NOSCOPE,
@@ -66,16 +70,16 @@ func (t *TypeSource) List(ctx context.Context, scope string, ignoreCache bool) (
 		}
 	}
 
-	typesMap := make(map[string][]Source)
+	typesMap := make(map[string][]Adapter)
 
-	for _, source := range t.sh.Sources() {
-		if hiddenSource, ok := source.(HiddenSource); ok {
+	for _, adapter := range t.sh.Adapters() {
+		if hiddenSource, ok := adapter.(HiddenAdapter); ok {
 			if hiddenSource.Hidden() {
-				// Skip hidden sources on list
+				// Skip hidden adapters on list
 				continue
 			}
 		}
-		typesMap[source.Type()] = append(typesMap[source.Type()], source)
+		typesMap[adapter.Type()] = append(typesMap[adapter.Type()], adapter)
 	}
 
 	items := make([]*sdp.Item, 0)
@@ -88,37 +92,41 @@ func (t *TypeSource) List(ctx context.Context, scope string, ignoreCache bool) (
 }
 
 // Scopes Returns just global since all the Overmind types are global
-func (m *TypeSource) Scopes() []string {
+func (m *TypeAdapter) Scopes() []string {
 	return []string{"global"}
 }
 
-// Weight Default weight to satisfy `Source` interface
-func (m *TypeSource) Weight() int {
+// Weight Default weight to satisfy `adapter` interface
+func (m *TypeAdapter) Weight() int {
 	return 100
 }
 
 // DefaultCacheDuration Defaults to a vary low value since these resources
 // aren't expensive to get
-func (m *TypeSource) DefaultCacheDuration() time.Duration {
+func (m *TypeAdapter) DefaultCacheDuration() time.Duration {
 	return time.Second
 }
 
 // Hidden These resources should be hidden
-func (m *TypeSource) Hidden() bool {
+func (m *TypeAdapter) Hidden() bool {
 	return true
 }
 
-type ScopeSource struct {
-	// The SourceHost to query sources from
-	sh *SourceHost
+type ScopeAdapter struct {
+	// The AdapterHost to query adapters from
+	sh *AdapterHost
 }
 
-func (t *ScopeSource) Type() string {
+func (t *ScopeAdapter) Type() string {
 	return "overmind-scope"
 }
 
-func (t *ScopeSource) Name() string {
-	return "overmind-scope-metasource"
+func (t *ScopeAdapter) Name() string {
+	return "overmind-scope-meta-adapter"
+}
+
+func (t *ScopeAdapter) Metadata() sdp.AdapterMetadata {
+	return sdp.AdapterMetadata{}
 }
 
 func newScopeItem(scope string) *sdp.Item {
@@ -136,7 +144,7 @@ func newScopeItem(scope string) *sdp.Item {
 	}
 }
 
-func (t *ScopeSource) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
+func (t *ScopeAdapter) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
 	if !strings.Contains("global", scope) {
 		return nil, &sdp.QueryError{
 			ErrorType:   sdp.QueryError_NOSCOPE,
@@ -144,8 +152,8 @@ func (t *ScopeSource) Get(ctx context.Context, scope string, query string, ignor
 		}
 	}
 
-	for _, source := range t.sh.Sources() {
-		for _, scope := range source.Scopes() {
+	for _, adapter := range t.sh.Adapters() {
+		for _, scope := range adapter.Scopes() {
 			if scope == query {
 				return newScopeItem(scope), nil
 			}
@@ -158,7 +166,7 @@ func (t *ScopeSource) Get(ctx context.Context, scope string, query string, ignor
 	}
 }
 
-func (t *ScopeSource) List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error) {
+func (t *ScopeAdapter) List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error) {
 	if !strings.Contains("global", scope) {
 		return nil, &sdp.QueryError{
 			ErrorType:   sdp.QueryError_NOSCOPE,
@@ -168,15 +176,15 @@ func (t *ScopeSource) List(ctx context.Context, scope string, ignoreCache bool) 
 
 	scopesMap := make(map[string]bool)
 
-	for _, source := range t.sh.Sources() {
-		if hiddenSource, ok := source.(HiddenSource); ok {
-			if hiddenSource.Hidden() {
-				// Skip hidden sources on list
+	for _, adapter := range t.sh.Adapters() {
+		if hiddenAdapter, ok := adapter.(HiddenAdapter); ok {
+			if hiddenAdapter.Hidden() {
+				// Skip hidden adapters on list
 				continue
 			}
 		}
 
-		for _, scope := range source.Scopes() {
+		for _, scope := range adapter.Scopes() {
 			scopesMap[scope] = true
 		}
 	}
@@ -191,50 +199,54 @@ func (t *ScopeSource) List(ctx context.Context, scope string, ignoreCache bool) 
 }
 
 // Scopes Returns just global since all the Overmind types are global
-func (m *ScopeSource) Scopes() []string {
+func (m *ScopeAdapter) Scopes() []string {
 	return []string{"global"}
 }
 
-// Weight Default weight to satisfy `Source` interface
-func (m *ScopeSource) Weight() int {
+// Weight Default weight to satisfy `Adapter` interface
+func (m *ScopeAdapter) Weight() int {
 	return 100
 }
 
 // DefaultCacheDuration Defaults to a vary low value since these resources
 // aren't expensive to get
-func (m *ScopeSource) DefaultCacheDuration() time.Duration {
+func (m *ScopeAdapter) DefaultCacheDuration() time.Duration {
 	return time.Second
 }
 
 // Hidden These resources should be hidden
-func (m *ScopeSource) Hidden() bool {
+func (m *ScopeAdapter) Hidden() bool {
 	return true
 }
 
-// SourcesSource A source which returns the details of all running sources as
+// SourcesAdapter A source which returns the details of all running adapter as
 // items
-type SourcesSource struct {
-	sh *SourceHost
+type SourcesAdapter struct {
+	sh *AdapterHost
 
 	SearchResultsLimit int
 }
 
-func (s *SourcesSource) Type() string {
-	return "overmind-source"
+func (s *SourcesAdapter) Type() string {
+	return "overmind-adapter"
 }
 
-func (s *SourcesSource) Name() string {
-	return "overmind-source-metasource"
+func (s *SourcesAdapter) Name() string {
+	return "overmind-adapter-meta-adapter"
 }
 
-func (s *SourcesSource) Scopes() []string {
+func (s *SourcesAdapter) Metadata() sdp.AdapterMetadata {
+	return sdp.AdapterMetadata{}
+}
+
+func (s *SourcesAdapter) Scopes() []string {
 	return []string{"global"}
 }
 
-func (s *SourcesSource) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
-	for _, src := range s.sh.Sources() {
+func (s *SourcesAdapter) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
+	for _, src := range s.sh.Adapters() {
 		if src.Name() == query {
-			return s.sourceToItem(src)
+			return s.adapterToItem(src)
 		}
 	}
 
@@ -243,15 +255,15 @@ func (s *SourcesSource) Get(ctx context.Context, scope string, query string, ign
 	}
 }
 
-func (s *SourcesSource) List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error) {
-	sources := s.sh.Sources()
-	items := make([]*sdp.Item, len(sources))
+func (s *SourcesAdapter) List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error) {
+	adapters := s.sh.Adapters()
+	items := make([]*sdp.Item, len(adapters))
 
 	var item *sdp.Item
 	var err error
 
-	for i, src := range sources {
-		item, err = s.sourceToItem(src)
+	for i, src := range adapters {
+		item, err = s.adapterToItem(src)
 
 		if err != nil {
 			return nil, sdp.NewQueryError(err)
@@ -263,27 +275,27 @@ func (s *SourcesSource) List(ctx context.Context, scope string, ignoreCache bool
 	return items, nil
 }
 
-func (s *SourcesSource) Hidden() bool {
+func (s *SourcesAdapter) Hidden() bool {
 	return true
 }
 
-func (s *SourcesSource) Weight() int {
+func (s *SourcesAdapter) Weight() int {
 	return 100
 }
 
-func (s *SourcesSource) sourceToItem(src Source) (*sdp.Item, error) {
+func (s *SourcesAdapter) adapterToItem(src Adapter) (*sdp.Item, error) {
 	attrMap := make(map[string]interface{})
 
 	attrMap["name"] = src.Name()
 	attrMap["scopes"] = src.Scopes()
 	attrMap["weight"] = src.Weight()
 
-	_, searchable := src.(SearchableSource)
+	_, searchable := src.(SearchableAdapter)
 	attrMap["searchable"] = searchable
 
 	var hidden bool
 
-	if h, ok := src.(HiddenSource); ok {
+	if h, ok := src.(HiddenAdapter); ok {
 		hidden = h.Hidden()
 	} else {
 		hidden = false

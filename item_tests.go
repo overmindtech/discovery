@@ -1,4 +1,4 @@
-// Reusable testing libraries for testing sources
+// Reusable testing libraries for testing adapters
 package discovery
 
 import (

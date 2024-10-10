@@ -36,7 +36,7 @@ func RandomName() string {
 
 var generation atomic.Int32
 
-func (s *TestSource) NewTestItem(scope string, query string) *sdp.Item {
+func (s *TestAdapter) NewTestItem(scope string, query string) *sdp.Item {
 	gen := generation.Add(1)
 	return &sdp.Item{
 		Type:            s.Type(),
@@ -64,7 +64,7 @@ func (s *TestSource) NewTestItem(scope string, query string) *sdp.Item {
 	}
 }
 
-type TestSource struct {
+type TestAdapter struct {
 	ReturnScopes []string
 	ReturnType   string
 	GetCalls     [][]string
@@ -72,19 +72,19 @@ type TestSource struct {
 	SearchCalls  [][]string
 	IsHidden     bool
 	ReturnWeight int    // Weight to be returned
-	ReturnName   string // The name of the source
+	ReturnName   string // The name of the Adapter
 	mutex        sync.Mutex
 
 	CacheDuration time.Duration   // How long to cache items for
-	cache         *sdpcache.Cache // The sdpcache of this source
+	cache         *sdpcache.Cache // The sdpcache of this Adapter
 	cacheInitMu   sync.Mutex      // Mutex to ensure cache is only initialised once
 }
 
 // assert interface implementation
-var _ CachingSource = (*TestSource)(nil)
+var _ CachingAdapter = (*TestAdapter)(nil)
 
 // ClearCalls Clears the call counters between tests
-func (s *TestSource) ClearCalls() {
+func (s *TestAdapter) ClearCalls() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -94,7 +94,7 @@ func (s *TestSource) ClearCalls() {
 	s.cache.Clear()
 }
 
-func (s *TestSource) Type() string {
+func (s *TestAdapter) Type() string {
 	if s.ReturnType != "" {
 		return s.ReturnType
 	}
@@ -102,15 +102,22 @@ func (s *TestSource) Type() string {
 	return "person"
 }
 
-func (s *TestSource) Name() string {
-	return fmt.Sprintf("testSource-%v", s.ReturnName)
+func (s *TestAdapter) Name() string {
+	return fmt.Sprintf("testAdapter-%v", s.ReturnName)
 }
 
-func (s *TestSource) DefaultCacheDuration() time.Duration {
+func (s *TestAdapter) DefaultCacheDuration() time.Duration {
 	return 100 * time.Millisecond
 }
 
-func (s *TestSource) ensureCache() {
+func (s *TestAdapter) Metadata() sdp.AdapterMetadata {
+	return sdp.AdapterMetadata{
+		Type:            s.Type(),
+		DescriptiveName: "Person",
+	}
+}
+
+func (s *TestAdapter) ensureCache() {
 	s.cacheInitMu.Lock()
 	defer s.cacheInitMu.Unlock()
 
@@ -120,12 +127,12 @@ func (s *TestSource) ensureCache() {
 	}
 }
 
-func (s *TestSource) Cache() *sdpcache.Cache {
+func (s *TestAdapter) Cache() *sdpcache.Cache {
 	s.ensureCache()
 	return s.cache
 }
 
-func (s *TestSource) Scopes() []string {
+func (s *TestAdapter) Scopes() []string {
 	if len(s.ReturnScopes) > 0 {
 		return s.ReturnScopes
 	}
@@ -133,11 +140,11 @@ func (s *TestSource) Scopes() []string {
 	return []string{"test"}
 }
 
-func (s *TestSource) Hidden() bool {
+func (s *TestAdapter) Hidden() bool {
 	return s.IsHidden
 }
 
-func (s *TestSource) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
+func (s *TestAdapter) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -178,7 +185,7 @@ func (s *TestSource) Get(ctx context.Context, scope string, query string, ignore
 	}
 }
 
-func (s *TestSource) List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error) {
+func (s *TestAdapter) List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -215,7 +222,7 @@ func (s *TestSource) List(ctx context.Context, scope string, ignoreCache bool) (
 	}
 }
 
-func (s *TestSource) Search(ctx context.Context, scope string, query string, ignoreCache bool) ([]*sdp.Item, error) {
+func (s *TestAdapter) Search(ctx context.Context, scope string, query string, ignoreCache bool) ([]*sdp.Item, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -252,6 +259,6 @@ func (s *TestSource) Search(ctx context.Context, scope string, query string, ign
 	}
 }
 
-func (s *TestSource) Weight() int {
+func (s *TestAdapter) Weight() int {
 	return s.ReturnWeight
 }

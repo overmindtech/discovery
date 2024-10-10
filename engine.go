@@ -32,17 +32,17 @@ type HeartbeatOptions struct {
 	// The client that will be used to send heartbeats
 	ManagementClient HeartbeatClient
 
-	// The function that should be run to check if the source is healthy. It
+	// The function that should be run to check if the adapter is healthy. It
 	// will be executed each time a heartbeat is sent and should return an error
-	// if the source is unhealthy.
+	// if the adapter is unhealthy.
 	HealthCheck func() error
 
 	// How frequently to send a heartbeat
 	Frequency time.Duration
 }
 
-// Engine is the main discovery engine. This is where all of the Sources and
-// sources are stored and is responsible for calling out to the right sources to
+// Engine is the main discovery engine. This is where all of the Adapters and
+// adapters are stored and is responsible for calling out to the right adapters to
 // discover everything
 //
 // Note that an engine that does not have a connected NATS connection will
@@ -53,13 +53,13 @@ type Engine struct {
 	// UUID iof this engine. This will be used to identify it for heartbeats. If
 	// this is empty, a random UUID will be generated when the engine is started
 	UUID uuid.UUID
-	// The version of the source that should be reported in the heartbeat
+	// The version of the adapter that should be reported in the heartbeat
 	Version string
-	// The of source, this will be reported to Overmind as part of the
+	// The of adapter, this will be reported to Overmind as part of the
 	// heartbeat. e.g. "aws" or "kubernetes"
 	Type string
-	// Whether this source is managed by Overmind. This is inly used for
-	// reporting so that you can tell the difference between managed sources and
+	// Whether this adapter is managed by Overmind. This is inly used for
+	// reporting so that you can tell the difference between managed adapters and
 	// ones you're running locally
 	Managed sdp.SourceManaged
 
@@ -105,8 +105,8 @@ type Engine struct {
 	// List of all current subscriptions
 	subscriptions []*nats.Subscription
 
-	// All Sources managed by this Engine
-	sh *SourceHost
+	// All Adapters managed by this Engine
+	sh *AdapterHost
 
 	// GetListMutex used for locking out Get queries when there's a List happening
 	gfm GetListMutex
@@ -127,7 +127,7 @@ type Engine struct {
 }
 
 func NewEngine() (*Engine, error) {
-	sh := NewSourceHost()
+	sh := NewAdapterHost()
 	return &Engine{
 		MaxParallelExecutions:   runtime.NumCPU(),
 		MaxRequestTimeout:       DefaultMaxRequestTimeout,
@@ -166,9 +166,9 @@ func (e *Engine) DeleteTrackedQuery(uuid [16]byte) {
 	delete(e.trackedQueries, uuid)
 }
 
-// AddSources Adds a source to this engine
-func (e *Engine) AddSources(sources ...Source) {
-	e.sh.AddSources(sources...)
+// AddAdapters Adds an adapter to this engine
+func (e *Engine) AddAdapters(adapters ...Adapter) {
+	e.sh.AddAdapters(adapters...)
 }
 
 // Connect Connects to NATS
@@ -292,8 +292,8 @@ func (e *Engine) disconnect() error {
 }
 
 // Start performs all of the initialisation steps required for the engine to
-// work. Note that this creates NATS subscriptions for all available sources so
-// modifying the Sources value after an engine has been started will not have
+// work. Note that this creates NATS subscriptions for all available adapters so
+// modifying the Adapters value after an engine has been started will not have
 // any effect until the engine is restarted
 func (e *Engine) Start() error {
 	e.listExecutionPool = pool.New().WithMaxGoroutines(e.MaxParallelExecutions)
@@ -454,11 +454,11 @@ func (e *Engine) ClearCache() {
 	e.sh.ClearCaches()
 }
 
-// ClearSources Deletes all sources from the engine, allowing new sources to be
-// added using `AddSource()`. Note that this requires a restart using
+// ClearAdapters Deletes all adapters from the engine, allowing new adapters to be
+// added using `AddAdapter()`. Note that this requires a restart using
 // `Restart()` in order to take effect
-func (e *Engine) ClearSources() {
-	e.sh.ClearAllSources()
+func (e *Engine) ClearAdapters() {
+	e.sh.ClearAllAdapters()
 }
 
 // IsWildcard checks if a string is the wildcard. Use this instead of

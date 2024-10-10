@@ -41,21 +41,18 @@ func (e *Engine) SendHeartbeat(ctx context.Context) error {
 	}
 
 	// Get available types and scopes
-	availableTypesMap := make(map[string]bool)
 	availableScopesMap := make(map[string]bool)
-	for _, source := range e.sh.VisibleSources() {
-		availableTypesMap[source.Type()] = true
-		for _, scope := range source.Scopes() {
+	adapterMetadata := []*sdp.AdapterMetadata{}
+	for _, adapter := range e.sh.VisibleAdapters() {
+		for _, scope := range adapter.Scopes() {
 			availableScopesMap[scope] = true
 		}
+		metaData := adapter.Metadata()
+		adapterMetadata = append(adapterMetadata, &metaData)
 	}
 
 	// Extract slices from maps
-	availableTypes := make([]string, 0)
 	availableScopes := make([]string, 0)
-	for t := range availableTypesMap {
-		availableTypes = append(availableTypes, t)
-	}
 	for s := range availableScopesMap {
 		availableScopes = append(availableScopes, s)
 	}
@@ -70,8 +67,8 @@ func (e *Engine) SendHeartbeat(ctx context.Context) error {
 			Version:          e.Version,
 			Name:             e.Name,
 			Type:             e.Type,
-			AvailableTypes:   availableTypes,
 			AvailableScopes:  availableScopes,
+			AdapterMetadata:  adapterMetadata,
 			Managed:          e.Managed,
 			Error:            heartbeatError,
 			NextHeartbeatMax: durationpb.New(nextHeartbeat),
@@ -83,9 +80,9 @@ func (e *Engine) SendHeartbeat(ctx context.Context) error {
 
 // Starts sending heartbeats at the specified frequency. These will be sent in
 // the background and this function will return immediately. Heartbeats are
-// automatically started when the engine started, but if a sources has startup
+// automatically started when the engine started, but if an adapter has startup
 // steps that take a long time, or are liable to fail, the user may want to
-// start the heartbeats first so that users can see that the source has failed
+// start the heartbeats first so that users can see that the adapter has failed
 // to start.
 //
 // If this is called multiple times, nothing will happen. Heartbeats will be

@@ -12,31 +12,35 @@ import (
 	"github.com/overmindtech/sdp-go"
 )
 
-type SlowSource struct {
+type SlowAdapter struct {
 	QueryDuration time.Duration
 }
 
-func (s *SlowSource) Type() string {
+func (s *SlowAdapter) Type() string {
 	return "person"
 }
 
-func (s *SlowSource) Name() string {
-	return "slow-source"
+func (s *SlowAdapter) Name() string {
+	return "slow-adapter"
 }
 
-func (s *SlowSource) DefaultCacheDuration() time.Duration {
+func (s *SlowAdapter) DefaultCacheDuration() time.Duration {
 	return 10 * time.Minute
 }
 
-func (s *SlowSource) Scopes() []string {
+func (s *SlowAdapter) Metadata() sdp.AdapterMetadata {
+	return sdp.AdapterMetadata{}
+}
+
+func (s *SlowAdapter) Scopes() []string {
 	return []string{"test"}
 }
 
-func (s *SlowSource) Hidden() bool {
+func (s *SlowAdapter) Hidden() bool {
 	return false
 }
 
-func (s *SlowSource) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
+func (s *SlowAdapter) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
 	end := time.Now().Add(s.QueryDuration)
 	attributes, _ := sdp.ToAttributes(map[string]interface{}{
 		"name": query,
@@ -64,11 +68,11 @@ func (s *SlowSource) Get(ctx context.Context, scope string, query string, ignore
 	return &item, nil
 }
 
-func (s *SlowSource) List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error) {
+func (s *SlowAdapter) List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error) {
 	return []*sdp.Item{}, nil
 }
 
-func (s *SlowSource) Weight() int {
+func (s *SlowAdapter) Weight() int {
 	return 100
 }
 
@@ -123,7 +127,7 @@ func TimeQueries(numQueries int, linkDepth int, numParallel int) TimedResults {
 		panic(fmt.Sprintf("Error initializing Engine: %v", err))
 	}
 	e.MaxParallelExecutions = numParallel
-	e.AddSources(&SlowSource{
+	e.AddAdapters(&SlowAdapter{
 		QueryDuration: 100 * time.Millisecond,
 	})
 	err = e.Start()

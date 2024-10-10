@@ -8,16 +8,16 @@ import (
 	"github.com/overmindtech/sdp-go"
 )
 
-func TestTypeSource(t *testing.T) {
-	s := &TypeSource{
-		sh: newTestSourceHost(),
+func TestTypeAdapter(t *testing.T) {
+	s := &TypeAdapter{
+		sh: newTestAdapterHost(),
 	}
 
-	t.Run("satisfies Source interface", func(t *testing.T) {
+	t.Run("satisfies Adapter interface", func(t *testing.T) {
 		//lint:ignore S1021 Testing that it satisfies the interface
-		var src Source
+		var src Adapter
 
-		src = &TypeSource{}
+		src = &TypeAdapter{}
 
 		t.Log(src)
 	})
@@ -78,16 +78,16 @@ func TestTypeSource(t *testing.T) {
 	})
 }
 
-func TestScopeSource(t *testing.T) {
-	s := &ScopeSource{
-		sh: newTestSourceHost(),
+func TestScopeAdapter(t *testing.T) {
+	s := &ScopeAdapter{
+		sh: newTestAdapterHost(),
 	}
 
-	t.Run("satisfies Source interface", func(t *testing.T) {
+	t.Run("satisfies Adapter interface", func(t *testing.T) {
 		//lint:ignore S1021 Testing that it satisfies the interface
-		var src Source
+		var src Adapter
 
-		src = &ScopeSource{}
+		src = &ScopeAdapter{}
 
 		t.Log(src)
 	})
@@ -148,41 +148,41 @@ func TestScopeSource(t *testing.T) {
 	})
 }
 
-func newTestSourceHost() *SourceHost {
-	sh := NewSourceHost()
-	sh.AddSources(
-		&TestSource{
+func newTestAdapterHost() *AdapterHost {
+	sh := NewAdapterHost()
+	sh.AddAdapters(
+		&TestAdapter{
 			ReturnType: "aws-ec2instance",
 			ReturnScopes: []string{
 				"prodAccountInternetBanking",
 				"devAccountInternetBanking",
 				"global",
 			},
-			ReturnName: "test-aws-ec2instance-source",
+			ReturnName: "test-aws-ec2instance-adapter",
 		},
-		&TestSource{
-			ReturnType: "aws-elasticloadbalancer",
+		&TestAdapter{
+			ReturnType: "aws-elastic-load-balancer",
 			ReturnScopes: []string{
 				"devAccountInternetBanking",
 				"some-other-scope",
 				"global",
 			},
-			ReturnName: "test-aws-elasticloadbalancer-source",
+			ReturnName: "test-aws-elastic-load-balancer-adapter",
 		},
-		&TestSource{
+		&TestAdapter{
 			ReturnType: "ip",
 			ReturnScopes: []string{
 				"global",
 			},
-			ReturnName: "test-ip-source",
+			ReturnName: "test-ip-adapter",
 		},
-		&TestSource{
+		&TestAdapter{
 			ReturnType: "secret",
 			ReturnScopes: []string{
 				"global",
 				"secret",
 			},
-			ReturnName: "test-secret-source",
+			ReturnName: "test-secret-adapter",
 			IsHidden:   true,
 		},
 	)
