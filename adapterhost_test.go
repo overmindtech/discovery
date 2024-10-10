@@ -210,9 +210,9 @@ func TestAdapterHostExpandQuery(t *testing.T) {
 func TestAdapterHostAddAdapters(t *testing.T) {
 	sh := NewAdapterHost()
 
-	src := TestAdapter{}
+	adapter := TestAdapter{}
 
-	sh.AddAdapters(&src)
+	sh.AddAdapters(&adapter)
 
 	if x := len(sh.Adapters()); x != 4 {
 		t.Fatalf("Expected 4 adapters, got %v", x)

@@ -186,10 +186,10 @@ func TestNats(t *testing.T) {
 	e.NATSQueueName = "test"
 	e.MaxParallelExecutions = 10
 
-	src := TestAdapter{}
+	adapter := TestAdapter{}
 
 	e.AddAdapters(
-		&src,
+		&adapter,
 		&TestAdapter{
 			ReturnScopes: []string{
 				sdp.WILDCARD,
@@ -229,7 +229,7 @@ func TestNats(t *testing.T) {
 
 	t.Run("Handling a basic query", func(t *testing.T) {
 		t.Cleanup(func() {
-			src.ClearCalls()
+			adapter.ClearCalls()
 			e.ClearCache()
 		})
 
@@ -249,8 +249,8 @@ func TestNats(t *testing.T) {
 			t.Error(err)
 		}
 
-		if len(src.GetCalls) != 1 {
-			t.Errorf("expected 1 get call, got %v: %v", len(src.GetCalls), src.GetCalls)
+		if len(adapter.GetCalls) != 1 {
+			t.Errorf("expected 1 get call, got %v: %v", len(adapter.GetCalls), adapter.GetCalls)
 		}
 	})
 
@@ -282,13 +282,13 @@ func TestNatsCancel(t *testing.T) {
 	e.NATSQueueName = "test"
 	e.MaxParallelExecutions = 1
 
-	src := SpeedTestAdapter{
+	adapter := SpeedTestAdapter{
 		QueryDelay:   2 * time.Second,
 		ReturnType:   "person",
 		ReturnScopes: []string{"test"},
 	}
 
-	e.AddAdapters(&src)
+	e.AddAdapters(&adapter)
 
 	t.Run("Starting", func(t *testing.T) {
 		err := e.Start()
@@ -589,10 +589,10 @@ func TestNatsAuth(t *testing.T) {
 	e.NATSQueueName = "test"
 	e.MaxParallelExecutions = 10
 
-	src := TestAdapter{}
+	adapter := TestAdapter{}
 
 	e.AddAdapters(
-		&src,
+		&adapter,
 		&TestAdapter{
 			ReturnScopes: []string{
 				sdp.WILDCARD,
@@ -614,7 +614,7 @@ func TestNatsAuth(t *testing.T) {
 
 	t.Run("Handling a basic query", func(t *testing.T) {
 		t.Cleanup(func() {
-			src.ClearCalls()
+			adapter.ClearCalls()
 			e.ClearCache()
 		})
 
@@ -632,8 +632,8 @@ func TestNatsAuth(t *testing.T) {
 			t.Error(err)
 		}
 
-		if len(src.GetCalls) != 1 {
-			t.Errorf("expected 1 get call, got %v: %v", len(src.GetCalls), src.GetCalls)
+		if len(adapter.GetCalls) != 1 {
+			t.Errorf("expected 1 get call, got %v: %v", len(adapter.GetCalls), adapter.GetCalls)
 		}
 	})
 

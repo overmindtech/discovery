@@ -47,8 +47,8 @@ func (sh *AdapterHost) AddAdapters(adapters ...Adapter) {
 	sh.adapterMapMutex.Lock()
 	defer sh.adapterMapMutex.Unlock()
 
-	for _, src := range adapters {
-		allAdapters := append(sh.adapterMap[src.Type()], src)
+	for _, adapter := range adapters {
+		allAdapters := append(sh.adapterMap[adapter.Type()], adapter)
 
 		sort.Slice(allAdapters, func(i, j int) bool {
 			iAdapter := allAdapters[i]
@@ -58,7 +58,7 @@ func (sh *AdapterHost) AddAdapters(adapters ...Adapter) {
 			return iAdapter.Weight() > jAdapter.Weight()
 		})
 
-		sh.adapterMap[src.Type()] = allAdapters
+		sh.adapterMap[adapter.Type()] = allAdapters
 	}
 }
 
@@ -140,14 +140,14 @@ func (sh *AdapterHost) ExpandQuery(q *sdp.Query) map[*sdp.Query][]Adapter {
 		checkAdapters = sh.AdaptersByType(q.GetType())
 	}
 
-	for _, src := range checkAdapters {
+	for _, adapter := range checkAdapters {
 		// is the adapter is hidden
 		isHidden := false
-		if hs, ok := src.(HiddenAdapter); ok {
+		if hs, ok := adapter.(HiddenAdapter); ok {
 			isHidden = hs.Hidden()
 		}
 
-		for _, adapterScope := range src.Scopes() {
+		for _, adapterScope := range adapter.Scopes() {
 			// Create a new query if:
 			//
 			// * The adapter supports all scopes, or
@@ -157,7 +157,7 @@ func (sh *AdapterHost) ExpandQuery(q *sdp.Query) map[*sdp.Query][]Adapter {
 				dest := sdp.Query{}
 				q.Copy(&dest)
 
-				dest.Type = src.Type()
+				dest.Type = adapter.Type()
 
 				// Choose the more specific scope
 				if IsWildcard(adapterScope) {
@@ -171,7 +171,7 @@ func (sh *AdapterHost) ExpandQuery(q *sdp.Query) map[*sdp.Query][]Adapter {
 
 				if err == nil {
 					if existing, ok := queries[hash]; ok {
-						existing.Adapters = append(existing.Adapters, src)
+						existing.Adapters = append(existing.Adapters, adapter)
 					} else {
 						queries[hash] = &struct {
 							Query    *sdp.Query
@@ -179,7 +179,7 @@ func (sh *AdapterHost) ExpandQuery(q *sdp.Query) map[*sdp.Query][]Adapter {
 						}{
 							Query: &dest,
 							Adapters: []Adapter{
-								src,
+								adapter,
 							},
 						}
 					}

@@ -13,7 +13,7 @@ import (
 )
 
 func TestExecuteQuery(t *testing.T) {
-	src := TestAdapter{
+	adapter := TestAdapter{
 		ReturnType:   "person",
 		ReturnScopes: []string{"test"},
 	}
@@ -25,7 +25,7 @@ func TestExecuteQuery(t *testing.T) {
 			ConnectionTimeout: time.Second,
 			MaxReconnects:     5,
 		},
-		&src,
+		&adapter,
 	)
 
 	t.Run("Basic happy-path Get query", func(t *testing.T) {
@@ -49,7 +49,7 @@ func TestExecuteQuery(t *testing.T) {
 			t.Error(e)
 		}
 
-		if x := len(src.GetCalls); x != 1 {
+		if x := len(adapter.GetCalls); x != 1 {
 			t.Errorf("expected adapter's Get() to have been called 1 time, got %v", x)
 		}
 
@@ -303,14 +303,14 @@ func TestSendQuerySync(t *testing.T) {
 	ctx, span := tracing.Tracer().Start(ctx, "TestSendQuerySync")
 	defer span.End()
 
-	src := TestAdapter{
+	adapter := TestAdapter{
 		ReturnType: "person",
 		ReturnScopes: []string{
 			"test",
 		},
 	}
 
-	e := newStartedEngine(t, "TestSendQuerySync", nil, &src)
+	e := newStartedEngine(t, "TestSendQuerySync", nil, &adapter)
 
 	for i := 0; i < 250; i++ {
 		u := uuid.New()

@@ -47,8 +47,7 @@ func (e *Engine) SendHeartbeat(ctx context.Context) error {
 		for _, scope := range adapter.Scopes() {
 			availableScopesMap[scope] = true
 		}
-		metaData := adapter.Metadata()
-		adapterMetadata = append(adapterMetadata, &metaData)
+		adapterMetadata = append(adapterMetadata, adapter.Metadata())
 	}
 
 	// Extract slices from maps

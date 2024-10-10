@@ -37,8 +37,8 @@ func (s *SpeedTestAdapter) Scopes() []string {
 	return []string{"test"}
 }
 
-func (s *SpeedTestAdapter) Metadata() sdp.AdapterMetadata {
-	return sdp.AdapterMetadata{}
+func (s *SpeedTestAdapter) Metadata() *sdp.AdapterMetadata {
+	return &sdp.AdapterMetadata{}
 }
 
 func (s *SpeedTestAdapter) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
@@ -91,14 +91,14 @@ func (s *SpeedTestAdapter) Weight() int {
 }
 
 func TestExecute(t *testing.T) {
-	src := TestAdapter{
+	adapter := TestAdapter{
 		ReturnType: "person",
 		ReturnScopes: []string{
 			"test",
 		},
 	}
 
-	e := newStartedEngine(t, "TestExecute", nil, &src)
+	e := newStartedEngine(t, "TestExecute", nil, &adapter)
 
 	t.Run("Without linking", func(t *testing.T) {
 		t.Parallel()
@@ -171,10 +171,10 @@ func TestExecute(t *testing.T) {
 }
 
 func TestTimeout(t *testing.T) {
-	src := SpeedTestAdapter{
+	adapter := SpeedTestAdapter{
 		QueryDelay: 100 * time.Millisecond,
 	}
-	e := newStartedEngine(t, "TestTimeout", nil, &src)
+	e := newStartedEngine(t, "TestTimeout", nil, &adapter)
 
 	t.Run("With a timeout, but not exceeding it", func(t *testing.T) {
 		t.Parallel()

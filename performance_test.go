@@ -28,8 +28,8 @@ func (s *SlowAdapter) DefaultCacheDuration() time.Duration {
 	return 10 * time.Minute
 }
 
-func (s *SlowAdapter) Metadata() sdp.AdapterMetadata {
-	return sdp.AdapterMetadata{}
+func (s *SlowAdapter) Metadata() *sdp.AdapterMetadata {
+	return &sdp.AdapterMetadata{}
 }
 
 func (s *SlowAdapter) Scopes() []string {

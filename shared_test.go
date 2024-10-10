@@ -110,8 +110,8 @@ func (s *TestAdapter) DefaultCacheDuration() time.Duration {
 	return 100 * time.Millisecond
 }
 
-func (s *TestAdapter) Metadata() sdp.AdapterMetadata {
-	return sdp.AdapterMetadata{
+func (s *TestAdapter) Metadata() *sdp.AdapterMetadata {
+	return &sdp.AdapterMetadata{
 		Type:            s.Type(),
 		DescriptiveName: "Person",
 	}
