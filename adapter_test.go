@@ -14,9 +14,9 @@ func TestEngineAddAdapters(t *testing.T) {
 		t.Fatalf("Error initializing Engine: %v", err)
 	}
 
-	src := TestAdapter{}
+	adapter := TestAdapter{}
 
-	e.AddAdapters(&src)
+	e.AddAdapters(&adapter)
 
 	if x := len(e.sh.Adapters()); x != 4 {
 		t.Fatalf("Expected 4 adapters, got %v", x)
@@ -24,7 +24,7 @@ func TestEngineAddAdapters(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	src := TestAdapter{
+	adapter := TestAdapter{
 		ReturnName: "orange",
 		ReturnScopes: []string{
 			"test",
@@ -32,11 +32,11 @@ func TestGet(t *testing.T) {
 		},
 	}
 
-	e := newStartedEngine(t, "TestGet", nil, &src)
+	e := newStartedEngine(t, "TestGet", nil, &adapter)
 
 	t.Run("Basic test", func(t *testing.T) {
 		t.Cleanup(func() {
-			src.ClearCalls()
+			adapter.ClearCalls()
 		})
 
 		err := e.ExecuteQuery(context.Background(), &sdp.Query{
@@ -49,11 +49,11 @@ func TestGet(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if x := len(src.GetCalls); x != 1 {
+		if x := len(adapter.GetCalls); x != 1 {
 			t.Fatalf("Expected 1 get call, got %v", x)
 		}
 
-		firstCall := src.GetCalls[0]
+		firstCall := adapter.GetCalls[0]
 
 		if firstCall[0] != "test" || firstCall[1] != "three" {
 			t.Fatalf("First get call parameters unexpected: %v", firstCall)
@@ -62,7 +62,7 @@ func TestGet(t *testing.T) {
 
 	t.Run("not found error", func(t *testing.T) {
 		t.Cleanup(func() {
-			src.ClearCalls()
+			adapter.ClearCalls()
 		})
 
 		items, errs, err := e.ExecuteQuerySync(context.Background(), &sdp.Query{
@@ -106,7 +106,7 @@ func TestGet(t *testing.T) {
 
 	t.Run("Test caching", func(t *testing.T) {
 		t.Cleanup(func() {
-			src.ClearCalls()
+			adapter.ClearCalls()
 		})
 
 		var list1 []*sdp.Item
@@ -151,7 +151,7 @@ func TestGet(t *testing.T) {
 
 	t.Run("Test Get() caching errors", func(t *testing.T) {
 		t.Cleanup(func() {
-			src.ClearCalls()
+			adapter.ClearCalls()
 		})
 
 		req := sdp.Query{
@@ -170,17 +170,17 @@ func TestGet(t *testing.T) {
 			t.Fatal("expected an error because of cache")
 		}
 
-		if l := len(src.GetCalls); l != 1 {
+		if l := len(adapter.GetCalls); l != 1 {
 			t.Errorf("Expected 1 Get call due to caching og NOTFOUND errors, got %v", l)
 		}
 	})
 
 	t.Run("Hidden items", func(t *testing.T) {
 		t.Cleanup(func() {
-			src.ClearCalls()
+			adapter.ClearCalls()
 		})
 
-		src.IsHidden = true
+		adapter.IsHidden = true
 
 		t.Run("Get", func(t *testing.T) {
 			item, _, err := e.ExecuteQuerySync(context.Background(), &sdp.Query{
@@ -235,9 +235,9 @@ func TestGet(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	src := TestAdapter{}
+	adapter := TestAdapter{}
 
-	e := newStartedEngine(t, "TestList", nil, &src)
+	e := newStartedEngine(t, "TestList", nil, &adapter)
 
 	_, _, err := e.ExecuteQuerySync(context.Background(), &sdp.Query{
 		Type:   "person",
@@ -248,11 +248,11 @@ func TestList(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if x := len(src.ListCalls); x != 1 {
+	if x := len(adapter.ListCalls); x != 1 {
 		t.Fatalf("Expected 1 find call, got %v", x)
 	}
 
-	firstCall := src.ListCalls[0]
+	firstCall := adapter.ListCalls[0]
 
 	if firstCall[0] != "test" {
 		t.Fatalf("First find call parameters unexpected: %v", firstCall)
@@ -260,9 +260,9 @@ func TestList(t *testing.T) {
 }
 
 func TestSearch(t *testing.T) {
-	src := TestAdapter{}
+	adapter := TestAdapter{}
 
-	e := newStartedEngine(t, "TestSearch", nil, &src)
+	e := newStartedEngine(t, "TestSearch", nil, &adapter)
 
 	_, _, err := e.ExecuteQuerySync(context.Background(), &sdp.Query{
 		Type:   "person",
@@ -274,11 +274,11 @@ func TestSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if x := len(src.SearchCalls); x != 1 {
+	if x := len(adapter.SearchCalls); x != 1 {
 		t.Fatalf("Expected 1 Search call, got %v", x)
 	}
 
-	firstCall := src.SearchCalls[0]
+	firstCall := adapter.SearchCalls[0]
 
 	if firstCall[0] != "test" || firstCall[1] != "query" {
 		t.Fatalf("First Search call parameters unexpected: %v", firstCall)
@@ -286,7 +286,7 @@ func TestSearch(t *testing.T) {
 }
 
 func TestListSearchCaching(t *testing.T) {
-	src := TestAdapter{
+	adapter := TestAdapter{
 		ReturnScopes: []string{
 			"test",
 			"empty",
@@ -294,11 +294,11 @@ func TestListSearchCaching(t *testing.T) {
 		},
 	}
 
-	e := newStartedEngine(t, "TestListSearchCaching", nil, &src)
+	e := newStartedEngine(t, "TestListSearchCaching", nil, &adapter)
 
 	t.Run("caching with successful list", func(t *testing.T) {
 		t.Cleanup(func() {
-			src.ClearCalls()
+			adapter.ClearCalls()
 		})
 
 		var list1 []*sdp.Item
@@ -343,7 +343,7 @@ func TestListSearchCaching(t *testing.T) {
 
 	t.Run("empty list", func(t *testing.T) {
 		t.Cleanup(func() {
-			src.ClearCalls()
+			adapter.ClearCalls()
 		})
 
 		var err error
@@ -366,8 +366,8 @@ func TestListSearchCaching(t *testing.T) {
 			t.Error("expected error but got nil")
 		}
 
-		if l := len(src.ListCalls); l != 1 {
-			t.Errorf("Expected only 1 list call, got %v, cache not working: %v", l, src.ListCalls)
+		if l := len(adapter.ListCalls); l != 1 {
+			t.Errorf("Expected only 1 list call, got %v, cache not working: %v", l, adapter.ListCalls)
 		}
 
 		time.Sleep(200 * time.Millisecond)
@@ -378,14 +378,14 @@ func TestListSearchCaching(t *testing.T) {
 			t.Error("expected error but got nil")
 		}
 
-		if l := len(src.ListCalls); l != 2 {
-			t.Errorf("Expected 2 list calls, got %v, cache not clearing: %v", l, src.ListCalls)
+		if l := len(adapter.ListCalls); l != 2 {
+			t.Errorf("Expected 2 list calls, got %v, cache not clearing: %v", l, adapter.ListCalls)
 		}
 	})
 
 	t.Run("caching with successful search", func(t *testing.T) {
 		t.Cleanup(func() {
-			src.ClearCalls()
+			adapter.ClearCalls()
 		})
 
 		var list1 []*sdp.Item
@@ -429,7 +429,7 @@ func TestListSearchCaching(t *testing.T) {
 
 	t.Run("empty search", func(t *testing.T) {
 		t.Cleanup(func() {
-			src.ClearCalls()
+			adapter.ClearCalls()
 		})
 
 		var err error
@@ -454,7 +454,7 @@ func TestListSearchCaching(t *testing.T) {
 			t.Error("expected error but got nil")
 		}
 
-		if l := len(src.SearchCalls); l != 1 {
+		if l := len(adapter.SearchCalls); l != 1 {
 			t.Errorf("Expected only 1 find call, got %v, cache not working", l)
 		}
 
@@ -466,14 +466,14 @@ func TestListSearchCaching(t *testing.T) {
 			t.Error("expected error but got nil")
 		}
 
-		if l := len(src.SearchCalls); l != 2 {
+		if l := len(adapter.SearchCalls); l != 2 {
 			t.Errorf("Expected 2 find calls, got %v, cache not clearing", l)
 		}
 	})
 
 	t.Run("non-caching of OTHER errors", func(t *testing.T) {
 		t.Cleanup(func() {
-			src.ClearCalls()
+			adapter.ClearCalls()
 		})
 
 		q := sdp.Query{
@@ -492,14 +492,14 @@ func TestListSearchCaching(t *testing.T) {
 			t.Fatal("expected an error because of non-caching")
 		}
 
-		if l := len(src.GetCalls); l != 2 {
+		if l := len(adapter.GetCalls); l != 2 {
 			t.Errorf("Expected 2 get calls, got %v, OTHER errors should not be cached", l)
 		}
 	})
 
 	t.Run("non-caching when ignoreCache is specified", func(t *testing.T) {
 		t.Cleanup(func() {
-			src.ClearCalls()
+			adapter.ClearCalls()
 		})
 
 		q := sdp.Query{
@@ -540,15 +540,15 @@ func TestListSearchCaching(t *testing.T) {
 			t.Fatal("expected an error because of non-caching")
 		}
 
-		if l := len(src.GetCalls); l != 2 {
+		if l := len(adapter.GetCalls); l != 2 {
 			t.Errorf("Expected 2 get calls, got %v", l)
 		}
 
-		if l := len(src.ListCalls); l != 2 {
+		if l := len(adapter.ListCalls); l != 2 {
 			t.Errorf("Expected 2 List calls, got %v", l)
 		}
 
-		if l := len(src.SearchCalls); l != 2 {
+		if l := len(adapter.SearchCalls); l != 2 {
 			t.Errorf("Expected 2 Search calls, got %v", l)
 		}
 	})
@@ -558,17 +558,17 @@ func TestSearchGetCaching(t *testing.T) {
 	// We want to be sure that if an item has been found via a search and
 	// cached, the cache will be hit if a Get is run for that particular item
 
-	src := TestAdapter{
+	adapter := TestAdapter{
 		ReturnScopes: []string{
 			"test",
 		},
 	}
 
-	e := newStartedEngine(t, "TestSearchGetCaching", nil, &src)
+	e := newStartedEngine(t, "TestSearchGetCaching", nil, &adapter)
 
 	t.Run("caching with successful search", func(t *testing.T) {
 		t.Cleanup(func() {
-			src.ClearCalls()
+			adapter.ClearCalls()
 		})
 
 		var searchResult []*sdp.Item

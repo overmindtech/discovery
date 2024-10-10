@@ -44,7 +44,7 @@ type Adapter interface {
 
 	// A struct that contains information about the adapter, it is used by the api-server to determine the capabilities of the adapter
 	// It is mandatory for all adapters to implement this method
-	Metadata() sdp.AdapterMetadata
+	Metadata() *sdp.AdapterMetadata
 }
 
 func AdapterMetadataToJSONFile(components []sdp.AdapterMetadata, targetLocation string) error {

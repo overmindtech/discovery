@@ -23,8 +23,8 @@ func (t *TypeAdapter) Name() string {
 	return "overmind-type-meta-source"
 }
 
-func (t *TypeAdapter) Metadata() sdp.AdapterMetadata {
-	return sdp.AdapterMetadata{}
+func (t *TypeAdapter) Metadata() *sdp.AdapterMetadata {
+	return &sdp.AdapterMetadata{}
 }
 
 func newTypeItem(typ string) *sdp.Item {
@@ -125,8 +125,8 @@ func (t *ScopeAdapter) Name() string {
 	return "overmind-scope-meta-adapter"
 }
 
-func (t *ScopeAdapter) Metadata() sdp.AdapterMetadata {
-	return sdp.AdapterMetadata{}
+func (t *ScopeAdapter) Metadata() *sdp.AdapterMetadata {
+	return &sdp.AdapterMetadata{}
 }
 
 func newScopeItem(scope string) *sdp.Item {
@@ -235,8 +235,8 @@ func (s *SourcesAdapter) Name() string {
 	return "overmind-adapter-meta-adapter"
 }
 
-func (s *SourcesAdapter) Metadata() sdp.AdapterMetadata {
-	return sdp.AdapterMetadata{}
+func (s *SourcesAdapter) Metadata() *sdp.AdapterMetadata {
+	return &sdp.AdapterMetadata{}
 }
 
 func (s *SourcesAdapter) Scopes() []string {
@@ -244,9 +244,9 @@ func (s *SourcesAdapter) Scopes() []string {
 }
 
 func (s *SourcesAdapter) Get(ctx context.Context, scope string, query string, ignoreCache bool) (*sdp.Item, error) {
-	for _, src := range s.sh.Adapters() {
-		if src.Name() == query {
-			return s.adapterToItem(src)
+	for _, adapter := range s.sh.Adapters() {
+		if adapter.Name() == query {
+			return s.adapterToItem(adapter)
 		}
 	}
 
@@ -262,8 +262,8 @@ func (s *SourcesAdapter) List(ctx context.Context, scope string, ignoreCache boo
 	var item *sdp.Item
 	var err error
 
-	for i, src := range adapters {
-		item, err = s.adapterToItem(src)
+	for i, adapter := range adapters {
+		item, err = s.adapterToItem(adapter)
 
 		if err != nil {
 			return nil, sdp.NewQueryError(err)
@@ -283,19 +283,19 @@ func (s *SourcesAdapter) Weight() int {
 	return 100
 }
 
-func (s *SourcesAdapter) adapterToItem(src Adapter) (*sdp.Item, error) {
+func (s *SourcesAdapter) adapterToItem(adapter Adapter) (*sdp.Item, error) {
 	attrMap := make(map[string]interface{})
 
-	attrMap["name"] = src.Name()
-	attrMap["scopes"] = src.Scopes()
-	attrMap["weight"] = src.Weight()
+	attrMap["name"] = adapter.Name()
+	attrMap["scopes"] = adapter.Scopes()
+	attrMap["weight"] = adapter.Weight()
 
-	_, searchable := src.(SearchableAdapter)
+	_, searchable := adapter.(SearchableAdapter)
 	attrMap["searchable"] = searchable
 
 	var hidden bool
 
-	if h, ok := src.(HiddenAdapter); ok {
+	if h, ok := adapter.(HiddenAdapter); ok {
 		hidden = h.Hidden()
 	} else {
 		hidden = false

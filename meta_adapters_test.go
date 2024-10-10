@@ -15,11 +15,11 @@ func TestTypeAdapter(t *testing.T) {
 
 	t.Run("satisfies Adapter interface", func(t *testing.T) {
 		//lint:ignore S1021 Testing that it satisfies the interface
-		var src Adapter
+		var adapter Adapter
 
-		src = &TypeAdapter{}
+		adapter = &TypeAdapter{}
 
-		t.Log(src)
+		t.Log(adapter)
 	})
 
 	t.Run("listing types", func(t *testing.T) {
@@ -85,11 +85,11 @@ func TestScopeAdapter(t *testing.T) {
 
 	t.Run("satisfies Adapter interface", func(t *testing.T) {
 		//lint:ignore S1021 Testing that it satisfies the interface
-		var src Adapter
+		var adapter Adapter
 
-		src = &ScopeAdapter{}
+		adapter = &ScopeAdapter{}
 
-		t.Log(src)
+		t.Log(adapter)
 	})
 
 	t.Run("listing Scopes", func(t *testing.T) {
