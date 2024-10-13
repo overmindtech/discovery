@@ -47,14 +47,14 @@ type Adapter interface {
 	Metadata() *sdp.AdapterMetadata
 }
 
-func AdapterMetadataToJSONFile(components []sdp.AdapterMetadata, targetLocation string) error {
+func AdapterMetadataToJSONFile(components []*sdp.AdapterMetadata, targetLocation string) error {
 	// create the target location folder if it doesn't exist
 	err := os.MkdirAll(targetLocation, os.ModePerm)
 	if err != nil {
 		return err
 	}
 	for i := range components {
-		component := &components[i]
+		component := components[i]
 		// convert the component to JSON
 		bytes, err := json.Marshal(component)
 		if err != nil {
