@@ -9,7 +9,8 @@ import (
 )
 
 func TestEngineAddAdapters(t *testing.T) {
-	e, err := NewEngine()
+	ec := EngineConfig{}
+	e, err := NewEngine(&ec)
 	if err != nil {
 		t.Fatalf("Error initializing Engine: %v", err)
 	}

@@ -32,11 +32,14 @@ func TestHeartbeats(t *testing.T) {
 	requests := make(chan *connect.Request[sdp.SubmitSourceHeartbeatRequest], 1)
 	responses := make(chan *connect.Response[sdp.SubmitSourceHeartbeatResponse], 1)
 
-	e, _ := NewEngine()
-	e.Name = name
-	e.UUID = u
-	e.Version = version
-	e.Type = engineType
+	ec := EngineConfig{
+		SourceName: name,
+		SourceUUID: u,
+		Version:    version,
+		EngineType: engineType,
+	}
+	e, _ := NewEngine(&ec)
+
 	e.Managed = sdp.SourceManaged_LOCAL
 	e.HeartbeatOptions = &HeartbeatOptions{
 		ManagementClient: testHeartbeatClient{
