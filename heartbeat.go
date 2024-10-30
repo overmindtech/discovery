@@ -36,8 +36,8 @@ func (e *Engine) SendHeartbeat(ctx context.Context) error {
 
 	var engineUUID []byte
 
-	if e.UUID != uuid.Nil {
-		engineUUID = e.UUID[:]
+	if e.EngineConfig.SourceUUID != uuid.Nil {
+		engineUUID = e.EngineConfig.SourceUUID[:]
 	}
 
 	// Get available types and scopes
@@ -63,9 +63,9 @@ func (e *Engine) SendHeartbeat(ctx context.Context) error {
 	_, err := e.HeartbeatOptions.ManagementClient.SubmitSourceHeartbeat(ctx, &connect.Request[sdp.SubmitSourceHeartbeatRequest]{
 		Msg: &sdp.SubmitSourceHeartbeatRequest{
 			UUID:             engineUUID,
-			Version:          e.Version,
-			Name:             e.Name,
-			Type:             e.Type,
+			Version:          e.EngineConfig.Version,
+			Name:             e.EngineConfig.SourceName,
+			Type:             e.EngineConfig.EngineType,
 			AvailableScopes:  availableScopes,
 			AdapterMetadata:  adapterMetadata,
 			Managed:          e.Managed,

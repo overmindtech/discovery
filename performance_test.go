@@ -122,11 +122,13 @@ type TimedResults struct {
 }
 
 func TimeQueries(numQueries int, linkDepth int, numParallel int) TimedResults {
-	e, err := NewEngine()
+	ec := EngineConfig{
+		MaxParallelExecutions: numParallel,
+	}
+	e, err := NewEngine(&ec)
 	if err != nil {
 		panic(fmt.Sprintf("Error initializing Engine: %v", err))
 	}
-	e.MaxParallelExecutions = numParallel
 	e.AddAdapters(&SlowAdapter{
 		QueryDuration: 100 * time.Millisecond,
 	})

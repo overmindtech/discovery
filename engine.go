@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 	"sync"
 	"time"
 
@@ -41,6 +40,18 @@ type HeartbeatOptions struct {
 	Frequency time.Duration
 }
 
+// EngineConfig is the configuration for the engine
+// it is used to configure the engine before starting it
+type EngineConfig struct {
+	EngineType            string    // The type of the engine, e.g. "aws" or "kubernetes"
+	Version               string    // The version of the adapter that should be reported in the heartbeat
+	SourceName            string    // normally follows the format of "type-hostname", e.g. "stdlib-source"
+	SourceUUID            uuid.UUID // The UUID of the source, is this is blank it will be auto-generated. This is used in heartbeats and shouldn't be supplied usually"
+	App                   string    // "https://app.overmind.tech", "The URL of the Overmind app to use"
+	ApiKey                string    // The API key to use to authenticate to the Overmind API"
+	MaxParallelExecutions int       // 2_000, Max number of requests to run in parallel
+}
+
 // Engine is the main discovery engine. This is where all of the Adapters and
 // adapters are stored and is responsible for calling out to the right adapters to
 // discover everything
@@ -48,27 +59,14 @@ type HeartbeatOptions struct {
 // Note that an engine that does not have a connected NATS connection will
 // simply not communicate over NATS
 type Engine struct {
-	// Descriptive name of this engine. Used as responder name in SDP responses
-	Name string
-	// UUID iof this engine. This will be used to identify it for heartbeats. If
-	// this is empty, a random UUID will be generated when the engine is started
-	UUID uuid.UUID
-	// The version of the adapter that should be reported in the heartbeat
-	Version string
-	// The of adapter, this will be reported to Overmind as part of the
-	// heartbeat. e.g. "aws" or "kubernetes"
-	Type string
-	// Whether this adapter is managed by Overmind. This is inly used for
+	EngineConfig *EngineConfig
+	// Whether this adapter is managed by Overmind. This is initially used for
 	// reporting so that you can tell the difference between managed adapters and
 	// ones you're running locally
 	Managed sdp.SourceManaged
 
 	NATSOptions   *auth.NATSOptions // Options for connecting to NATS
 	NATSQueueName string            // The name of the queue to use when subscribing
-
-	// The maximum number of queries that can be executing in parallel. Defaults
-	// to the number of CPUs
-	MaxParallelExecutions int
 
 	// The maximum request timeout. Defaults to `DefaultMaxRequestTimeout` if
 	// set to zero. If a client does not send a timeout, it will default to this
@@ -126,10 +124,10 @@ type Engine struct {
 	heartbeatCancel      context.CancelFunc
 }
 
-func NewEngine() (*Engine, error) {
+func NewEngine(engineConfig *EngineConfig) (*Engine, error) {
 	sh := NewAdapterHost()
 	return &Engine{
-		MaxParallelExecutions:   runtime.NumCPU(),
+		EngineConfig:            engineConfig,
 		MaxRequestTimeout:       DefaultMaxRequestTimeout,
 		ConnectionWatchInterval: DefaultConnectionWatchInterval,
 		sh:                      sh,
@@ -296,14 +294,14 @@ func (e *Engine) disconnect() error {
 // modifying the Adapters value after an engine has been started will not have
 // any effect until the engine is restarted
 func (e *Engine) Start() error {
-	e.listExecutionPool = pool.New().WithMaxGoroutines(e.MaxParallelExecutions)
-	e.getExecutionPool = pool.New().WithMaxGoroutines(e.MaxParallelExecutions)
+	e.listExecutionPool = pool.New().WithMaxGoroutines(e.EngineConfig.MaxParallelExecutions)
+	e.getExecutionPool = pool.New().WithMaxGoroutines(e.EngineConfig.MaxParallelExecutions)
 
 	e.backgroundJobContext, e.backgroundJobCancel = context.WithCancel(context.Background())
 
 	// Decide your own UUID if not provided
-	if e.UUID == uuid.Nil {
-		e.UUID = uuid.New()
+	if e.EngineConfig.SourceUUID == uuid.Nil {
+		e.EngineConfig.SourceUUID = uuid.New()
 	}
 
 	// Start background jobs
@@ -329,7 +327,7 @@ func (e *Engine) subscribe(subject string, handler nats.MsgHandler) error {
 	log.WithFields(log.Fields{
 		"queueName":  e.NATSQueueName,
 		"subject":    subject,
-		"engineName": e.Name,
+		"engineName": e.EngineConfig.SourceName,
 	}).Debug("creating NATS subscription")
 
 	if e.NATSQueueName == "" {
@@ -409,7 +407,7 @@ func (e *Engine) HealthCheck(ctx context.Context) error {
 	natsConnected := e.IsNATSConnected()
 
 	span.SetAttributes(
-		attribute.String("ovm.engine.name", e.Name),
+		attribute.String("ovm.engine.name", e.EngineConfig.SourceName),
 		attribute.Bool("ovm.nats.connected", natsConnected),
 		attribute.Int("ovm.discovery.listExecutionPoolCount", int(listExecutionPoolCount.Load())),
 		attribute.Int("ovm.discovery.getExecutionPoolCount", int(getExecutionPoolCount.Load())),

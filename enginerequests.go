@@ -109,7 +109,7 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 	responder.Start(
 		ctx,
 		pub,
-		e.Name,
+		e.EngineConfig.SourceName,
 		ru,
 	)
 
@@ -325,7 +325,7 @@ func (e *Engine) callAdapters(ctx context.Context, q *sdp.Query, relevantAdapter
 				ErrorType:     sdp.QueryError_OTHER,
 				ErrorString:   ctx.Err().Error(),
 				Scope:         q.GetScope(),
-				ResponderName: e.Name,
+				ResponderName: e.EngineConfig.SourceName,
 				ItemType:      q.GetType(),
 			},
 		}
@@ -442,7 +442,7 @@ func (e *Engine) callAdapters(ctx context.Context, q *sdp.Query, relevantAdapter
 						Scope:         scope,
 						SourceName:    adapter.Name(),
 						ItemType:      adapter.Type(),
-						ResponderName: e.Name,
+						ResponderName: e.EngineConfig.SourceName,
 					})
 				} else {
 					errs = append(errs, &sdp.QueryError{
@@ -452,7 +452,7 @@ func (e *Engine) callAdapters(ctx context.Context, q *sdp.Query, relevantAdapter
 						Scope:         q.GetScope(),
 						SourceName:    adapter.Name(),
 						ItemType:      q.GetType(),
-						ResponderName: e.Name,
+						ResponderName: e.EngineConfig.SourceName,
 					})
 				}
 			}
