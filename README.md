@@ -92,3 +92,21 @@ This repository is configured to us [VSCode devcontainers](https://code.visualst
 
 * Local environment not polluted
 * NATS sidecar container automatically started for end-to-end tests
+
+### Releasing
+
+- Make sure that main is green before proceeding! Then in the discovery directory, update to latest.
+
+```shell
+git fetch --all
+git rebase origin/main
+```
+
+- Compare the changes from the last release to what is in main. For [example](https://github.com/overmindtech/discovery/compare/v0.29.2...main). Following [semver](https://semver.org/) choose your new version. And use it to tag a version, and push it.
+
+```shell
+git tag v0.0.0
+git push origin tag v0.0.0
+```
+
+- Github actions will then run.
