@@ -88,6 +88,7 @@ func TestEngineConfigFromViper(t *testing.T) {
 				viper.Set("app", "https://custom.app")
 				viper.Set("source-access-token", "custom-access-token")
 				viper.Set("source-token-type", "custom-token-type")
+				viper.Set("overmind-managed-source", true)
 				viper.Set("max-parallel", 10)
 			},
 			engineType:                "test-engine",
@@ -102,17 +103,6 @@ func TestEngineConfigFromViper(t *testing.T) {
 			expectError:               false,
 		},
 		{
-			name: "source access token and api key set",
-			setupViper: func() {
-				viper.Reset()
-				viper.Set("source-access-token", "custom-access-token")
-				viper.Set("api-key", "custom-api-key")
-			},
-			engineType:  "test-engine",
-			version:     "1.0",
-			expectError: true,
-		},
-		{
 			name: "source access token and api key not set",
 			setupViper: func() {
 				viper.Reset()
@@ -120,6 +110,20 @@ func TestEngineConfigFromViper(t *testing.T) {
 			engineType:  "test-engine",
 			version:     "1.0",
 			expectError: true,
+		},
+		{
+			name: "only nats token set",
+			setupViper: func() {
+				viper.Reset()
+				viper.Set("nats-jwt", "nats-jwt")
+				viper.Set("nats-nkey-seed", "nats-nkey-seed")
+				viper.Set("source-name", "custom-source")
+			},
+			engineType:          "test-engine",
+			version:             "1.0",
+			expectError:         false,
+			expectedMaxParallel: runtime.NumCPU(),
+			expectedSourceName:  "custom-source",
 		},
 	}
 
