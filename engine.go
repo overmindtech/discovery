@@ -43,13 +43,19 @@ type HeartbeatOptions struct {
 // EngineConfig is the configuration for the engine
 // it is used to configure the engine before starting it
 type EngineConfig struct {
-	EngineType            string    // The type of the engine, e.g. "aws" or "kubernetes"
-	Version               string    // The version of the adapter that should be reported in the heartbeat
-	SourceName            string    // normally follows the format of "type-hostname", e.g. "stdlib-source"
-	SourceUUID            uuid.UUID // The UUID of the source, is this is blank it will be auto-generated. This is used in heartbeats and shouldn't be supplied usually"
-	App                   string    // "https://app.overmind.tech", "The URL of the Overmind app to use"
-	ApiKey                string    // The API key to use to authenticate to the Overmind API"
-	MaxParallelExecutions int       // 2_000, Max number of requests to run in parallel
+	EngineType        string    // The type of the engine, e.g. "aws" or "kubernetes"
+	Version           string    // The version of the adapter that should be reported in the heartbeat
+	SourceName        string    // normally follows the format of "type-hostname", e.g. "stdlib-source"
+	SourceUUID        uuid.UUID // The UUID of the source, is this is blank it will be auto-generated. This is used in heartbeats and shouldn't be supplied usually"
+	App               string    // "https://app.overmind.tech", "The URL of the Overmind app to use"
+	ApiKey            string    // The API key to use to authenticate to the Overmind API"
+	SourceAccessToken string    // The access token to use to authenticate to the source
+	SourceTokenType   string    // The type of token to use to authenticate the source for managed sources
+	// Whether this adapter is managed by Overmind. This is initially used for
+	// reporting so that you can tell the difference between managed adapters and
+	// ones you're running locally
+	OvermindManagedSource sdp.SourceManaged
+	MaxParallelExecutions int // 2_000, Max number of requests to run in parallel
 }
 
 // Engine is the main discovery engine. This is where all of the Adapters and
@@ -60,10 +66,6 @@ type EngineConfig struct {
 // simply not communicate over NATS
 type Engine struct {
 	EngineConfig *EngineConfig
-	// Whether this adapter is managed by Overmind. This is initially used for
-	// reporting so that you can tell the difference between managed adapters and
-	// ones you're running locally
-	Managed sdp.SourceManaged
 
 	NATSOptions   *auth.NATSOptions // Options for connecting to NATS
 	NATSQueueName string            // The name of the queue to use when subscribing
