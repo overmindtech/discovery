@@ -40,7 +40,6 @@ func TestHeartbeats(t *testing.T) {
 	}
 	e, _ := NewEngine(&ec)
 
-	e.Managed = sdp.SourceManaged_LOCAL
 	e.HeartbeatOptions = &HeartbeatOptions{
 		ManagementClient: testHeartbeatClient{
 			Requests:  requests,

@@ -68,7 +68,7 @@ func (e *Engine) SendHeartbeat(ctx context.Context) error {
 			Type:             e.EngineConfig.EngineType,
 			AvailableScopes:  availableScopes,
 			AdapterMetadata:  adapterMetadata,
-			Managed:          e.Managed,
+			Managed:          e.EngineConfig.OvermindManagedSource,
 			Error:            heartbeatError,
 			NextHeartbeatMax: durationpb.New(nextHeartbeat),
 		},
