@@ -89,6 +89,10 @@ func EngineConfigFromViper(engineType, version string) (*EngineConfig, error) {
 		maxParallelExecutions = runtime.NumCPU()
 	}
 
+	// TODO: Get the source-access-token and source-token-type and convert it
+	// into a *oauth2.Token to store in the EngineConfig. Also might as well put
+	// the validation here too
+
 	return &EngineConfig{
 		EngineType:            engineType,
 		Version:               version,
@@ -133,9 +137,9 @@ func (ec *EngineConfig) CreateClients(oi sdp.OvermindInstance) (auth.TokenClient
 	var key string
 
 	if ec.ApiKey != "" {
-		key = ec.ApiKey
+		key = ec.ApiKey // ovm_98jiGUHJWSU&
 	} else if ec.SourceAccessToken != "" {
-		key = ec.SourceAccessToken
+		key = ec.SourceAccessToken // eiaweuhrfuiefr.jksdufvbuksdybhfv.sdjfhvbsdkjfyvb
 	} else {
 		return nil, nil, fmt.Errorf("api-key or source-access-token must be set")
 	}
