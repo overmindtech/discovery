@@ -83,6 +83,12 @@ sequenceDiagram
     NATS-->>Engine: Connected
 ```
 
+Login to the Overmind app, eg [local dev](https://localhost.df.overmind-demo.com:3000/settings/api-keys) and create a new overmind API key. Use the scope of 'request:receive'. To use the API key with a source add the CLI option
+
+```shell
+go run main.go start --aws-regions eu-west-2  --aws-access-strategy sso-profile --aws-profile sso-dogfood   --nats-jwt=...  --api-key=ovm...
+```
+
 ### Static Access Token Auth
 
 ```mermaid
@@ -99,6 +105,12 @@ sequenceDiagram
     Engine->>Engine: Sign Nonce using Private NKey
     Engine->>NATS: Signed Nonce
     NATS-->>Engine: Connected
+```
+
+To generate a static access token go to `https://manage.auth0.com/dashboard/eu/om-dogfood/applications` and select your application. Go to quick start and grab the curl command. You will need to add the account_name to the curl request. eg `,"account_name":"6351cbb7-cb45-481a-99cd-909d04a58512"`. This will return a JWT token that you can use to authenticate with the engine. You can now start your source.
+
+```shell
+go run main.go start --aws-regions eu-west-2  --aws-access-strategy sso-profile --aws-profile sso-dogfood   --nats-jwt=... --overmind-managed-source true --source-token-type Bearer --source-access-token ey....
 ```
 
 ## Default Adapters

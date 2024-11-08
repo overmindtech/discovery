@@ -89,18 +89,14 @@ func EngineConfigFromViper(engineType, version string) (*EngineConfig, error) {
 		maxParallelExecutions = runtime.NumCPU()
 	}
 
-	// TODO: Get the source-access-token and source-token-type and convert it
-	// into a *oauth2.Token to store in the EngineConfig. Also might as well put
-	// the validation here too
-
 	return &EngineConfig{
 		EngineType:            engineType,
 		Version:               version,
 		SourceName:            sourceName,
 		SourceUUID:            sourceUUID,
+		OvermindManagedSource: managedSource,
 		SourceAccessToken:     viper.GetString("source-access-token"),
 		SourceTokenType:       viper.GetString("source-token-type"),
-		OvermindManagedSource: managedSource,
 		App:                   viper.GetString("app"),
 		ApiKey:                viper.GetString("api-key"),
 		MaxParallelExecutions: maxParallelExecutions,
@@ -134,23 +130,32 @@ func MapFromEngineConfig(ec *EngineConfig) map[string]any {
 
 func (ec *EngineConfig) CreateClients(oi sdp.OvermindInstance) (auth.TokenClient, *HeartbeatOptions, error) {
 	apiUrl := oi.ApiUrl.String()
-	var key string
+	var tokenClient auth.TokenClient
+	var tokenSource oauth2.TokenSource
+	var err error
+	if ec.SourceAccessToken != "" {
+		tokenClient, err = auth.NewStaticTokenClient(apiUrl, ec.SourceAccessToken, ec.SourceTokenType)
+		if err != nil {
+			err = fmt.Errorf("error creating static token client %w", err)
+			sentry.CaptureException(err)
+			log.WithError(err).Fatal("error creating static token client")
+		}
+		tokenSource = oauth2.StaticTokenSource(&oauth2.Token{
+			AccessToken: ec.SourceAccessToken,
+			TokenType:   ec.SourceTokenType,
+		})
 
-	if ec.ApiKey != "" {
-		key = ec.ApiKey // ovm_98jiGUHJWSU&
-	} else if ec.SourceAccessToken != "" {
-		key = ec.SourceAccessToken // eiaweuhrfuiefr.jksdufvbuksdybhfv.sdjfhvbsdkjfyvb
+	} else if ec.ApiKey != "" {
+		tokenClient, err = auth.NewAPIKeyClient(apiUrl, ec.ApiKey)
+		if err != nil {
+			err = fmt.Errorf("error creating API key client %w", err)
+			sentry.CaptureException(err)
+			log.WithError(err).Fatal("error creating API key client")
+		}
+		tokenSource = auth.NewAPIKeyTokenSource(ec.ApiKey, apiUrl)
 	} else {
 		return nil, nil, fmt.Errorf("api-key or source-access-token must be set")
 	}
-	tokenClient, err := auth.NewAPIKeyClient(apiUrl, key)
-	if err != nil {
-		err = fmt.Errorf("error creating API key client %w", err)
-		sentry.CaptureException(err)
-		log.WithError(err).Fatal("error creating API key client")
-	}
-
-	tokenSource := auth.NewAPIKeyTokenSource(key, apiUrl)
 	transport := oauth2.Transport{
 		Source: tokenSource,
 		Base:   http.DefaultTransport,
