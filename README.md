@@ -22,6 +22,8 @@ Look at the tests for some simple examples of starting and running an engine, or
 
 ## Triggers
 
+**NOTE:** This was never fully implement and shouldn't be used
+
 Triggers allow source developers to have their source be triggered by the discover of other items on the NATS network. This allows for a pattern where a source is triggered by a relevant resource being discovered by another query, rather than by being queried directly. This can be used to write secondary adapters that fire automatically e.g.
 
 > When a package with the name "nginx" is found in any scope, the source should be triggered to try to find the config file for nginx in this scope, parse it, and return more detailed information.
@@ -53,6 +55,63 @@ var trigger = Trigger{
 ```
 
 When the above trigger fires it will result in the engine that it is assigned to processing a SEARCH query as defined above. Note that while only the `Type`, `Method` and `Query` attributes have been specified, the rest will be filled in automatically with data from the `Metadata.SourceQuery` of the originating item to ensure that the responses are sent to the user that originated the query.
+
+## Auth
+
+The engine can authenticate using either an Overmind API Key (e.g. `ovm_...`) or a static OAuth2 Access Token (in form of a JWT). The static token is only used for managed sources currently and shouldn't be used by end-users since you have to manage the expiration and rotation of the token yourself, as well as getting it in the first place.
+
+### API-Key Auth
+
+```mermaid
+sequenceDiagram
+
+    alt ApiKeyServiceClient.ExchangeKeyForToken
+        Engine->>Overmind: API Key
+        Overmind-->>Engine: OAuth Access Token (JWT)
+    end
+
+    alt ManagementServiceClient.CreateToken
+        Engine->>Engine: Generate NKey Pair
+        Engine->>Overmind: OAuth Access Token & Public Nkey & Username
+        Overmind-->>Engine: NATS JWT
+    end
+
+    Engine->>NATS: NATS JWT
+    NATS-->>Engine: Nonce (Some random text)
+    Engine->>Engine: Sign Nonce using Private NKey
+    Engine->>NATS: Signed Nonce
+    NATS-->>Engine: Connected
+```
+
+Login to the Overmind app, eg [local dev](https://localhost.df.overmind-demo.com:3000/settings/api-keys) and create a new overmind API key. Use the scope of 'request:receive'. To use the API key with a source add the CLI option
+
+```shell
+go run main.go start --aws-regions eu-west-2  --aws-access-strategy sso-profile --aws-profile sso-dogfood   --nats-jwt=...  --api-key=ovm...
+```
+
+### Static Access Token Auth
+
+```mermaid
+sequenceDiagram
+
+    alt ManagementServiceClient.CreateToken
+        Engine->>Engine: Generate NKey Pair
+        Engine->>Overmind: OAuth Access Token & Public Nkey & Username
+        Overmind-->>Engine: NATS JWT
+    end
+
+    Engine->>NATS: NATS JWT
+    NATS-->>Engine: Nonce (Some random text)
+    Engine->>Engine: Sign Nonce using Private NKey
+    Engine->>NATS: Signed Nonce
+    NATS-->>Engine: Connected
+```
+
+To generate a static access token go to `https://manage.auth0.com/dashboard/eu/om-dogfood/applications` and select your application. Go to quick start and grab the curl command. You will need to add the account_name to the curl request. eg `,"account_name":"6351cbb7-cb45-481a-99cd-909d04a58512"`. This will return a JWT token that you can use to authenticate with the engine. You can now start your source.
+
+```shell
+go run main.go start --aws-regions eu-west-2  --aws-access-strategy sso-profile --aws-profile sso-dogfood   --nats-jwt=... --overmind-managed-source true --source-token-type Bearer --source-access-token ey....
+```
 
 ## Default Adapters
 
@@ -110,3 +169,4 @@ git push origin tag v0.0.0
 ```
 
 - Github actions will then run.
+
