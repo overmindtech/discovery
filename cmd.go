@@ -69,11 +69,19 @@ func EngineConfigFromViper(engineType, version string) (*EngineConfig, error) {
 	if (viper.GetString("nats-jwt") != "" && viper.GetString("nats-nkey-seed") != "") && (viper.GetString("api-key") == "" || viper.GetString("source-access-token") == "") {
 		log.Debug("Using nats jwt and nkey-seed for authentication")
 	} else {
-		if viper.GetBool("overmind-managed-source") && viper.GetString("source-access-token") == "" {
-			return nil, fmt.Errorf("source-access-token must be set for managed sources")
-		}
-		if !viper.GetBool("overmind-managed-source") && viper.GetString("api-key") == "" {
-			return nil, fmt.Errorf("api-key must be set for local sources")
+		if viper.GetBool("overmind-managed-source") {
+			// If managed source, we expect a token
+			if viper.GetString("source-access-token") == "" {
+				return nil, fmt.Errorf("source-access-token must be set for managed sources")
+			}
+		} else {
+			// If unmanaged we can have unauthenticated sources for local
+			// testing, or we can use an API key
+			if allow, exists := os.LookupEnv("ALLOW_UNAUTHENTICATED"); exists && allow == "true" {
+				log.Debug("Using unauthenticated mode as ALLOW_UNAUTHENTICATED is set")
+			} else if viper.GetString("api-key") == "" {
+				return nil, fmt.Errorf("api-key must be set for local sources")
+			}
 		}
 	}
 
