@@ -20,6 +20,11 @@ import (
 )
 
 func AddEngineFlags(command *cobra.Command) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.WithError(err).Fatal("Could not determine hostname for use in NATS connection name and source name")
+	}
+
 	command.PersistentFlags().String("source-name", "", "The name of the source")
 	cobra.CheckErr(viper.BindEnv("source-name", "SOURCE_NAME"))
 	command.PersistentFlags().String("source-uuid", "", "The UUID of the source, is this is blank it will be auto-generated. This is used in heartbeats and shouldn't be supplied usually")
@@ -36,6 +41,17 @@ func AddEngineFlags(command *cobra.Command) {
 	cobra.CheckErr(viper.BindEnv("app", "APP"))
 	command.PersistentFlags().String("api-key", "", "The API key to use to authenticate to the Overmind API")
 	cobra.CheckErr(viper.BindEnv("api-key", "OVM_API_KEY", "API_KEY"))
+
+	command.PersistentFlags().StringArray("nats-servers", []string{"nats://localhost:4222", "nats://nats:4222"}, "A list of NATS servers to connect to")
+	cobra.CheckErr(viper.BindEnv("nats-servers", "NATS_SERVERS"))
+	command.PersistentFlags().String("nats-jwt", "", "The JWT token that should be used to authenticate to NATS, provided in raw format e.g. eyJ0eXAiOiJKV1Q...")
+	cobra.CheckErr(viper.BindEnv("nats-jwt", "NATS_JWT"))
+	command.PersistentFlags().String("nats-nkey-seed", "", "The NKey seed which corresponds to the NATS JWT e.g. SUAFK6QUC...")
+	cobra.CheckErr(viper.BindEnv("nats-nkey-seed", "NATS_NKEY_SEED"))
+	command.PersistentFlags().String("nats-connection-name", hostname, "The name that the source should use to connect to NATS")
+	cobra.CheckErr(viper.BindEnv("nats-connection-name", "NATS_CONNECTION_NAME"))
+	command.PersistentFlags().Int("nats-connection-timeout", 10, "The timeout for connecting to NATS")
+	cobra.CheckErr(viper.BindEnv("nats-connection-timeout", "NATS_CONNECTION_TIMEOUT"))
 
 	command.PersistentFlags().Int("max-parallel", 0, "The maximum number of parallel executions")
 	cobra.CheckErr(viper.BindEnv("max-parallel", "MAX_PARALLEL"))

@@ -56,6 +56,10 @@ type EngineConfig struct {
 	SourceAccessToken string // The access token to use to authenticate to the source
 	SourceTokenType   string // The type of token to use to authenticate the source for managed sources
 
+	// NATS options
+	NATSOptions   *auth.NATSOptions // Options for connecting to NATS
+	NATSQueueName string            // The name of the queue to use when subscribing
+
 	// Whether this adapter is managed by Overmind. This is initially used for
 	// reporting so that you can tell the difference between managed adapters and
 	// ones you're running locally
@@ -71,10 +75,6 @@ type EngineConfig struct {
 // simply not communicate over NATS
 type Engine struct {
 	EngineConfig *EngineConfig
-
-	NATSOptions   *auth.NATSOptions // Options for connecting to NATS
-	NATSQueueName string            // The name of the queue to use when subscribing
-
 	// The maximum request timeout. Defaults to `DefaultMaxRequestTimeout` if
 	// set to zero. If a client does not send a timeout, it will default to this
 	// value. Requests with timeouts larger than this value will have their
@@ -179,15 +179,14 @@ func (e *Engine) AddAdapters(adapters ...Adapter) {
 // Connect Connects to NATS
 func (e *Engine) connect() error {
 	// Try to connect to NATS
-	if e.NATSOptions != nil {
-		ec, err := e.NATSOptions.Connect()
-
+	if e.EngineConfig.NATSOptions != nil {
+		encodedConnection, err := e.EngineConfig.NATSOptions.Connect()
 		if err != nil {
 			return err
 		}
 
 		e.natsConnectionMutex.Lock()
-		e.natsConnection = ec
+		e.natsConnection = encodedConnection
 		e.natsConnectionMutex.Unlock()
 
 		e.connectionWatcher = NATSWatcher{
@@ -332,15 +331,15 @@ func (e *Engine) subscribe(subject string, handler nats.MsgHandler) error {
 	}
 
 	log.WithFields(log.Fields{
-		"queueName":  e.NATSQueueName,
+		"queueName":  e.EngineConfig.NATSQueueName,
 		"subject":    subject,
 		"engineName": e.EngineConfig.SourceName,
 	}).Debug("creating NATS subscription")
 
-	if e.NATSQueueName == "" {
+	if e.EngineConfig.NATSQueueName == "" {
 		subscription, err = e.natsConnection.Subscribe(subject, handler)
 	} else {
-		subscription, err = e.natsConnection.QueueSubscribe(subject, e.NATSQueueName, handler)
+		subscription, err = e.natsConnection.QueueSubscribe(subject, e.EngineConfig.NATSQueueName, handler)
 	}
 
 	if err != nil {
