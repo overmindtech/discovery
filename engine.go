@@ -43,11 +43,12 @@ type HeartbeatOptions struct {
 // EngineConfig is the configuration for the engine
 // it is used to configure the engine before starting it
 type EngineConfig struct {
-	EngineType string    // The type of the engine, e.g. "aws" or "kubernetes"
-	Version    string    // The version of the adapter that should be reported in the heartbeat
-	SourceName string    // normally follows the format of "type-hostname", e.g. "stdlib-source"
-	SourceUUID uuid.UUID // The UUID of the source, is this is blank it will be auto-generated. This is used in heartbeats and shouldn't be supplied usually"
-	App        string    // "https://app.overmind.tech", "The URL of the Overmind app to use"
+	EngineType   string    // The type of the engine, e.g. "aws" or "kubernetes"
+	Version      string    // The version of the adapter that should be reported in the heartbeat
+	SourceName   string    // normally follows the format of "type-hostname", e.g. "stdlib-source"
+	SourceUUID   uuid.UUID // The UUID of the source, is this is blank it will be auto-generated. This is used in heartbeats and shouldn't be supplied usually"
+	App          string    // "https://app.overmind.tech", "The URL of the Overmind app to use"
+	APIServerURL string    // The URL of the Overmind API server to uses for the heartbeat, this is calculated
 
 	// The 'ovm_*' API key to use to authenticate to the Overmind API.
 	// This and 'SourceAccessToken' are mutually exclusive

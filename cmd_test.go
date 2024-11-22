@@ -24,8 +24,11 @@ func TestEngineConfigFromViper(t *testing.T) {
 		expectedSourceTokenType   string
 		expectedManagedSource     sdp.SourceManaged
 		expectedApp               string
+		expectedApiServerURL      string
 		expectedApiKey            string
 		expectedMaxParallel       int
+		expectedNATSOnly          bool
+		expectUnauthenticated     bool
 		expectError               bool
 	}{
 		{
@@ -43,6 +46,7 @@ func TestEngineConfigFromViper(t *testing.T) {
 			expectedSourceTokenType:   "",
 			expectedManagedSource:     sdp.SourceManaged_LOCAL,
 			expectedApp:               "https://app.overmind.tech",
+			expectedApiServerURL:      "https://api.app.overmind.tech",
 			expectedApiKey:            "api-key",
 			expectedMaxParallel:       runtime.NumCPU(),
 			expectError:               false,
@@ -53,7 +57,7 @@ func TestEngineConfigFromViper(t *testing.T) {
 				viper.Reset()
 				viper.Set("source-name", "custom-source")
 				viper.Set("source-uuid", "123e4567-e89b-12d3-a456-426614174000")
-				viper.Set("app", "https://custom.app")
+				viper.Set("app", "https://df.overmind-demo.com/")
 				viper.Set("api-key", "custom-api-key")
 				viper.Set("max-parallel", 10)
 			},
@@ -64,7 +68,8 @@ func TestEngineConfigFromViper(t *testing.T) {
 			expectedSourceAccessToken: "",
 			expectedSourceTokenType:   "",
 			expectedManagedSource:     sdp.SourceManaged_LOCAL,
-			expectedApp:               "https://custom.app",
+			expectedApp:               "https://df.overmind-demo.com/",
+			expectedApiServerURL:      "https://api.df.overmind-demo.com",
 			expectedApiKey:            "custom-api-key",
 			expectedMaxParallel:       10,
 			expectError:               false,
@@ -80,16 +85,18 @@ func TestEngineConfigFromViper(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name: "custom values with source access token",
+			name: "managed source",
 			setupViper: func() {
 				viper.Reset()
 				viper.Set("source-name", "custom-source")
 				viper.Set("source-uuid", "123e4567-e89b-12d3-a456-426614174000")
-				viper.Set("app", "https://custom.app")
 				viper.Set("source-access-token", "custom-access-token")
 				viper.Set("source-token-type", "custom-token-type")
 				viper.Set("overmind-managed-source", true)
 				viper.Set("max-parallel", 10)
+
+				viper.Set("api-server-service-host", "api.app.overmind.tech")
+				viper.Set("api-server-service-port", "443")
 			},
 			engineType:                "test-engine",
 			version:                   "1.0",
@@ -98,9 +105,10 @@ func TestEngineConfigFromViper(t *testing.T) {
 			expectedSourceAccessToken: "custom-access-token",
 			expectedSourceTokenType:   "custom-token-type",
 			expectedManagedSource:     sdp.SourceManaged_MANAGED,
-			expectedApp:               "https://custom.app",
-			expectedMaxParallel:       10,
-			expectError:               false,
+
+			expectedApiServerURL: "api.app.overmind.tech:443",
+			expectedMaxParallel:  10,
+			expectError:          false,
 		},
 		{
 			name: "source access token and api key not set",
@@ -112,43 +120,69 @@ func TestEngineConfigFromViper(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name: "only nats token set",
+			name: "nats authenticated",
 			setupViper: func() {
 				viper.Reset()
 				viper.Set("nats-jwt", "nats-jwt")
 				viper.Set("nats-nkey-seed", "nats-nkey-seed")
 				viper.Set("source-name", "custom-source")
+				viper.Set("app", "https://app.overmind.tech")
 			},
-			engineType:          "test-engine",
-			version:             "1.0",
-			expectError:         false,
-			expectedMaxParallel: runtime.NumCPU(),
-			expectedSourceName:  "custom-source",
+			engineType:            "test-engine",
+			version:               "1.0",
+			expectError:           false,
+			expectedMaxParallel:   runtime.NumCPU(),
+			expectedSourceName:    "custom-source",
+			expectedApp:           "https://app.overmind.tech",
+			expectedApiServerURL:  "https://api.app.overmind.tech",
+			expectedNATSOnly:      true,
+			expectUnauthenticated: false,
+		},
+		{
+			name: "fully unauthenticated",
+			setupViper: func() {
+				viper.Reset()
+				viper.Set("app", "https://app.overmind.tech")
+				viper.Set("source-name", "custom-source")
+				t.Setenv("ALLOW_UNAUTHENTICATED", "true")
+			},
+			engineType:            "test-engine",
+			version:               "1.0",
+			expectError:           false,
+			expectedMaxParallel:   runtime.NumCPU(),
+			expectedSourceName:    "custom-source",
+			expectedApp:           "https://app.overmind.tech",
+			expectedApiServerURL:  "https://api.app.overmind.tech",
+			expectedNATSOnly:      true,
+			expectUnauthenticated: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setupViper()
-			config, err := EngineConfigFromViper(tt.engineType, tt.version)
+			engineConfig, err := EngineConfigFromViper(tt.engineType, tt.version)
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.engineType, config.EngineType)
-				assert.Equal(t, tt.version, config.Version)
-				assert.Equal(t, tt.expectedSourceName, config.SourceName)
+				assert.Equal(t, tt.engineType, engineConfig.EngineType)
+				assert.Equal(t, tt.version, engineConfig.Version)
+				assert.Equal(t, tt.expectedSourceName, engineConfig.SourceName)
 				if tt.expectedSourceUUID == uuid.Nil {
-					assert.NotEqual(t, uuid.Nil, config.SourceUUID)
+					assert.NotEqual(t, uuid.Nil, engineConfig.SourceUUID)
 				} else {
-					assert.Equal(t, tt.expectedSourceUUID, config.SourceUUID)
+					assert.Equal(t, tt.expectedSourceUUID, engineConfig.SourceUUID)
 				}
-				assert.Equal(t, tt.expectedSourceAccessToken, config.SourceAccessToken)
-				assert.Equal(t, tt.expectedSourceTokenType, config.SourceTokenType)
-				assert.Equal(t, tt.expectedManagedSource, config.OvermindManagedSource)
-				assert.Equal(t, tt.expectedApp, config.App)
-				assert.Equal(t, tt.expectedApiKey, config.ApiKey)
-				assert.Equal(t, tt.expectedMaxParallel, config.MaxParallelExecutions)
+				assert.Equal(t, tt.expectedSourceAccessToken, engineConfig.SourceAccessToken)
+				assert.Equal(t, tt.expectedSourceTokenType, engineConfig.SourceTokenType)
+				assert.Equal(t, tt.expectedManagedSource, engineConfig.OvermindManagedSource)
+				assert.Equal(t, tt.expectedApp, engineConfig.App)
+				assert.Equal(t, tt.expectedApiServerURL, engineConfig.APIServerURL)
+				assert.Equal(t, tt.expectedApiKey, engineConfig.ApiKey)
+				assert.Equal(t, tt.expectedMaxParallel, engineConfig.MaxParallelExecutions)
+				assert.Equal(t, tt.expectedNATSOnly, engineConfig.NATSOnly)
+				assert.Equal(t, tt.expectUnauthenticated, engineConfig.Unauthenticated)
 			}
 		})
 	}
