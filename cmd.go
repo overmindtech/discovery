@@ -20,10 +20,6 @@ import (
 )
 
 func AddEngineFlags(command *cobra.Command) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		log.WithError(err).Fatal("Could not determine hostname for use in NATS connection name and source name")
-	}
 
 	command.PersistentFlags().String("source-name", "", "The name of the source")
 	cobra.CheckErr(viper.BindEnv("source-name", "SOURCE_NAME"))
@@ -48,7 +44,7 @@ func AddEngineFlags(command *cobra.Command) {
 	cobra.CheckErr(viper.BindEnv("nats-jwt", "NATS_JWT"))
 	command.PersistentFlags().String("nats-nkey-seed", "", "The NKey seed which corresponds to the NATS JWT e.g. SUAFK6QUC...")
 	cobra.CheckErr(viper.BindEnv("nats-nkey-seed", "NATS_NKEY_SEED"))
-	command.PersistentFlags().String("nats-connection-name", hostname, "The name that the source should use to connect to NATS")
+	command.PersistentFlags().String("nats-connection-name", "", "The name that the source should use to connect to NATS")
 	cobra.CheckErr(viper.BindEnv("nats-connection-name", "NATS_CONNECTION_NAME"))
 	command.PersistentFlags().Int("nats-connection-timeout", 10, "The timeout for connecting to NATS")
 	cobra.CheckErr(viper.BindEnv("nats-connection-timeout", "NATS_CONNECTION_TIMEOUT"))
@@ -59,11 +55,12 @@ func AddEngineFlags(command *cobra.Command) {
 
 func EngineConfigFromViper(engineType, version string) (*EngineConfig, error) {
 	var sourceName string
+	hostname, err := os.Hostname()
+	if err != nil {
+		return nil, fmt.Errorf("error getting hostname: %w", err)
+	}
+
 	if viper.GetString("source-name") == "" {
-		hostname, err := os.Hostname()
-		if err != nil {
-			return nil, fmt.Errorf("error getting hostname: %w", err)
-		}
 		sourceName = fmt.Sprintf("%s-%s", engineType, hostname)
 	} else {
 		sourceName = viper.GetString("source-name")
@@ -79,6 +76,22 @@ func EngineConfigFromViper(engineType, version string) (*EngineConfig, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error parsing source-uuid: %w", err)
 		}
+	}
+
+	// setup natsOptions
+	var natsConnectionName string
+	if viper.GetString("nats-connection-name") == "" {
+		natsConnectionName = hostname
+	}
+	natsOptions := auth.NATSOptions{
+		NumRetries:        -1,
+		RetryDelay:        5 * time.Second,
+		Servers:           viper.GetStringSlice("nats-servers"),
+		ConnectionName:    natsConnectionName,
+		ConnectionTimeout: time.Duration(viper.GetInt("nats-connection-timeout")) * time.Second,
+		MaxReconnects:     -1,
+		ReconnectWait:     1 * time.Second,
+		ReconnectJitter:   1 * time.Second,
 	}
 
 	// this is a workaround until we can remove nats only authentication. Going forward all sources must send a heartbeat
@@ -123,6 +136,7 @@ func EngineConfigFromViper(engineType, version string) (*EngineConfig, error) {
 		SourceTokenType:       viper.GetString("source-token-type"),
 		App:                   viper.GetString("app"),
 		ApiKey:                viper.GetString("api-key"),
+		NATSOptions:           &natsOptions,
 		MaxParallelExecutions: maxParallelExecutions,
 	}, nil
 }
@@ -149,6 +163,10 @@ func MapFromEngineConfig(ec *EngineConfig) map[string]any {
 		"app":                     ec.App,
 		"api-key":                 apiKeyClientSecret,
 		"max-parallel-executions": ec.MaxParallelExecutions,
+		"nats-servers":            ec.NATSOptions.Servers,
+		"nats-connection-name":    ec.NATSOptions.ConnectionName,
+		"nats-connection-timeout": ec.NATSConnectionTimeout,
+		"nats-queue-name":         ec.NATSQueueName,
 	}
 }
 
@@ -195,5 +213,4 @@ func (ec *EngineConfig) CreateClients(oi sdp.OvermindInstance) (auth.TokenClient
 		Frequency: time.Second * 30,
 	}
 	return tokenClient, &heartbeatOptions, nil
-
 }
