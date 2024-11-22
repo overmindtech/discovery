@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
+	"github.com/nats-io/jwt/v2"
+	"github.com/nats-io/nkeys"
 	"github.com/overmindtech/sdp-go"
 	"github.com/overmindtech/sdp-go/auth"
 	"github.com/overmindtech/sdp-go/sdpconnect"
@@ -94,9 +97,15 @@ func EngineConfigFromViper(engineType, version string) (*EngineConfig, error) {
 		ReconnectJitter:   1 * time.Second,
 	}
 
+	// decide if we are using apiUrl := oi.ApiUrl.String()
+	// what if its manual vs local vs nats only
+	appURL := viper.GetString("app")
+
+	natsOnly := false
 	// this is a workaround until we can remove nats only authentication. Going forward all sources must send a heartbeat
 	if (viper.GetString("nats-jwt") != "" && viper.GetString("nats-nkey-seed") != "") && (viper.GetString("api-key") == "" || viper.GetString("source-access-token") == "") {
 		log.Debug("Using nats jwt and nkey-seed for authentication")
+		natsOnly = true
 	} else {
 		if viper.GetBool("overmind-managed-source") {
 			// If managed source, we expect a token
@@ -134,9 +143,12 @@ func EngineConfigFromViper(engineType, version string) (*EngineConfig, error) {
 		OvermindManagedSource: managedSource,
 		SourceAccessToken:     viper.GetString("source-access-token"),
 		SourceTokenType:       viper.GetString("source-token-type"),
-		App:                   viper.GetString("app"),
+		App:                   appURL,
 		ApiKey:                viper.GetString("api-key"),
 		NATSOptions:           &natsOptions,
+		NATSJwt:               viper.GetString("nats-jwt"),
+		NATSNkeySeed:          viper.GetString("nats-nkey-seed"),
+		NATSOnly:              natsOnly,
 		MaxParallelExecutions: maxParallelExecutions,
 	}, nil
 }
@@ -167,50 +179,108 @@ func MapFromEngineConfig(ec *EngineConfig) map[string]any {
 		"nats-connection-name":    ec.NATSOptions.ConnectionName,
 		"nats-connection-timeout": ec.NATSConnectionTimeout,
 		"nats-queue-name":         ec.NATSQueueName,
+		"nats-only":               ec.NATSOnly,
 	}
 }
 
-func (ec *EngineConfig) CreateClients(oi sdp.OvermindInstance) (auth.TokenClient, *HeartbeatOptions, error) {
-	apiUrl := oi.ApiUrl.String()
-	var tokenClient auth.TokenClient
-	var tokenSource oauth2.TokenSource
-	var err error
-	if ec.SourceAccessToken != "" {
-		tokenClient, err = auth.NewStaticTokenClient(apiUrl, ec.SourceAccessToken, ec.SourceTokenType)
-		if err != nil {
-			err = fmt.Errorf("error creating static token client %w", err)
-			sentry.CaptureException(err)
-			log.WithError(err).Fatal("error creating static token client")
-		}
-		tokenSource = oauth2.StaticTokenSource(&oauth2.Token{
-			AccessToken: ec.SourceAccessToken,
-			TokenType:   ec.SourceTokenType,
-		})
-
-	} else if ec.ApiKey != "" {
-		tokenClient, err = auth.NewAPIKeyClient(apiUrl, ec.ApiKey)
+func (ec *EngineConfig) CreateClients() (*HeartbeatOptions, error) {
+	if ec.OvermindManagedSource == sdp.SourceManaged_LOCAL {
+		tokenClient, err := auth.NewAPIKeyClient(ec.App, ec.ApiKey)
 		if err != nil {
 			err = fmt.Errorf("error creating API key client %w", err)
 			sentry.CaptureException(err)
 			log.WithError(err).Fatal("error creating API key client")
 		}
-		tokenSource = auth.NewAPIKeyTokenSource(ec.ApiKey, apiUrl)
-	} else {
-		return nil, nil, fmt.Errorf("api-key or source-access-token must be set")
+		tokenSource := auth.NewAPIKeyTokenSource(ec.ApiKey, ec.App)
+		transport := oauth2.Transport{
+			Source: tokenSource,
+			Base:   http.DefaultTransport,
+		}
+		authenticatedClient := http.Client{
+			Transport: otelhttp.NewTransport(&transport),
+		}
+		heartbeatOptions := HeartbeatOptions{
+			ManagementClient: sdpconnect.NewManagementServiceClient(
+				&authenticatedClient,
+				ec.App,
+			),
+			Frequency: time.Second * 30,
+		}
+		ec.NATSOptions.TokenClient = tokenClient
+		// lets print out the config
+		log.WithFields(MapFromEngineConfig(ec)).Info("Engine config")
+		return &heartbeatOptions, nil
+	} else if ec.OvermindManagedSource == sdp.SourceManaged_MANAGED {
+		tokenClient, err := auth.NewStaticTokenClient(ec.App, ec.SourceAccessToken, ec.SourceTokenType)
+		if err != nil {
+			err = fmt.Errorf("error creating static token client %w", err)
+			sentry.CaptureException(err)
+			log.WithError(err).Fatal("error creating static token client")
+		}
+		tokenSource := oauth2.StaticTokenSource(&oauth2.Token{
+			AccessToken: ec.SourceAccessToken,
+			TokenType:   ec.SourceTokenType,
+		})
+		transport := oauth2.Transport{
+			Source: tokenSource,
+			Base:   http.DefaultTransport,
+		}
+		authenticatedClient := http.Client{
+			Transport: otelhttp.NewTransport(&transport),
+		}
+		heartbeatOptions := HeartbeatOptions{
+			ManagementClient: sdpconnect.NewManagementServiceClient(
+				&authenticatedClient,
+				ec.App,
+			),
+			Frequency: time.Second * 30,
+		}
+		ec.NATSOptions.TokenClient = tokenClient
+		// lets print out the config
+		log.WithFields(MapFromEngineConfig(ec)).Info("Engine config")
+		return &heartbeatOptions, nil
+	} else if ec.NATSOnly {
+		tokenClient, err := createNATSTokenClient(ec.NATSJwt, ec.NATSNkeySeed)
+		log.Info("Using NATS authentication, no heartbeat will be sent")
+		if err != nil {
+			log.WithError(err).Fatal("Error validating NATS authentication info")
+		}
+		ec.NATSOptions.TokenClient = tokenClient
+		// lets print out the config
+		log.WithFields(MapFromEngineConfig(ec)).Info("Engine config")
+		return nil, nil
+	} else if allow, exists := os.LookupEnv("ALLOW_UNAUTHENTICATED"); exists && allow == "true" {
+		// this is a special case for testing the api-server
+		log.Debug("Using unauthenticated mode as ALLOW_UNAUTHENTICATED is set")
+		return nil, nil
 	}
-	transport := oauth2.Transport{
-		Source: tokenSource,
-		Base:   http.DefaultTransport,
+	err := fmt.Errorf("unable to setup authentication. source managed %v. nats only:%v", ec.OvermindManagedSource, ec.NATSOnly)
+	sentry.CaptureException(err)
+	log.WithError(err).Fatal("unable to setup authentication")
+	return nil, err
+}
+
+// createNATSTokenClient Creates a basic token client that will authenticate to NATS
+// using the given values
+func createNATSTokenClient(natsJWT string, natsNKeySeed string) (auth.TokenClient, error) {
+	var kp nkeys.KeyPair
+	var err error
+
+	if natsJWT == "" {
+		return nil, errors.New("nats-jwt was blank. This is required when using authentication")
 	}
-	authenticatedClient := http.Client{
-		Transport: otelhttp.NewTransport(&transport),
+
+	if natsNKeySeed == "" {
+		return nil, errors.New("nats-nkey-seed was blank. This is required when using authentication")
 	}
-	heartbeatOptions := HeartbeatOptions{
-		ManagementClient: sdpconnect.NewManagementServiceClient(
-			&authenticatedClient,
-			apiUrl,
-		),
-		Frequency: time.Second * 30,
+
+	if _, err = jwt.DecodeUserClaims(natsJWT); err != nil {
+		return nil, fmt.Errorf("could not parse nats-jwt: %w", err)
 	}
-	return tokenClient, &heartbeatOptions, nil
+
+	if kp, err = nkeys.FromSeed([]byte(natsNKeySeed)); err != nil {
+		return nil, fmt.Errorf("could not parse nats-nkey-seed: %w", err)
+	}
+
+	return auth.NewBasicTokenClient(natsJWT, kp), nil
 }

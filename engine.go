@@ -60,6 +60,9 @@ type EngineConfig struct {
 	NATSOptions           *auth.NATSOptions // Options for connecting to NATS
 	NATSConnectionTimeout int               // The timeout for connecting to NATS
 	NATSQueueName         string            // The name of the queue to use when subscribing
+	NATSJwt               string            // The JWT to use for NATS
+	NATSNkeySeed          string            // The seed to use for the NATS nkey
+	NATSOnly              bool              // ONLY used for testing
 
 	// Whether this adapter is managed by Overmind. This is initially used for
 	// reporting so that you can tell the difference between managed adapters and
