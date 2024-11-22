@@ -23,7 +23,6 @@ import (
 )
 
 func AddEngineFlags(command *cobra.Command) {
-
 	command.PersistentFlags().String("source-name", "", "The name of the source")
 	cobra.CheckErr(viper.BindEnv("source-name", "SOURCE_NAME"))
 	command.PersistentFlags().String("source-uuid", "", "The UUID of the source, is this is blank it will be auto-generated. This is used in heartbeats and shouldn't be supplied usually")
@@ -102,8 +101,14 @@ func EngineConfigFromViper(engineType, version string) (*EngineConfig, error) {
 	appURL := viper.GetString("app")
 
 	natsOnly := false
+	allow, exists := os.LookupEnv("ALLOW_UNAUTHENTICATED")
+	unauthenticated := exists && allow == "true"
+	// TODO ADD LOGIC HERE FOR UNAUTHENTICATED
+
+	fmt.Println(unauthenticated)
 	// this is a workaround until we can remove nats only authentication. Going forward all sources must send a heartbeat
-	if (viper.GetString("nats-jwt") != "" && viper.GetString("nats-nkey-seed") != "") && (viper.GetString("api-key") == "" || viper.GetString("source-access-token") == "") {
+	if (viper.GetString("nats-jwt") != "" && viper.GetString("nats-nkey-seed") != "") &&
+		(viper.GetString("api-key") == "" || viper.GetString("source-access-token") == "") {
 		log.Debug("Using nats jwt and nkey-seed for authentication")
 		natsOnly = true
 	} else {
@@ -180,10 +185,12 @@ func MapFromEngineConfig(ec *EngineConfig) map[string]any {
 		"nats-connection-timeout": ec.NATSConnectionTimeout,
 		"nats-queue-name":         ec.NATSQueueName,
 		"nats-only":               ec.NATSOnly,
+		"unauthenticated":         ec.Unauthenticated,
 	}
 }
 
-func (ec *EngineConfig) CreateClients() (*HeartbeatOptions, error) {
+func (ec *EngineConfig) CreateClients() error {
+	// we need to have some checks, as it is called by the cli tool
 	if ec.OvermindManagedSource == sdp.SourceManaged_LOCAL {
 		tokenClient, err := auth.NewAPIKeyClient(ec.App, ec.ApiKey)
 		if err != nil {
@@ -206,10 +213,11 @@ func (ec *EngineConfig) CreateClients() (*HeartbeatOptions, error) {
 			),
 			Frequency: time.Second * 30,
 		}
+		ec.HeartbeatOptions = &heartbeatOptions
 		ec.NATSOptions.TokenClient = tokenClient
 		// lets print out the config
 		log.WithFields(MapFromEngineConfig(ec)).Info("Engine config")
-		return &heartbeatOptions, nil
+		return nil
 	} else if ec.OvermindManagedSource == sdp.SourceManaged_MANAGED {
 		tokenClient, err := auth.NewStaticTokenClient(ec.App, ec.SourceAccessToken, ec.SourceTokenType)
 		if err != nil {
@@ -236,9 +244,10 @@ func (ec *EngineConfig) CreateClients() (*HeartbeatOptions, error) {
 			Frequency: time.Second * 30,
 		}
 		ec.NATSOptions.TokenClient = tokenClient
+		ec.HeartbeatOptions = &heartbeatOptions
 		// lets print out the config
 		log.WithFields(MapFromEngineConfig(ec)).Info("Engine config")
-		return &heartbeatOptions, nil
+		return nil
 	} else if ec.NATSOnly {
 		tokenClient, err := createNATSTokenClient(ec.NATSJwt, ec.NATSNkeySeed)
 		log.Info("Using NATS authentication, no heartbeat will be sent")
@@ -248,16 +257,17 @@ func (ec *EngineConfig) CreateClients() (*HeartbeatOptions, error) {
 		ec.NATSOptions.TokenClient = tokenClient
 		// lets print out the config
 		log.WithFields(MapFromEngineConfig(ec)).Info("Engine config")
-		return nil, nil
+		return nil
 	} else if allow, exists := os.LookupEnv("ALLOW_UNAUTHENTICATED"); exists && allow == "true" {
 		// this is a special case for testing the api-server
+		log.WithFields(MapFromEngineConfig(ec)).Info("Engine config")
 		log.Debug("Using unauthenticated mode as ALLOW_UNAUTHENTICATED is set")
-		return nil, nil
+		return nil
 	}
 	err := fmt.Errorf("unable to setup authentication. source managed %v. nats only:%v", ec.OvermindManagedSource, ec.NATSOnly)
 	sentry.CaptureException(err)
 	log.WithError(err).Fatal("unable to setup authentication")
-	return nil, err
+	return err
 }
 
 // createNATSTokenClient Creates a basic token client that will authenticate to NATS
