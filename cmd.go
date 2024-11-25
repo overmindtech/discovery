@@ -117,7 +117,7 @@ func EngineConfigFromViper(engineType, version string) (*EngineConfig, error) {
 		host := viper.GetString("api-server-service-host")
 		port := viper.GetString("api-server-service-port")
 		if host == "" || port == "" {
-			return nil, errors.New("api-server-service-host and api-server-service-port must be set for managed sources")
+			return nil, errors.New("API_SERVER_SERVICE_HOST and API_SERVER_SERVICE_PORT (provided by k8s) must be set for managed sources")
 		}
 		apiServerURL = net.JoinHostPort(host, port)
 		if port == "443" {
@@ -151,20 +151,21 @@ func EngineConfigFromViper(engineType, version string) (*EngineConfig, error) {
 
 	// this is a workaround until we can remove nats only authentication. Going forward all sources must send a heartbeat
 	if unauthenticated {
-		log.Debug("Using unauthenticated mode as ALLOW_UNAUTHENTICATED is set")
+		log.Warn("Using unauthenticated mode as ALLOW_UNAUTHENTICATED is set")
 		natsOnly = true
 	} else {
 		if viper.GetBool("overmind-managed-source") {
+			log.Info("Running source in managed mode")
 			// If managed source, we expect a token
 			if viper.GetString("source-access-token") == "" {
 				return nil, fmt.Errorf("source-access-token must be set for managed sources")
 			}
 		} else if viper.GetString("nats-jwt") != "" && viper.GetString("nats-nkey-seed") != "" {
 			// If not managed source, we expect nats jwt and nkey seed
-			log.Debug("Using nats jwt and nkey-seed for authentication")
+			log.Warn("Using nats jwt and nkey-seed for authentication")
 			natsOnly = true
 		} else if viper.GetString("api-key") == "" {
-			return nil, fmt.Errorf("api-key must be set for local sources, or set overmind-managed-source to true")
+			return nil, fmt.Errorf("api-key must be set for local sources")
 		}
 	}
 
@@ -222,7 +223,7 @@ func MapFromEngineConfig(ec *EngineConfig) map[string]any {
 		"managed-source":           ec.OvermindManagedSource,
 		"app":                      ec.App,
 		"api-key":                  apiKeyClientSecret,
-		"app-server-url":           ec.APIServerURL,
+		"api-server-url":           ec.APIServerURL,
 		"max-parallel-executions":  ec.MaxParallelExecutions,
 		"nats-servers":             ec.NATSOptions.Servers,
 		"nats-connection-name":     ec.NATSOptions.ConnectionName,
@@ -240,7 +241,7 @@ func (ec *EngineConfig) CreateClients() error {
 	// NATS authenticated and unauthenticated mode
 	if ec.NATSOnly {
 		if ec.Unauthenticated {
-			log.Debug("Using unauthenticated NATS as ALLOW_UNAUTHENTICATED is set")
+			log.Warn("Using unauthenticated NATS as ALLOW_UNAUTHENTICATED is set")
 			log.WithFields(MapFromEngineConfig(ec)).Info("Engine config")
 			return nil
 		}
@@ -257,6 +258,7 @@ func (ec *EngineConfig) CreateClients() error {
 	}
 	// this is the normal case
 	if ec.OvermindManagedSource == sdp.SourceManaged_LOCAL {
+		log.Info("Using API Key for authentication, heartbeats will be sent")
 		tokenClient, err := auth.NewAPIKeyClient(ec.APIServerURL, ec.ApiKey)
 		if err != nil {
 			err = fmt.Errorf("error creating API key client %w", err)
@@ -283,6 +285,7 @@ func (ec *EngineConfig) CreateClients() error {
 		log.WithFields(MapFromEngineConfig(ec)).Info("Engine config")
 		return nil
 	} else if ec.OvermindManagedSource == sdp.SourceManaged_MANAGED {
+		log.Info("Using static token for authentication, heartbeats will be sent")
 		tokenClient, err := auth.NewStaticTokenClient(ec.APIServerURL, ec.SourceAccessToken, ec.SourceAccessTokenType)
 		if err != nil {
 			err = fmt.Errorf("error creating static token client %w", err)

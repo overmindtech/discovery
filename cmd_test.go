@@ -15,22 +15,22 @@ import (
 // NB we do not call AddEngineFlags so we use command line flags, not environment variables
 func TestEngineConfigFromViper(t *testing.T) {
 	tests := []struct {
-		name                      string
-		setupViper                func()
-		engineType                string
-		version                   string
-		expectedSourceName        string
-		expectedSourceUUID        uuid.UUID
-		expectedSourceAccessToken string
-		expectedSourceAccessType  string
-		expectedManagedSource     sdp.SourceManaged
-		expectedApp               string
-		expectedApiServerURL      string
-		expectedApiKey            string
-		expectedMaxParallel       int
-		expectedNATSOnly          bool
-		expectUnauthenticated     bool
-		expectError               bool
+		name                          string
+		setupViper                    func()
+		engineType                    string
+		version                       string
+		expectedSourceName            string
+		expectedSourceUUID            uuid.UUID
+		expectedSourceAccessToken     string
+		expectedSourceAccessTokenType string
+		expectedManagedSource         sdp.SourceManaged
+		expectedApp                   string
+		expectedApiServerURL          string
+		expectedApiKey                string
+		expectedMaxParallel           int
+		expectedNATSOnly              bool
+		expectUnauthenticated         bool
+		expectError                   bool
 	}{
 		{
 			name: "default values",
@@ -39,18 +39,18 @@ func TestEngineConfigFromViper(t *testing.T) {
 				viper.Set("app", "https://app.overmind.tech")
 				viper.Set("api-key", "api-key")
 			},
-			engineType:                "test-engine",
-			version:                   "1.0",
-			expectedSourceName:        "test-engine-" + getHostname(t),
-			expectedSourceUUID:        uuid.Nil,
-			expectedSourceAccessToken: "",
-			expectedSourceAccessType:  "",
-			expectedManagedSource:     sdp.SourceManaged_LOCAL,
-			expectedApp:               "https://app.overmind.tech",
-			expectedApiServerURL:      "https://api.app.overmind.tech",
-			expectedApiKey:            "api-key",
-			expectedMaxParallel:       runtime.NumCPU(),
-			expectError:               false,
+			engineType:                    "test-engine",
+			version:                       "1.0",
+			expectedSourceName:            "test-engine-" + getHostname(t),
+			expectedSourceUUID:            uuid.Nil,
+			expectedSourceAccessToken:     "",
+			expectedSourceAccessTokenType: "",
+			expectedManagedSource:         sdp.SourceManaged_LOCAL,
+			expectedApp:                   "https://app.overmind.tech",
+			expectedApiServerURL:          "https://api.app.overmind.tech",
+			expectedApiKey:                "api-key",
+			expectedMaxParallel:           runtime.NumCPU(),
+			expectError:                   false,
 		},
 		{
 			name: "custom values",
@@ -62,18 +62,18 @@ func TestEngineConfigFromViper(t *testing.T) {
 				viper.Set("api-key", "custom-api-key")
 				viper.Set("max-parallel", 10)
 			},
-			engineType:                "test-engine",
-			version:                   "1.0",
-			expectedSourceName:        "custom-source",
-			expectedSourceUUID:        uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
-			expectedSourceAccessToken: "",
-			expectedSourceAccessType:  "",
-			expectedManagedSource:     sdp.SourceManaged_LOCAL,
-			expectedApp:               "https://df.overmind-demo.com/",
-			expectedApiServerURL:      "https://api.df.overmind-demo.com",
-			expectedApiKey:            "custom-api-key",
-			expectedMaxParallel:       10,
-			expectError:               false,
+			engineType:                    "test-engine",
+			version:                       "1.0",
+			expectedSourceName:            "custom-source",
+			expectedSourceUUID:            uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
+			expectedSourceAccessToken:     "",
+			expectedSourceAccessTokenType: "",
+			expectedManagedSource:         sdp.SourceManaged_LOCAL,
+			expectedApp:                   "https://df.overmind-demo.com/",
+			expectedApiServerURL:          "https://api.df.overmind-demo.com",
+			expectedApiKey:                "custom-api-key",
+			expectedMaxParallel:           10,
+			expectError:                   false,
 		},
 		{
 			name: "invalid UUID",
@@ -99,13 +99,13 @@ func TestEngineConfigFromViper(t *testing.T) {
 				viper.Set("api-server-service-host", "api.app.overmind.tech")
 				viper.Set("api-server-service-port", "443")
 			},
-			engineType:                "test-engine",
-			version:                   "1.0",
-			expectedSourceName:        "custom-source",
-			expectedSourceUUID:        uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
-			expectedSourceAccessToken: "custom-access-token",
-			expectedSourceAccessType:  "custom-token-type",
-			expectedManagedSource:     sdp.SourceManaged_MANAGED,
+			engineType:                    "test-engine",
+			version:                       "1.0",
+			expectedSourceName:            "custom-source",
+			expectedSourceUUID:            uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
+			expectedSourceAccessToken:     "custom-access-token",
+			expectedSourceAccessTokenType: "custom-token-type",
+			expectedManagedSource:         sdp.SourceManaged_MANAGED,
 
 			expectedApiServerURL: "https://api.app.overmind.tech:443",
 			expectedMaxParallel:  10,
@@ -125,13 +125,13 @@ func TestEngineConfigFromViper(t *testing.T) {
 				viper.Set("api-server-service-host", "localhost")
 				viper.Set("api-server-service-port", "8080")
 			},
-			engineType:                "test-engine",
-			version:                   "1.0",
-			expectedSourceName:        "custom-source",
-			expectedSourceUUID:        uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
-			expectedSourceAccessToken: "custom-access-token",
-			expectedSourceAccessType:  "custom-token-type",
-			expectedManagedSource:     sdp.SourceManaged_MANAGED,
+			engineType:                    "test-engine",
+			version:                       "1.0",
+			expectedSourceName:            "custom-source",
+			expectedSourceUUID:            uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
+			expectedSourceAccessToken:     "custom-access-token",
+			expectedSourceAccessTokenType: "custom-token-type",
+			expectedManagedSource:         sdp.SourceManaged_MANAGED,
 
 			expectedApiServerURL: "http://localhost:8080",
 			expectedMaxParallel:  10,
@@ -202,7 +202,7 @@ func TestEngineConfigFromViper(t *testing.T) {
 					assert.Equal(t, tt.expectedSourceUUID, engineConfig.SourceUUID)
 				}
 				assert.Equal(t, tt.expectedSourceAccessToken, engineConfig.SourceAccessToken)
-				assert.Equal(t, tt.expectedSourceAccessType, engineConfig.SourceAccessTokenType)
+				assert.Equal(t, tt.expectedSourceAccessTokenType, engineConfig.SourceAccessTokenType)
 				assert.Equal(t, tt.expectedManagedSource, engineConfig.OvermindManagedSource)
 				assert.Equal(t, tt.expectedApp, engineConfig.App)
 				assert.Equal(t, tt.expectedApiServerURL, engineConfig.APIServerURL)
