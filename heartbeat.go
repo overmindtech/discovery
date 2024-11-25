@@ -21,11 +21,11 @@ var ErrNoHealthcheckDefined = errors.New("no healthcheck defined")
 // `StartSendingHeartbeats` has been called manually. Users can also call this
 // method to immediately send a heartbeat if required
 func (e *Engine) SendHeartbeat(ctx context.Context) error {
-	if e.HeartbeatOptions == nil || e.HeartbeatOptions.HealthCheck == nil {
+	if e.EngineConfig.HeartbeatOptions == nil || e.EngineConfig.HeartbeatOptions.HealthCheck == nil {
 		return ErrNoHealthcheckDefined
 	}
 
-	healthCheckError := e.HeartbeatOptions.HealthCheck()
+	healthCheckError := e.EngineConfig.HeartbeatOptions.HealthCheck()
 
 	var heartbeatError *string
 
@@ -58,9 +58,9 @@ func (e *Engine) SendHeartbeat(ctx context.Context) error {
 
 	// Calculate the duration for the next heartbeat, based on the current
 	// frequency x2.5 to give us some leeway
-	nextHeartbeat := time.Duration(float64(e.HeartbeatOptions.Frequency) * 2.5)
+	nextHeartbeat := time.Duration(float64(e.EngineConfig.HeartbeatOptions.Frequency) * 2.5)
 
-	_, err := e.HeartbeatOptions.ManagementClient.SubmitSourceHeartbeat(ctx, &connect.Request[sdp.SubmitSourceHeartbeatRequest]{
+	_, err := e.EngineConfig.HeartbeatOptions.ManagementClient.SubmitSourceHeartbeat(ctx, &connect.Request[sdp.SubmitSourceHeartbeatRequest]{
 		Msg: &sdp.SubmitSourceHeartbeatRequest{
 			UUID:             engineUUID,
 			Version:          e.EngineConfig.Version,
@@ -91,7 +91,7 @@ func (e *Engine) SendHeartbeat(ctx context.Context) error {
 // then run in a background goroutine that sends heartbeats at the specified
 // frequency, and will stop when the provided context is canceled.
 func (e *Engine) StartSendingHeartbeats(ctx context.Context) {
-	if e.HeartbeatOptions == nil || e.HeartbeatOptions.Frequency == 0 || e.heartbeatCancel != nil {
+	if e.EngineConfig.HeartbeatOptions == nil || e.EngineConfig.HeartbeatOptions.Frequency == 0 || e.heartbeatCancel != nil {
 		return
 	}
 
@@ -105,7 +105,7 @@ func (e *Engine) StartSendingHeartbeats(ctx context.Context) {
 	}
 
 	go func() {
-		ticker := time.NewTicker(e.HeartbeatOptions.Frequency)
+		ticker := time.NewTicker(e.EngineConfig.HeartbeatOptions.Frequency)
 		defer ticker.Stop()
 
 		for {

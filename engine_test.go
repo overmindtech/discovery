@@ -21,15 +21,12 @@ func newStartedEngine(t *testing.T, name string, no *auth.NATSOptions, adapters 
 	ec := EngineConfig{
 		MaxParallelExecutions: 10,
 		SourceName:            name,
-	}
-	e, err := NewEngine(&ec)
-	if err != nil {
-		t.Fatalf("Error initializing Engine: %v", err)
+		NATSQueueName:         "test",
 	}
 	if no != nil {
-		e.NATSOptions = no
+		ec.NATSOptions = no
 	} else {
-		e.NATSOptions = &auth.NATSOptions{
+		ec.NATSOptions = &auth.NATSOptions{
 			NumRetries:        5,
 			RetryDelay:        time.Second,
 			Servers:           NatsTestURLs,
@@ -39,7 +36,10 @@ func newStartedEngine(t *testing.T, name string, no *auth.NATSOptions, adapters 
 			TokenClient:       GetTestOAuthTokenClient(t, "org_hdeUXbB55sMMvJLa"),
 		}
 	}
-	e.NATSQueueName = "test"
+	e, err := NewEngine(&ec)
+	if err != nil {
+		t.Fatalf("Error initializing Engine: %v", err)
+	}
 
 	e.AddAdapters(adapters...)
 
@@ -175,21 +175,21 @@ func TestNats(t *testing.T) {
 	ec := EngineConfig{
 		MaxParallelExecutions: 10,
 		SourceName:            "nats-test",
+		NATSOptions: &auth.NATSOptions{
+			NumRetries:        5,
+			RetryDelay:        time.Second,
+			Servers:           NatsTestURLs,
+			ConnectionName:    "test-connection",
+			ConnectionTimeout: time.Second,
+			MaxReconnects:     5,
+		},
+		NATSQueueName: "test",
 	}
 
 	e, err := NewEngine(&ec)
 	if err != nil {
 		t.Fatalf("Error initializing Engine: %v", err)
 	}
-	e.NATSOptions = &auth.NATSOptions{
-		NumRetries:        5,
-		RetryDelay:        time.Second,
-		Servers:           NatsTestURLs,
-		ConnectionName:    "test-connection",
-		ConnectionTimeout: time.Second,
-		MaxReconnects:     5,
-	}
-	e.NATSQueueName = "test"
 
 	adapter := TestAdapter{}
 
@@ -274,20 +274,20 @@ func TestNatsCancel(t *testing.T) {
 	ec := EngineConfig{
 		MaxParallelExecutions: 1,
 		SourceName:            "nats-test",
+		NATSOptions: &auth.NATSOptions{
+			NumRetries:        5,
+			RetryDelay:        time.Second,
+			Servers:           NatsTestURLs,
+			ConnectionName:    "test-connection",
+			ConnectionTimeout: time.Second,
+			MaxReconnects:     5,
+		},
+		NATSQueueName: "test",
 	}
 	e, err := NewEngine(&ec)
 	if err != nil {
 		t.Fatalf("Error initializing Engine: %v", err)
 	}
-	e.NATSOptions = &auth.NATSOptions{
-		NumRetries:        5,
-		RetryDelay:        time.Second,
-		Servers:           NatsTestURLs,
-		ConnectionName:    "test-connection",
-		ConnectionTimeout: time.Second,
-		MaxReconnects:     5,
-	}
-	e.NATSQueueName = "test"
 
 	adapter := SpeedTestAdapter{
 		QueryDelay:   2 * time.Second,
@@ -364,18 +364,18 @@ func TestNatsConnections(t *testing.T) {
 		ec := EngineConfig{
 			MaxParallelExecutions: 1,
 			SourceName:            "nats-test",
+			NATSOptions: &auth.NATSOptions{
+				Servers:           []string{"nats://bad.server"},
+				ConnectionName:    "test-disconnection",
+				ConnectionTimeout: time.Second,
+				MaxReconnects:     1,
+			},
+			NATSQueueName: "test",
 		}
 		e, err := NewEngine(&ec)
 		if err != nil {
 			t.Fatalf("Error initializing Engine: %v", err)
 		}
-		e.NATSOptions = &auth.NATSOptions{
-			Servers:           []string{"nats://bad.server"},
-			ConnectionName:    "test-disconnection",
-			ConnectionTimeout: time.Second,
-			MaxReconnects:     1,
-		}
-		e.NATSQueueName = "test"
 
 		err = e.Start()
 
@@ -404,25 +404,24 @@ func TestNatsConnections(t *testing.T) {
 		ec := EngineConfig{
 			MaxParallelExecutions: 1,
 			SourceName:            "nats-test",
+			NATSOptions: &auth.NATSOptions{
+				NumRetries:        5,
+				RetryDelay:        time.Second,
+				Servers:           []string{"127.0.0.1:4111"},
+				ConnectionName:    "test-disconnection",
+				ConnectionTimeout: time.Second,
+				MaxReconnects:     10,
+				ReconnectWait:     time.Second,
+				ReconnectJitter:   time.Second,
+			},
+			NATSQueueName: "test",
 		}
 		e, err := NewEngine(&ec)
 		if err != nil {
 			t.Fatalf("Error initializing Engine: %v", err)
 		}
-		e.NATSOptions = &auth.NATSOptions{
-			NumRetries:        5,
-			RetryDelay:        time.Second,
-			Servers:           []string{"127.0.0.1:4111"},
-			ConnectionName:    "test-disconnection",
-			ConnectionTimeout: time.Second,
-			MaxReconnects:     10,
-			ReconnectWait:     time.Second,
-			ReconnectJitter:   time.Second,
-		}
-		e.NATSQueueName = "test"
 
 		err = e.Start()
-
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -471,22 +470,22 @@ func TestNatsConnections(t *testing.T) {
 		ec := EngineConfig{
 			MaxParallelExecutions: 1,
 			SourceName:            "nats-test",
+			NATSOptions: &auth.NATSOptions{
+				NumRetries:        10,
+				RetryDelay:        time.Second,
+				Servers:           []string{"127.0.0.1:4112"},
+				ConnectionName:    "test-disconnection",
+				ConnectionTimeout: time.Second,
+				MaxReconnects:     10,
+				ReconnectWait:     time.Second,
+				ReconnectJitter:   time.Second,
+			},
+			NATSQueueName: "test",
 		}
 		e, err := NewEngine(&ec)
 		if err != nil {
 			t.Fatalf("Error initializing Engine: %v", err)
 		}
-		e.NATSOptions = &auth.NATSOptions{
-			NumRetries:        10,
-			RetryDelay:        time.Second,
-			Servers:           []string{"127.0.0.1:4112"},
-			ConnectionName:    "test-disconnection",
-			ConnectionTimeout: time.Second,
-			MaxReconnects:     10,
-			ReconnectWait:     time.Second,
-			ReconnectJitter:   time.Second,
-		}
-		e.NATSQueueName = "test"
 
 		var s *server.Server
 
@@ -505,7 +504,6 @@ func TestNatsConnections(t *testing.T) {
 		}()
 
 		err = e.Start()
-
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -526,23 +524,23 @@ func TestNATSFailureRestart(t *testing.T) {
 	ec := EngineConfig{
 		MaxParallelExecutions: 1,
 		SourceName:            "nats-test",
+		NATSOptions: &auth.NATSOptions{
+			NumRetries:        10,
+			RetryDelay:        time.Second,
+			Servers:           []string{"127.0.0.1:4113"},
+			ConnectionName:    "test-disconnection",
+			ConnectionTimeout: time.Second,
+			MaxReconnects:     10,
+			ReconnectWait:     100 * time.Millisecond,
+			ReconnectJitter:   10 * time.Millisecond,
+		},
+		NATSQueueName: "test",
 	}
 	e, err := NewEngine(&ec)
 	if err != nil {
 		t.Fatalf("Error initializing Engine: %v", err)
 	}
 
-	e.NATSOptions = &auth.NATSOptions{
-		NumRetries:        10,
-		RetryDelay:        time.Second,
-		Servers:           []string{"127.0.0.1:4113"},
-		ConnectionName:    "test-disconnection",
-		ConnectionTimeout: time.Second,
-		MaxReconnects:     10,
-		ReconnectWait:     100 * time.Millisecond,
-		ReconnectJitter:   10 * time.Millisecond,
-	}
-	e.NATSQueueName = "test"
 	e.ConnectionWatchInterval = 1 * time.Second
 
 	// Connect successfully
@@ -591,25 +589,23 @@ func TestNatsAuth(t *testing.T) {
 	ec := EngineConfig{
 		MaxParallelExecutions: 1,
 		SourceName:            "nats-test",
+		NATSOptions: &auth.NATSOptions{
+			NumRetries:        5,
+			RetryDelay:        time.Second,
+			Servers:           NatsTestURLs,
+			ConnectionName:    "test-connection",
+			ConnectionTimeout: time.Second,
+			MaxReconnects:     5,
+			TokenClient:       GetTestOAuthTokenClient(t, "org_hdeUXbB55sMMvJLa"),
+		},
+		NATSQueueName: "test",
 	}
 	e, err := NewEngine(&ec)
 	if err != nil {
 		t.Fatalf("Error initializing Engine: %v", err)
 	}
 
-	e.NATSOptions = &auth.NATSOptions{
-		NumRetries:        5,
-		RetryDelay:        time.Second,
-		Servers:           NatsTestURLs,
-		ConnectionName:    "test-connection",
-		ConnectionTimeout: time.Second,
-		MaxReconnects:     5,
-		TokenClient:       GetTestOAuthTokenClient(t, "org_hdeUXbB55sMMvJLa"),
-	}
-	e.NATSQueueName = "test"
-
 	adapter := TestAdapter{}
-
 	e.AddAdapters(
 		&adapter,
 		&TestAdapter{

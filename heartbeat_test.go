@@ -32,20 +32,20 @@ func TestHeartbeats(t *testing.T) {
 	requests := make(chan *connect.Request[sdp.SubmitSourceHeartbeatRequest], 1)
 	responses := make(chan *connect.Response[sdp.SubmitSourceHeartbeatResponse], 1)
 
-	ec := EngineConfig{
-		SourceName: name,
-		SourceUUID: u,
-		Version:    version,
-		EngineType: engineType,
-	}
-	e, _ := NewEngine(&ec)
-
-	e.HeartbeatOptions = &HeartbeatOptions{
+	heartbeatOptions := HeartbeatOptions{
 		ManagementClient: testHeartbeatClient{
 			Requests:  requests,
 			Responses: responses,
 		},
 	}
+	ec := EngineConfig{
+		SourceName:       name,
+		SourceUUID:       u,
+		Version:          version,
+		EngineType:       engineType,
+		HeartbeatOptions: &heartbeatOptions,
+	}
+	e, _ := NewEngine(&ec)
 
 	e.AddAdapters(
 		&TestAdapter{
@@ -63,7 +63,7 @@ func TestHeartbeats(t *testing.T) {
 	)
 
 	t.Run("sendHeartbeat when healthy", func(t *testing.T) {
-		e.HeartbeatOptions.HealthCheck = func() error {
+		ec.HeartbeatOptions.HealthCheck = func() error {
 			return nil
 		}
 		responses <- &connect.Response[sdp.SubmitSourceHeartbeatResponse]{
@@ -127,7 +127,7 @@ func TestHeartbeats(t *testing.T) {
 	})
 
 	t.Run("sendHeartbeat when unhealthy", func(t *testing.T) {
-		e.HeartbeatOptions.HealthCheck = func() error {
+		e.EngineConfig.HeartbeatOptions.HealthCheck = func() error {
 			return ErrNoHealthcheckDefined
 		}
 
@@ -148,8 +148,8 @@ func TestHeartbeats(t *testing.T) {
 	})
 
 	t.Run("startSendingHeartbeats", func(t *testing.T) {
-		e.HeartbeatOptions.Frequency = time.Millisecond * 250
-		e.HeartbeatOptions.HealthCheck = func() error {
+		e.EngineConfig.HeartbeatOptions.Frequency = time.Millisecond * 250
+		e.EngineConfig.HeartbeatOptions.HealthCheck = func() error {
 			return nil
 		}
 

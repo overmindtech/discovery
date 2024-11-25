@@ -110,7 +110,7 @@ sequenceDiagram
 To generate a static access token go to `https://manage.auth0.com/dashboard/eu/om-dogfood/applications` and select your application. Go to quick start and grab the curl command. You will need to add the account_name to the curl request. eg `,"account_name":"6351cbb7-cb45-481a-99cd-909d04a58512"`. This will return a JWT token that you can use to authenticate with the engine. You can now start your source.
 
 ```shell
-go run main.go start --aws-regions eu-west-2  --aws-access-strategy sso-profile --aws-profile sso-dogfood   --nats-jwt=... --overmind-managed-source true --source-token-type Bearer --source-access-token ey....
+go run main.go start --aws-regions eu-west-2  --aws-access-strategy sso-profile --aws-profile sso-dogfood   --nats-jwt=... --overmind-managed-source true --source-access-token-type Bearer --source-access-token ey....
 ```
 
 ## Default Adapters

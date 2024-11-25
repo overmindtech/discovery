@@ -43,18 +43,32 @@ type HeartbeatOptions struct {
 // EngineConfig is the configuration for the engine
 // it is used to configure the engine before starting it
 type EngineConfig struct {
-	EngineType string    // The type of the engine, e.g. "aws" or "kubernetes"
-	Version    string    // The version of the adapter that should be reported in the heartbeat
-	SourceName string    // normally follows the format of "type-hostname", e.g. "stdlib-source"
-	SourceUUID uuid.UUID // The UUID of the source, is this is blank it will be auto-generated. This is used in heartbeats and shouldn't be supplied usually"
-	App        string    // "https://app.overmind.tech", "The URL of the Overmind app to use"
+	EngineType   string    // The type of the engine, e.g. "aws" or "kubernetes"
+	Version      string    // The version of the adapter that should be reported in the heartbeat
+	SourceName   string    // normally follows the format of "type-hostname", e.g. "stdlib-source"
+	SourceUUID   uuid.UUID // The UUID of the source, is this is blank it will be auto-generated. This is used in heartbeats and shouldn't be supplied usually"
+	App          string    // "https://app.overmind.tech", "The URL of the Overmind app to use"
+	APIServerURL string    // The URL of the Overmind API server to uses for the heartbeat, this is calculated
 
 	// The 'ovm_*' API key to use to authenticate to the Overmind API.
 	// This and 'SourceAccessToken' are mutually exclusive
 	ApiKey string // The API key to use to authenticate to the Overmind API"
 	// Static token passed to the source to authenticate.
-	SourceAccessToken string // The access token to use to authenticate to the source
-	SourceTokenType   string // The type of token to use to authenticate the source for managed sources
+	SourceAccessToken     string // The access token to use to authenticate to the source
+	SourceAccessTokenType string // The type of token to use to authenticate the source for managed sources
+
+	// NATS options
+	NATSOptions           *auth.NATSOptions // Options for connecting to NATS
+	NATSConnectionTimeout int               // The timeout for connecting to NATS
+	NATSQueueName         string            // The name of the queue to use when subscribing
+	NATSJwt               string            // The JWT to use for NATS
+	NATSNkeySeed          string            // The seed to use for the NATS nkey
+	NATSOnly              bool              // ONLY used for testing
+	Unauthenticated       bool              // Whether the source is unauthenticated
+
+	// The options for the heartbeat. If this is nil the engine won't send
+	// it is not used if we are nats only or unauthenticated. this will only happen if we are running in a test environment
+	HeartbeatOptions *HeartbeatOptions
 
 	// Whether this adapter is managed by Overmind. This is initially used for
 	// reporting so that you can tell the difference between managed adapters and
@@ -71,10 +85,6 @@ type EngineConfig struct {
 // simply not communicate over NATS
 type Engine struct {
 	EngineConfig *EngineConfig
-
-	NATSOptions   *auth.NATSOptions // Options for connecting to NATS
-	NATSQueueName string            // The name of the queue to use when subscribing
-
 	// The maximum request timeout. Defaults to `DefaultMaxRequestTimeout` if
 	// set to zero. If a client does not send a timeout, it will default to this
 	// value. Requests with timeouts larger than this value will have their
@@ -87,7 +97,6 @@ type Engine struct {
 
 	// The configuration for the heartbeat for this engine. If this is nil the
 	// engine won't send heartbeats when started
-	HeartbeatOptions *HeartbeatOptions
 
 	// Internal throttle used to limit MaxParallelExecutions. This reads
 	// MaxParallelExecutions and is populated when the engine is started. This
@@ -179,15 +188,14 @@ func (e *Engine) AddAdapters(adapters ...Adapter) {
 // Connect Connects to NATS
 func (e *Engine) connect() error {
 	// Try to connect to NATS
-	if e.NATSOptions != nil {
-		ec, err := e.NATSOptions.Connect()
-
+	if e.EngineConfig.NATSOptions != nil {
+		encodedConnection, err := e.EngineConfig.NATSOptions.Connect()
 		if err != nil {
 			return err
 		}
 
 		e.natsConnectionMutex.Lock()
-		e.natsConnection = ec
+		e.natsConnection = encodedConnection
 		e.natsConnectionMutex.Unlock()
 
 		e.connectionWatcher = NATSWatcher{
@@ -332,15 +340,15 @@ func (e *Engine) subscribe(subject string, handler nats.MsgHandler) error {
 	}
 
 	log.WithFields(log.Fields{
-		"queueName":  e.NATSQueueName,
+		"queueName":  e.EngineConfig.NATSQueueName,
 		"subject":    subject,
 		"engineName": e.EngineConfig.SourceName,
 	}).Debug("creating NATS subscription")
 
-	if e.NATSQueueName == "" {
+	if e.EngineConfig.NATSQueueName == "" {
 		subscription, err = e.natsConnection.Subscribe(subject, handler)
 	} else {
-		subscription, err = e.natsConnection.QueueSubscribe(subject, e.NATSQueueName, handler)
+		subscription, err = e.natsConnection.QueueSubscribe(subject, e.EngineConfig.NATSQueueName, handler)
 	}
 
 	if err != nil {
