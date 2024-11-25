@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// NB we do not call AddEngineFlags so we use command line flags, not environment variables
 func TestEngineConfigFromViper(t *testing.T) {
 	tests := []struct {
 		name                      string
@@ -21,7 +22,7 @@ func TestEngineConfigFromViper(t *testing.T) {
 		expectedSourceName        string
 		expectedSourceUUID        uuid.UUID
 		expectedSourceAccessToken string
-		expectedSourceTokenType   string
+		expectedSourceAccessType  string
 		expectedManagedSource     sdp.SourceManaged
 		expectedApp               string
 		expectedApiServerURL      string
@@ -43,7 +44,7 @@ func TestEngineConfigFromViper(t *testing.T) {
 			expectedSourceName:        "test-engine-" + getHostname(t),
 			expectedSourceUUID:        uuid.Nil,
 			expectedSourceAccessToken: "",
-			expectedSourceTokenType:   "",
+			expectedSourceAccessType:  "",
 			expectedManagedSource:     sdp.SourceManaged_LOCAL,
 			expectedApp:               "https://app.overmind.tech",
 			expectedApiServerURL:      "https://api.app.overmind.tech",
@@ -66,7 +67,7 @@ func TestEngineConfigFromViper(t *testing.T) {
 			expectedSourceName:        "custom-source",
 			expectedSourceUUID:        uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
 			expectedSourceAccessToken: "",
-			expectedSourceTokenType:   "",
+			expectedSourceAccessType:  "",
 			expectedManagedSource:     sdp.SourceManaged_LOCAL,
 			expectedApp:               "https://df.overmind-demo.com/",
 			expectedApiServerURL:      "https://api.df.overmind-demo.com",
@@ -91,7 +92,7 @@ func TestEngineConfigFromViper(t *testing.T) {
 				viper.Set("source-name", "custom-source")
 				viper.Set("source-uuid", "123e4567-e89b-12d3-a456-426614174000")
 				viper.Set("source-access-token", "custom-access-token")
-				viper.Set("source-token-type", "custom-token-type")
+				viper.Set("source-access-token-type", "custom-token-type")
 				viper.Set("overmind-managed-source", true)
 				viper.Set("max-parallel", 10)
 
@@ -103,10 +104,36 @@ func TestEngineConfigFromViper(t *testing.T) {
 			expectedSourceName:        "custom-source",
 			expectedSourceUUID:        uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
 			expectedSourceAccessToken: "custom-access-token",
-			expectedSourceTokenType:   "custom-token-type",
+			expectedSourceAccessType:  "custom-token-type",
 			expectedManagedSource:     sdp.SourceManaged_MANAGED,
 
-			expectedApiServerURL: "api.app.overmind.tech:443",
+			expectedApiServerURL: "https://api.app.overmind.tech:443",
+			expectedMaxParallel:  10,
+			expectError:          false,
+		},
+		{
+			name: "managed source local insecure",
+			setupViper: func() {
+				viper.Reset()
+				viper.Set("source-name", "custom-source")
+				viper.Set("source-uuid", "123e4567-e89b-12d3-a456-426614174000")
+				viper.Set("source-access-token", "custom-access-token")
+				viper.Set("source-access-token-type", "custom-token-type")
+				viper.Set("overmind-managed-source", true)
+				viper.Set("max-parallel", 10)
+
+				viper.Set("api-server-service-host", "localhost")
+				viper.Set("api-server-service-port", "8080")
+			},
+			engineType:                "test-engine",
+			version:                   "1.0",
+			expectedSourceName:        "custom-source",
+			expectedSourceUUID:        uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
+			expectedSourceAccessToken: "custom-access-token",
+			expectedSourceAccessType:  "custom-token-type",
+			expectedManagedSource:     sdp.SourceManaged_MANAGED,
+
+			expectedApiServerURL: "http://localhost:8080",
 			expectedMaxParallel:  10,
 			expectError:          false,
 		},
@@ -175,7 +202,7 @@ func TestEngineConfigFromViper(t *testing.T) {
 					assert.Equal(t, tt.expectedSourceUUID, engineConfig.SourceUUID)
 				}
 				assert.Equal(t, tt.expectedSourceAccessToken, engineConfig.SourceAccessToken)
-				assert.Equal(t, tt.expectedSourceTokenType, engineConfig.SourceTokenType)
+				assert.Equal(t, tt.expectedSourceAccessType, engineConfig.SourceAccessTokenType)
 				assert.Equal(t, tt.expectedManagedSource, engineConfig.OvermindManagedSource)
 				assert.Equal(t, tt.expectedApp, engineConfig.App)
 				assert.Equal(t, tt.expectedApiServerURL, engineConfig.APIServerURL)

@@ -33,8 +33,8 @@ func AddEngineFlags(command *cobra.Command) {
 	cobra.CheckErr(viper.BindEnv("source-uuid", "SOURCE_UUID"))
 	command.PersistentFlags().String("source-access-token", "", "The access token to use to authenticate the source for managed sources")
 	cobra.CheckErr(viper.BindEnv("source-access-token", "SOURCE_ACCESS_TOKEN"))
-	command.PersistentFlags().String("source-token-type", "", "The type of token to use to authenticate the source for managed sources")
-	cobra.CheckErr(viper.BindEnv("source-token-type", "SOURCE_TOKEN_TYPE"))
+	command.PersistentFlags().String("source-access-token-type", "", "The type of token to use to authenticate the source for managed sources")
+	cobra.CheckErr(viper.BindEnv("source-access-token-type", "SOURCE_ACCESS_TOKEN_TYPE"))
 	command.PersistentFlags().String("api-server-service-host", "", "The host of the API server service,only if the source is managed by Overmind")
 	cobra.CheckErr(viper.BindEnv("api-server-service-host", "API_SERVER_SERVICE_HOST"))
 	command.PersistentFlags().String("api-server-service-port", "", "The port of the API server service, only if the source is managed by Overmind")
@@ -116,7 +116,15 @@ func EngineConfigFromViper(engineType, version string) (*EngineConfig, error) {
 	if managedSource == sdp.SourceManaged_MANAGED {
 		host := viper.GetString("api-server-service-host")
 		port := viper.GetString("api-server-service-port")
+		if host == "" || port == "" {
+			return nil, errors.New("api-server-service-host and api-server-service-port must be set for managed sources")
+		}
 		apiServerURL = net.JoinHostPort(host, port)
+		if port == "443" {
+			apiServerURL = "https://" + apiServerURL
+		} else {
+			apiServerURL = "http://" + apiServerURL
+		}
 	} else {
 		// look up the api server url from the app url
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -172,7 +180,7 @@ func EngineConfigFromViper(engineType, version string) (*EngineConfig, error) {
 		SourceUUID:            sourceUUID,
 		OvermindManagedSource: managedSource,
 		SourceAccessToken:     viper.GetString("source-access-token"),
-		SourceTokenType:       viper.GetString("source-token-type"),
+		SourceAccessTokenType: viper.GetString("source-access-token-type"),
 		App:                   appURL,
 		APIServerURL:          apiServerURL,
 		ApiKey:                viper.GetString("api-key"),
@@ -205,25 +213,25 @@ func MapFromEngineConfig(ec *EngineConfig) map[string]any {
 	}
 
 	return map[string]interface{}{
-		"engine-type":             ec.EngineType,
-		"version":                 ec.Version,
-		"source-name":             ec.SourceName,
-		"source-uuid":             ec.SourceUUID,
-		"source-access-token":     sourceAccessToken,
-		"source-token-type":       ec.SourceTokenType,
-		"managed-source":          ec.OvermindManagedSource,
-		"app":                     ec.App,
-		"api-key":                 apiKeyClientSecret,
-		"app-server-url":          ec.APIServerURL,
-		"max-parallel-executions": ec.MaxParallelExecutions,
-		"nats-servers":            ec.NATSOptions.Servers,
-		"nats-connection-name":    ec.NATSOptions.ConnectionName,
-		"nats-connection-timeout": ec.NATSConnectionTimeout,
-		"nats-queue-name":         ec.NATSQueueName,
-		"nats-jwt":                natsJWT,
-		"nats-nkey-seed":          natsNKeySeed,
-		"nats-only":               ec.NATSOnly,
-		"unauthenticated":         ec.Unauthenticated,
+		"engine-type":              ec.EngineType,
+		"version":                  ec.Version,
+		"source-name":              ec.SourceName,
+		"source-uuid":              ec.SourceUUID,
+		"source-access-token":      sourceAccessToken,
+		"source-access-token-type": ec.SourceAccessTokenType,
+		"managed-source":           ec.OvermindManagedSource,
+		"app":                      ec.App,
+		"api-key":                  apiKeyClientSecret,
+		"app-server-url":           ec.APIServerURL,
+		"max-parallel-executions":  ec.MaxParallelExecutions,
+		"nats-servers":             ec.NATSOptions.Servers,
+		"nats-connection-name":     ec.NATSOptions.ConnectionName,
+		"nats-connection-timeout":  ec.NATSConnectionTimeout,
+		"nats-queue-name":          ec.NATSQueueName,
+		"nats-jwt":                 natsJWT,
+		"nats-nkey-seed":           natsNKeySeed,
+		"nats-only":                ec.NATSOnly,
+		"unauthenticated":          ec.Unauthenticated,
 	}
 }
 
@@ -275,7 +283,7 @@ func (ec *EngineConfig) CreateClients() error {
 		log.WithFields(MapFromEngineConfig(ec)).Info("Engine config")
 		return nil
 	} else if ec.OvermindManagedSource == sdp.SourceManaged_MANAGED {
-		tokenClient, err := auth.NewStaticTokenClient(ec.APIServerURL, ec.SourceAccessToken, ec.SourceTokenType)
+		tokenClient, err := auth.NewStaticTokenClient(ec.APIServerURL, ec.SourceAccessToken, ec.SourceAccessTokenType)
 		if err != nil {
 			err = fmt.Errorf("error creating static token client %w", err)
 			sentry.CaptureException(err)
@@ -283,7 +291,7 @@ func (ec *EngineConfig) CreateClients() error {
 		}
 		tokenSource := oauth2.StaticTokenSource(&oauth2.Token{
 			AccessToken: ec.SourceAccessToken,
-			TokenType:   ec.SourceTokenType,
+			TokenType:   ec.SourceAccessTokenType,
 		})
 		transport := oauth2.Transport{
 			Source: tokenSource,

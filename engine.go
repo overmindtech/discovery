@@ -54,8 +54,8 @@ type EngineConfig struct {
 	// This and 'SourceAccessToken' are mutually exclusive
 	ApiKey string // The API key to use to authenticate to the Overmind API"
 	// Static token passed to the source to authenticate.
-	SourceAccessToken string // The access token to use to authenticate to the source
-	SourceTokenType   string // The type of token to use to authenticate the source for managed sources
+	SourceAccessToken     string // The access token to use to authenticate to the source
+	SourceAccessTokenType string // The type of token to use to authenticate the source for managed sources
 
 	// NATS options
 	NATSOptions           *auth.NATSOptions // Options for connecting to NATS
