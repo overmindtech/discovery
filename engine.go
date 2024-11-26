@@ -191,7 +191,7 @@ func (e *Engine) connect() error {
 	if e.EngineConfig.NATSOptions != nil {
 		encodedConnection, err := e.EngineConfig.NATSOptions.Connect()
 		if err != nil {
-			return err
+			return fmt.Errorf("error connecting to NATS: %w", err)
 		}
 
 		e.natsConnectionMutex.Lock()
@@ -216,9 +216,8 @@ func (e *Engine) connect() error {
 
 		// Wait for the connection to be completed
 		err = e.natsConnection.Underlying().FlushTimeout(10 * time.Minute)
-
 		if err != nil {
-			return err
+			return fmt.Errorf("error flushing NATS connection: %w", err)
 		}
 
 		log.WithFields(log.Fields{
@@ -230,28 +229,28 @@ func (e *Engine) connect() error {
 			e.HandleQuery(ctx, i)
 		}))
 		if err != nil {
-			return err
+			return fmt.Errorf("error subscribing to request.all: %w", err)
 		}
 
 		err = e.subscribe("cancel.all", sdp.NewAsyncRawCancelQueryHandler("CancelQueryHandler", func(ctx context.Context, m *nats.Msg, i *sdp.CancelQuery) {
 			e.HandleCancelQuery(ctx, i)
 		}))
 		if err != nil {
-			return err
+			return fmt.Errorf("error subscribing to cancel.all: %w", err)
 		}
 
 		err = e.subscribe("request.scope.>", sdp.NewAsyncRawQueryHandler("WildcardQueryHandler", func(ctx context.Context, m *nats.Msg, i *sdp.Query) {
 			e.HandleQuery(ctx, i)
 		}))
 		if err != nil {
-			return err
+			return fmt.Errorf("error subscribing to request.scope.>: %w", err)
 		}
 
 		err = e.subscribe("cancel.scope.>", sdp.NewAsyncRawCancelQueryHandler("WildcardCancelQueryHandler", func(ctx context.Context, m *nats.Msg, i *sdp.CancelQuery) {
 			e.HandleCancelQuery(ctx, i)
 		}))
 		if err != nil {
-			return err
+			return fmt.Errorf("error subscribing to cancel.scope.>: %w", err)
 		}
 
 		return nil
@@ -281,15 +280,13 @@ func (e *Engine) disconnect() error {
 			}
 
 			err := c.Drain()
-
 			if err != nil {
-				return err
+				return fmt.Errorf("error draining subscription: %w", err)
 			}
 
 			err = c.Unsubscribe()
-
 			if err != nil {
-				return err
+				return fmt.Errorf("error unsubscribing: %w", err)
 			}
 		}
 
@@ -350,9 +347,8 @@ func (e *Engine) subscribe(subject string, handler nats.MsgHandler) error {
 	} else {
 		subscription, err = e.natsConnection.QueueSubscribe(subject, e.EngineConfig.NATSQueueName, handler)
 	}
-
 	if err != nil {
-		return err
+		return fmt.Errorf("error subscribing to NATS: %w", err)
 	}
 
 	e.subscriptions = append(e.subscriptions, subscription)
@@ -363,7 +359,6 @@ func (e *Engine) subscribe(subject string, handler nats.MsgHandler) error {
 // Stop Stops the engine running and disconnects from NATS
 func (e *Engine) Stop() error {
 	err := e.disconnect()
-
 	if err != nil {
 		return err
 	}
@@ -388,14 +383,12 @@ func (e *Engine) Restart() error {
 	defer e.restartMutex.Unlock()
 
 	err := e.Stop()
-
 	if err != nil {
-		return err
+		return fmt.Errorf("Restart.Stop: %w", err)
 	}
 
 	err = e.Start()
-
-	return err
+	return fmt.Errorf("Restart.Start: %w", err)
 }
 
 // IsNATSConnected returns whether the engine is connected to NATS
@@ -441,14 +434,12 @@ func (e *Engine) HandleCancelQuery(ctx context.Context, cancelQuery *sdp.CancelQ
 	span.SetName("HandleCancelQuery")
 
 	u, err := uuid.FromBytes(cancelQuery.GetUUID())
-
 	if err != nil {
 		log.Errorf("Error parsing UUID for cancel query: %v", err)
 		return
 	}
 
 	rt, err := e.GetTrackedQuery(u)
-
 	if err != nil {
 		log.Debugf("Could not find tracked query %v. Possibly it has already finished", u.String())
 		return
