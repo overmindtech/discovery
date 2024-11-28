@@ -61,10 +61,6 @@ type EngineConfig struct {
 	NATSOptions           *auth.NATSOptions // Options for connecting to NATS
 	NATSConnectionTimeout int               // The timeout for connecting to NATS
 	NATSQueueName         string            // The name of the queue to use when subscribing
-	NATSJwt               string            // The JWT to use for NATS
-	NATSNkeySeed          string            // The seed to use for the NATS nkey
-	NATSOnly              bool              // ONLY used for testing
-	Unauthenticated       bool              // Whether the source is unauthenticated
 
 	// The options for the heartbeat. If this is nil the engine won't send
 	// it is not used if we are nats only or unauthenticated. this will only happen if we are running in a test environment

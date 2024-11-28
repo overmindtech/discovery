@@ -28,8 +28,6 @@ func TestEngineConfigFromViper(t *testing.T) {
 		expectedApiServerURL          string
 		expectedApiKey                string
 		expectedMaxParallel           int
-		expectedNATSOnly              bool
-		expectUnauthenticated         bool
 		expectError                   bool
 	}{
 		{
@@ -146,43 +144,6 @@ func TestEngineConfigFromViper(t *testing.T) {
 			version:     "1.0",
 			expectError: true,
 		},
-		{
-			name: "nats authenticated",
-			setupViper: func() {
-				viper.Reset()
-				viper.Set("nats-jwt", "nats-jwt")
-				viper.Set("nats-nkey-seed", "nats-nkey-seed")
-				viper.Set("source-name", "custom-source")
-				viper.Set("app", "https://app.overmind.tech")
-			},
-			engineType:            "test-engine",
-			version:               "1.0",
-			expectError:           false,
-			expectedMaxParallel:   runtime.NumCPU(),
-			expectedSourceName:    "custom-source",
-			expectedApp:           "https://app.overmind.tech",
-			expectedApiServerURL:  "https://api.app.overmind.tech",
-			expectedNATSOnly:      true,
-			expectUnauthenticated: false,
-		},
-		{
-			name: "fully unauthenticated",
-			setupViper: func() {
-				viper.Reset()
-				viper.Set("app", "https://app.overmind.tech")
-				viper.Set("source-name", "custom-source")
-				t.Setenv("ALLOW_UNAUTHENTICATED", "true")
-			},
-			engineType:            "test-engine",
-			version:               "1.0",
-			expectError:           false,
-			expectedMaxParallel:   runtime.NumCPU(),
-			expectedSourceName:    "custom-source",
-			expectedApp:           "https://app.overmind.tech",
-			expectedApiServerURL:  "https://api.app.overmind.tech",
-			expectedNATSOnly:      true,
-			expectUnauthenticated: true,
-		},
 	}
 
 	for _, tt := range tests {
@@ -208,8 +169,6 @@ func TestEngineConfigFromViper(t *testing.T) {
 				assert.Equal(t, tt.expectedApiServerURL, engineConfig.APIServerURL)
 				assert.Equal(t, tt.expectedApiKey, engineConfig.ApiKey)
 				assert.Equal(t, tt.expectedMaxParallel, engineConfig.MaxParallelExecutions)
-				assert.Equal(t, tt.expectedNATSOnly, engineConfig.NATSOnly)
-				assert.Equal(t, tt.expectUnauthenticated, engineConfig.Unauthenticated)
 			}
 		})
 	}

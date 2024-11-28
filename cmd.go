@@ -12,8 +12,6 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
-	"github.com/nats-io/jwt/v2"
-	"github.com/nats-io/nkeys"
 	"github.com/overmindtech/sdp-go"
 	"github.com/overmindtech/sdp-go/auth"
 	"github.com/overmindtech/sdp-go/sdpconnect"
@@ -50,10 +48,6 @@ func AddEngineFlags(command *cobra.Command) {
 
 	command.PersistentFlags().StringArray("nats-servers", []string{"nats://localhost:4222", "nats://nats:4222"}, "A list of NATS servers to connect to")
 	cobra.CheckErr(viper.BindEnv("nats-servers", "NATS_SERVERS"))
-	command.PersistentFlags().String("nats-jwt", "", "The JWT token that should be used to authenticate to NATS, provided in raw format e.g. eyJ0eXAiOiJKV1Q...")
-	cobra.CheckErr(viper.BindEnv("nats-jwt", "NATS_JWT"))
-	command.PersistentFlags().String("nats-nkey-seed", "", "The NKey seed which corresponds to the NATS JWT e.g. SUAFK6QUC...")
-	cobra.CheckErr(viper.BindEnv("nats-nkey-seed", "NATS_NKEY_SEED"))
 	command.PersistentFlags().String("nats-connection-name", "", "The name that the source should use to connect to NATS")
 	cobra.CheckErr(viper.BindEnv("nats-connection-name", "NATS_CONNECTION_NAME"))
 	command.PersistentFlags().Int("nats-connection-timeout", 10, "The timeout for connecting to NATS")
@@ -137,34 +131,15 @@ func EngineConfigFromViper(engineType, version string) (*EngineConfig, error) {
 		apiServerURL = oi.ApiUrl.String()
 	}
 
-	natsOnly := false
-	allow, exists := os.LookupEnv("ALLOW_UNAUTHENTICATED")
-	unauthenticated := exists && allow == "true"
-
-	// order of precedence is:
-	// unauthenticated overrides everything  # used for local development
-	// if managed source, we expect a token
-	// if local source
-	//   we expect an api key
-	//   or
-	//   nats jwt and nkey seed              # old way
-
-	// this is a workaround until we can remove nats only authentication. Going forward all sources must send a heartbeat
-	if unauthenticated {
-		log.Warn("Using unauthenticated mode as ALLOW_UNAUTHENTICATED is set")
-		natsOnly = true
+	if viper.GetBool("overmind-managed-source") {
+		log.Info("Running source in managed mode")
+		// If managed source, we expect a token
+		if viper.GetString("source-access-token") == "" {
+			return nil, fmt.Errorf("source-access-token must be set for managed sources")
+		}
 	} else {
-		if viper.GetBool("overmind-managed-source") {
-			log.Info("Running source in managed mode")
-			// If managed source, we expect a token
-			if viper.GetString("source-access-token") == "" {
-				return nil, fmt.Errorf("source-access-token must be set for managed sources")
-			}
-		} else if viper.GetString("nats-jwt") != "" && viper.GetString("nats-nkey-seed") != "" {
-			// If not managed source, we expect nats jwt and nkey seed
-			log.Warn("Using nats jwt and nkey-seed for authentication")
-			natsOnly = true
-		} else if viper.GetString("api-key") == "" {
+		log.Info("Running source in local mode")
+		if viper.GetString("api-key") == "" {
 			return nil, fmt.Errorf("api-key must be set for local sources")
 		}
 	}
@@ -186,10 +161,6 @@ func EngineConfigFromViper(engineType, version string) (*EngineConfig, error) {
 		APIServerURL:          apiServerURL,
 		ApiKey:                viper.GetString("api-key"),
 		NATSOptions:           &natsOptions,
-		NATSJwt:               viper.GetString("nats-jwt"),
-		NATSNkeySeed:          viper.GetString("nats-nkey-seed"),
-		NATSOnly:              natsOnly,
-		Unauthenticated:       unauthenticated,
 		MaxParallelExecutions: maxParallelExecutions,
 	}, nil
 }
@@ -203,14 +174,6 @@ func MapFromEngineConfig(ec *EngineConfig) map[string]any {
 	var sourceAccessToken string
 	if ec.SourceAccessToken != "" {
 		sourceAccessToken = "[REDACTED]"
-	}
-	var natsJWT string
-	if ec.NATSJwt != "" {
-		natsJWT = "[REDACTED]"
-	}
-	var natsNKeySeed string
-	if ec.NATSNkeySeed != "" {
-		natsNKeySeed = "[REDACTED]"
 	}
 
 	return map[string]interface{}{
@@ -229,33 +192,11 @@ func MapFromEngineConfig(ec *EngineConfig) map[string]any {
 		"nats-connection-name":     ec.NATSOptions.ConnectionName,
 		"nats-connection-timeout":  ec.NATSConnectionTimeout,
 		"nats-queue-name":          ec.NATSQueueName,
-		"nats-jwt":                 natsJWT,
-		"nats-nkey-seed":           natsNKeySeed,
-		"nats-only":                ec.NATSOnly,
-		"unauthenticated":          ec.Unauthenticated,
 	}
 }
 
 // CreateClients we need to have some checks, as it is called by the cli tool
 func (ec *EngineConfig) CreateClients() error {
-	// NATS authenticated and unauthenticated mode
-	if ec.NATSOnly {
-		if ec.Unauthenticated {
-			log.Warn("Using unauthenticated NATS as ALLOW_UNAUTHENTICATED is set")
-			log.WithFields(MapFromEngineConfig(ec)).Info("Engine config")
-			return nil
-		}
-		log.Info("Using NATS authentication, no heartbeat will be sent")
-		tokenClient, err := createNATSTokenClient(ec.NATSJwt, ec.NATSNkeySeed)
-		if err != nil {
-			err = fmt.Errorf("error validating NATS only authentication information: %w", err)
-			return err
-		}
-		ec.NATSOptions.TokenClient = tokenClient
-		// lets print out the config
-		log.WithFields(MapFromEngineConfig(ec)).Info("Engine config")
-		return nil
-	}
 	// this is the normal case
 	if ec.OvermindManagedSource == sdp.SourceManaged_LOCAL {
 		log.Info("Using API Key for authentication, heartbeats will be sent")
@@ -318,29 +259,4 @@ func (ec *EngineConfig) CreateClients() error {
 	}
 	err := fmt.Errorf("unable to setup authentication. Please check your configuration %v", ec)
 	return err
-}
-
-// createNATSTokenClient Creates a basic token client that will authenticate to NATS
-// using the given values
-func createNATSTokenClient(natsJWT string, natsNKeySeed string) (auth.TokenClient, error) {
-	var kp nkeys.KeyPair
-	var err error
-
-	if natsJWT == "" {
-		return nil, errors.New("nats-jwt was blank. This is required when using authentication")
-	}
-
-	if natsNKeySeed == "" {
-		return nil, errors.New("nats-nkey-seed was blank. This is required when using authentication")
-	}
-
-	if _, err = jwt.DecodeUserClaims(natsJWT); err != nil {
-		return nil, fmt.Errorf("could not parse nats-jwt: %w", err)
-	}
-
-	if kp, err = nkeys.FromSeed([]byte(natsNKeySeed)); err != nil {
-		return nil, fmt.Errorf("could not parse nats-nkey-seed: %w", err)
-	}
-
-	return auth.NewBasicTokenClient(natsJWT, kp), nil
 }
