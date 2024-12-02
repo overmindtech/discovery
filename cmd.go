@@ -35,10 +35,16 @@ func AddEngineFlags(command *cobra.Command) {
 	cobra.CheckErr(viper.BindEnv("source-access-token", "SOURCE_ACCESS_TOKEN"))
 	command.PersistentFlags().String("source-access-token-type", "", "The type of token to use to authenticate the source for managed sources")
 	cobra.CheckErr(viper.BindEnv("source-access-token-type", "SOURCE_ACCESS_TOKEN_TYPE"))
-	command.PersistentFlags().String("api-server-service-host", "", "The host of the API server service,only if the source is managed by Overmind")
+
+	command.PersistentFlags().String("api-server-service-host", "", "The host of the API server service, only if the source is managed by Overmind")
 	cobra.CheckErr(viper.BindEnv("api-server-service-host", "API_SERVER_SERVICE_HOST"))
 	command.PersistentFlags().String("api-server-service-port", "", "The port of the API server service, only if the source is managed by Overmind")
 	cobra.CheckErr(viper.BindEnv("api-server-service-port", "API_SERVER_SERVICE_PORT"))
+	command.PersistentFlags().String("nats-service-host", "", "The host of the NATS service, only if the source is managed by Overmind")
+	cobra.CheckErr(viper.BindEnv("nats-service-host", "NATS_SERVICE_HOST"))
+	command.PersistentFlags().String("nats-service-port", "", "The port of the NATS service, only if the source is managed by Overmind")
+	cobra.CheckErr(viper.BindEnv("nats-service-port", "NATS_SERVICE_PORT"))
+
 	command.PersistentFlags().Bool("overmind-managed-source", false, "If you are running the source yourself or if it is managed by Overmind")
 	_ = command.Flags().MarkHidden("overmind-managed-source")
 	cobra.CheckErr(viper.BindEnv("overmind-managed-source", "OVERMIND_MANAGED_SOURCE"))
@@ -48,8 +54,6 @@ func AddEngineFlags(command *cobra.Command) {
 	command.PersistentFlags().String("api-key", "", "The API key to use to authenticate to the Overmind API")
 	cobra.CheckErr(viper.BindEnv("api-key", "OVM_API_KEY", "API_KEY"))
 
-	command.PersistentFlags().StringArray("nats-servers", []string{"nats://localhost:4222", "nats://nats:4222"}, "A list of NATS servers to connect to")
-	cobra.CheckErr(viper.BindEnv("nats-servers", "NATS_SERVERS"))
 	command.PersistentFlags().String("nats-jwt", "", "The JWT token that should be used to authenticate to NATS, provided in raw format e.g. eyJ0eXAiOiJKV1Q...")
 	cobra.CheckErr(viper.BindEnv("nats-jwt", "NATS_JWT"))
 	command.PersistentFlags().String("nats-nkey-seed", "", "The NKey seed which corresponds to the NATS JWT e.g. SUAFK6QUC...")
@@ -88,22 +92,6 @@ func EngineConfigFromViper(engineType, version string) (*EngineConfig, error) {
 		}
 	}
 
-	// setup natsOptions
-	var natsConnectionName string
-	if viper.GetString("nats-connection-name") == "" {
-		natsConnectionName = hostname
-	}
-	natsOptions := auth.NATSOptions{
-		NumRetries:        -1,
-		RetryDelay:        5 * time.Second,
-		Servers:           viper.GetStringSlice("nats-servers"),
-		ConnectionName:    natsConnectionName,
-		ConnectionTimeout: time.Duration(viper.GetInt("nats-connection-timeout")) * time.Second,
-		MaxReconnects:     -1,
-		ReconnectWait:     1 * time.Second,
-		ReconnectJitter:   1 * time.Second,
-	}
-
 	var managedSource sdp.SourceManaged
 	if viper.GetBool("overmind-managed-source") {
 		managedSource = sdp.SourceManaged_MANAGED
@@ -112,19 +100,28 @@ func EngineConfigFromViper(engineType, version string) (*EngineConfig, error) {
 	}
 
 	var apiServerURL string
+	var natsServerURL string
 	appURL := viper.GetString("app")
 	if managedSource == sdp.SourceManaged_MANAGED {
-		host := viper.GetString("api-server-service-host")
-		port := viper.GetString("api-server-service-port")
-		if host == "" || port == "" {
+		apiServerHost := viper.GetString("api-server-service-host")
+		apiServerPort := viper.GetString("api-server-service-port")
+		if apiServerHost == "" || apiServerPort == "" {
 			return nil, errors.New("API_SERVER_SERVICE_HOST and API_SERVER_SERVICE_PORT (provided by k8s) must be set for managed sources")
 		}
-		apiServerURL = net.JoinHostPort(host, port)
-		if port == "443" {
+		apiServerURL = net.JoinHostPort(apiServerHost, apiServerPort)
+		if apiServerPort == "443" {
 			apiServerURL = "https://" + apiServerURL
 		} else {
 			apiServerURL = "http://" + apiServerURL
 		}
+
+		natsServerHost := viper.GetString("nats-service-host")
+		natsServerPort := viper.GetString("nats-service-port")
+		if natsServerHost == "" || natsServerPort == "" {
+			return nil, errors.New("NATS_SERVICE_HOST and NATS_SERVICE_PORT (provided by k8s) must be set for managed sources")
+		}
+		natsServerURL = net.JoinHostPort(natsServerHost, natsServerPort)
+		natsServerURL = "nats://" + natsServerURL
 	} else {
 		// look up the api server url from the app url
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -135,6 +132,23 @@ func EngineConfigFromViper(engineType, version string) (*EngineConfig, error) {
 			return nil, err
 		}
 		apiServerURL = oi.ApiUrl.String()
+		natsServerURL = oi.NatsUrl.String()
+	}
+
+	// setup natsOptions
+	var natsConnectionName string
+	if viper.GetString("nats-connection-name") == "" {
+		natsConnectionName = hostname
+	}
+	natsOptions := auth.NATSOptions{
+		NumRetries:        -1,
+		RetryDelay:        5 * time.Second,
+		Servers:           []string{natsServerURL},
+		ConnectionName:    natsConnectionName,
+		ConnectionTimeout: time.Duration(viper.GetInt("nats-connection-timeout")) * time.Second,
+		MaxReconnects:     -1,
+		ReconnectWait:     1 * time.Second,
+		ReconnectJitter:   1 * time.Second,
 	}
 
 	natsOnly := false
