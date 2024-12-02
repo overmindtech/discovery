@@ -35,7 +35,6 @@ func TestEngineConfigFromViper(t *testing.T) {
 		{
 			name: "default values",
 			setupViper: func() {
-				viper.Reset()
 				viper.Set("app", "https://app.overmind.tech")
 				viper.Set("api-key", "api-key")
 			},
@@ -56,7 +55,6 @@ func TestEngineConfigFromViper(t *testing.T) {
 		{
 			name: "custom values",
 			setupViper: func() {
-				viper.Reset()
 				viper.Set("source-name", "custom-source")
 				viper.Set("source-uuid", "123e4567-e89b-12d3-a456-426614174000")
 				viper.Set("app", "https://df.overmind-demo.com/")
@@ -80,7 +78,6 @@ func TestEngineConfigFromViper(t *testing.T) {
 		{
 			name: "invalid UUID",
 			setupViper: func() {
-				viper.Reset()
 				viper.Set("source-uuid", "invalid-uuid")
 			},
 			engineType:  "test-engine",
@@ -90,7 +87,6 @@ func TestEngineConfigFromViper(t *testing.T) {
 		{
 			name: "managed source",
 			setupViper: func() {
-				viper.Reset()
 				viper.Set("source-name", "custom-source")
 				viper.Set("source-uuid", "123e4567-e89b-12d3-a456-426614174000")
 				viper.Set("source-access-token", "custom-access-token")
@@ -119,7 +115,6 @@ func TestEngineConfigFromViper(t *testing.T) {
 		{
 			name: "managed source local insecure",
 			setupViper: func() {
-				viper.Reset()
 				viper.Set("source-name", "custom-source")
 				viper.Set("source-uuid", "123e4567-e89b-12d3-a456-426614174000")
 				viper.Set("source-access-token", "custom-access-token")
@@ -146,10 +141,8 @@ func TestEngineConfigFromViper(t *testing.T) {
 			expectError:          false,
 		},
 		{
-			name: "source access token and api key not set",
-			setupViper: func() {
-				viper.Reset()
-			},
+			name:        "source access token and api key not set",
+			setupViper:  func() {},
 			engineType:  "test-engine",
 			version:     "1.0",
 			expectError: true,
@@ -157,7 +150,6 @@ func TestEngineConfigFromViper(t *testing.T) {
 		{
 			name: "fully unauthenticated",
 			setupViper: func() {
-				viper.Reset()
 				viper.Set("app", "https://app.overmind.tech")
 				viper.Set("source-name", "custom-source")
 				t.Setenv("ALLOW_UNAUTHENTICATED", "true")
@@ -176,6 +168,8 @@ func TestEngineConfigFromViper(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("ALLOW_UNAUTHENTICATED", "")
+			viper.Reset()
 			tt.setupViper()
 			engineConfig, err := EngineConfigFromViper(tt.engineType, tt.version)
 			if tt.expectError {
