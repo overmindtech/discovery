@@ -27,6 +27,7 @@ func TestEngineConfigFromViper(t *testing.T) {
 		expectedApp                   string
 		expectedApiServerURL          string
 		expectedApiKey                string
+		expectedNATSUrl               string
 		expectedMaxParallel           int
 		expectedNATSOnly              bool
 		expectUnauthenticated         bool
@@ -48,6 +49,7 @@ func TestEngineConfigFromViper(t *testing.T) {
 			expectedManagedSource:         sdp.SourceManaged_LOCAL,
 			expectedApp:                   "https://app.overmind.tech",
 			expectedApiServerURL:          "https://api.app.overmind.tech",
+			expectedNATSUrl:               "wss://messages.app.overmind.tech",
 			expectedApiKey:                "api-key",
 			expectedMaxParallel:           runtime.NumCPU(),
 			expectError:                   false,
@@ -71,6 +73,7 @@ func TestEngineConfigFromViper(t *testing.T) {
 			expectedManagedSource:         sdp.SourceManaged_LOCAL,
 			expectedApp:                   "https://df.overmind-demo.com/",
 			expectedApiServerURL:          "https://api.df.overmind-demo.com",
+			expectedNATSUrl:               "wss://messages.df.overmind-demo.com",
 			expectedApiKey:                "custom-api-key",
 			expectedMaxParallel:           10,
 			expectError:                   false,
@@ -98,6 +101,8 @@ func TestEngineConfigFromViper(t *testing.T) {
 
 				viper.Set("api-server-service-host", "api.app.overmind.tech")
 				viper.Set("api-server-service-port", "443")
+				viper.Set("nats-service-host", "messages.app.overmind.tech")
+				viper.Set("nats-service-port", "443")
 			},
 			engineType:                    "test-engine",
 			version:                       "1.0",
@@ -108,6 +113,7 @@ func TestEngineConfigFromViper(t *testing.T) {
 			expectedManagedSource:         sdp.SourceManaged_MANAGED,
 
 			expectedApiServerURL: "https://api.app.overmind.tech:443",
+			expectedNATSUrl:      "nats://messages.app.overmind.tech:443",
 			expectedMaxParallel:  10,
 			expectError:          false,
 		},
@@ -124,6 +130,8 @@ func TestEngineConfigFromViper(t *testing.T) {
 
 				viper.Set("api-server-service-host", "localhost")
 				viper.Set("api-server-service-port", "8080")
+				viper.Set("nats-service-host", "localhost")
+				viper.Set("nats-service-port", "4222")
 			},
 			engineType:                    "test-engine",
 			version:                       "1.0",
@@ -134,6 +142,7 @@ func TestEngineConfigFromViper(t *testing.T) {
 			expectedManagedSource:         sdp.SourceManaged_MANAGED,
 
 			expectedApiServerURL: "http://localhost:8080",
+			expectedNATSUrl:      "nats://localhost:4222",
 			expectedMaxParallel:  10,
 			expectError:          false,
 		},
@@ -162,6 +171,7 @@ func TestEngineConfigFromViper(t *testing.T) {
 			expectedSourceName:    "custom-source",
 			expectedApp:           "https://app.overmind.tech",
 			expectedApiServerURL:  "https://api.app.overmind.tech",
+			expectedNATSUrl:       "wss://messages.app.overmind.tech",
 			expectedNATSOnly:      true,
 			expectUnauthenticated: false,
 		},
@@ -180,6 +190,7 @@ func TestEngineConfigFromViper(t *testing.T) {
 			expectedSourceName:    "custom-source",
 			expectedApp:           "https://app.overmind.tech",
 			expectedApiServerURL:  "https://api.app.overmind.tech",
+			expectedNATSUrl:       "wss://messages.app.overmind.tech",
 			expectedNATSOnly:      true,
 			expectUnauthenticated: true,
 		},
@@ -206,6 +217,7 @@ func TestEngineConfigFromViper(t *testing.T) {
 				assert.Equal(t, tt.expectedManagedSource, engineConfig.OvermindManagedSource)
 				assert.Equal(t, tt.expectedApp, engineConfig.App)
 				assert.Equal(t, tt.expectedApiServerURL, engineConfig.APIServerURL)
+				assert.Equal(t, tt.expectedNATSUrl, engineConfig.NATSOptions.Servers[0])
 				assert.Equal(t, tt.expectedApiKey, engineConfig.ApiKey)
 				assert.Equal(t, tt.expectedMaxParallel, engineConfig.MaxParallelExecutions)
 				assert.Equal(t, tt.expectedNATSOnly, engineConfig.NATSOnly)
