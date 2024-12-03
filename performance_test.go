@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/overmindtech/sdp-go"
+	"github.com/overmindtech/sdp-go/auth"
 )
 
 type SlowAdapter struct {
@@ -101,7 +102,7 @@ func RunLinearPerformanceTest(t *testing.T, name string, numQueries int, linkDep
 	t.Helper()
 
 	t.Run(name, func(t *testing.T) {
-		result := TimeQueries(numQueries, linkDepth, numParallel)
+		result := TimeQueries(t, numQueries, linkDepth, numParallel)
 
 		if len(result.Results) != result.ExpectedItems {
 			t.Errorf("Expected %v items, got %v (%v errors)", result.ExpectedItems, len(result.Results), len(result.Errors))
@@ -121,25 +122,33 @@ type TimedResults struct {
 	Errors        []*sdp.QueryError
 }
 
-func TimeQueries(numQueries int, linkDepth int, numParallel int) TimedResults {
+func TimeQueries(t *testing.T, numQueries int, linkDepth int, numParallel int) TimedResults {
 	ec := EngineConfig{
 		MaxParallelExecutions: numParallel,
+		NATSOptions: &auth.NATSOptions{
+			NumRetries:        5,
+			RetryDelay:        time.Second,
+			Servers:           NatsTestURLs,
+			ConnectionName:    "test-connection",
+			ConnectionTimeout: time.Second,
+			MaxReconnects:     5,
+		},
 	}
 	e, err := NewEngine(&ec)
 	if err != nil {
-		panic(fmt.Sprintf("Error initializing Engine: %v", err))
+		t.Fatal(fmt.Sprintf("Error initializing Engine: %v", err))
 	}
 	e.AddAdapters(&SlowAdapter{
 		QueryDuration: 100 * time.Millisecond,
 	})
 	err = e.Start()
 	if err != nil {
-		panic(fmt.Sprintf("Error starting Engine: %v", err))
+		t.Fatal(fmt.Sprintf("Error starting Engine: %v", err))
 	}
 	defer func() {
 		err = e.Stop()
 		if err != nil {
-			panic(fmt.Sprintf("Error stopping Engine: %v", err))
+			t.Fatal(fmt.Sprintf("Error stopping Engine: %v", err))
 		}
 	}()
 
