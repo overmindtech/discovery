@@ -13,7 +13,7 @@ require (
 	github.com/nats-io/nats-server/v2 v2.10.22
 	github.com/nats-io/nats.go v1.37.0
 	github.com/nats-io/nkeys v0.4.8 // indirect
-	github.com/overmindtech/sdp-go v0.101.4
+	github.com/overmindtech/sdp-go v0.102.0
 	github.com/overmindtech/sdpcache v1.6.4
 	github.com/sirupsen/logrus v1.9.3
 	github.com/sourcegraph/conc v0.3.0
