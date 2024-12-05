@@ -9,11 +9,11 @@ require (
 	github.com/getsentry/sentry-go v0.29.1
 	github.com/google/uuid v1.6.0
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
-	github.com/nats-io/jwt/v2 v2.7.2
+	github.com/nats-io/jwt/v2 v2.7.2 // indirect
 	github.com/nats-io/nats-server/v2 v2.10.22
 	github.com/nats-io/nats.go v1.37.0
-	github.com/nats-io/nkeys v0.4.8
-	github.com/overmindtech/sdp-go v0.101.3
+	github.com/nats-io/nkeys v0.4.8 // indirect
+	github.com/overmindtech/sdp-go v0.101.4
 	github.com/overmindtech/sdpcache v1.6.4
 	github.com/sirupsen/logrus v1.9.3
 	github.com/sourcegraph/conc v0.3.0
