@@ -47,20 +47,20 @@ func TestHeartbeats(t *testing.T) {
 	}
 	e, _ := NewEngine(&ec)
 
-	e.AddAdapters(
+	if err := e.AddAdapters(
 		&TestAdapter{
 			ReturnScopes: []string{"test"},
 			ReturnType:   "test-type",
+			ReturnName:   "test-name",
 		},
 		&TestAdapter{
 			ReturnScopes: []string{"test"},
 			ReturnType:   "test-type2",
+			ReturnName:   "test-name2",
 		},
-		&TestAdapter{
-			ReturnScopes: []string{"test2"},
-			ReturnType:   "test-type",
-		},
-	)
+	); err != nil {
+		t.Fatalf("unexpected error adding adapters: %v", err)
+	}
 
 	t.Run("sendHeartbeat when healthy", func(t *testing.T) {
 		ec.HeartbeatOptions.HealthCheck = func() error {
@@ -107,22 +107,18 @@ func TestHeartbeats(t *testing.T) {
 
 		reqAvailableScopes := req.Msg.GetAvailableScopes()
 
-		if len(reqAvailableScopes) != 2 {
-			t.Errorf("expected 2 scopes, got %v", len(reqAvailableScopes))
+		if len(reqAvailableScopes) != 1 {
+			t.Errorf("expected 1 scope, got %v", len(reqAvailableScopes))
 		}
 
 		if !slices.Contains(reqAvailableScopes, "test") {
 			t.Errorf("expected scope 'test' to be present in the response")
 		}
 
-		if !slices.Contains(reqAvailableScopes, "test2") {
-			t.Errorf("expected scope 'test2' to be present in the response")
-		}
-
 		reqAdapterMetadata := req.Msg.GetAdapterMetadata()
 
-		if len(reqAdapterMetadata) != 3 {
-			t.Errorf("expected 3 adapter metadata, got %v", len(reqAdapterMetadata))
+		if len(reqAdapterMetadata) != 2 {
+			t.Errorf("expected 2 adapter metadata, got %v", len(reqAdapterMetadata))
 		}
 	})
 

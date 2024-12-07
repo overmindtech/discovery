@@ -36,12 +36,6 @@ type Adapter interface {
 	// List Lists all items in a given scope
 	List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error)
 
-	// Weight Returns the priority weighting of items returned by this adapter.
-	// This is used to resolve conflicts where two adapters of the same type
-	// return an item for a GET query. In this instance only one item can be
-	// sen on, so the one with the higher weight value will win.
-	Weight() int
-
 	// A struct that contains information about the adapter, it is used by the api-server to determine the capabilities of the adapter
 	// It is mandatory for all adapters to implement this method
 	Metadata() *sdp.AdapterMetadata
@@ -83,6 +77,11 @@ type SearchableAdapter interface {
 	// needs to be provided to Search is dependant on the adapter itself as each
 	// adapter will respond to searches differently
 	Search(ctx context.Context, scope string, query string, ignoreCache bool) ([]*sdp.Item, error)
+}
+
+type StreamingAdapter interface {
+	ListStream(ctx context.Context, scope string, ignoreCache bool, items chan<- *sdp.Item, errs chan<- error) error
+	SearchStream(ctx context.Context, scope string, query string, ignoreCache bool, items chan<- *sdp.Item, errs chan<- error) error
 }
 
 // HiddenAdapter adapters that define a `Hidden()` method are able to tell whether

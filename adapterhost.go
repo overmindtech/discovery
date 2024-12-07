@@ -2,17 +2,14 @@ package discovery
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/base64"
+	"errors"
 	"fmt"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/overmindtech/sdp-go"
-	"google.golang.org/protobuf/proto"
 )
 
 // AdapterHost This struct holds references to all Adapters in a process
@@ -20,13 +17,13 @@ import (
 // struct are safe to call concurrently.
 type AdapterHost struct {
 	// Map of types to all adapters for that type
-	adapterMap      map[string][]Adapter
+	adapterMap      map[string]Adapter
 	adapterMapMutex sync.RWMutex
 }
 
 func NewAdapterHost() *AdapterHost {
 	sh := &AdapterHost{
-		adapterMap: make(map[string][]Adapter),
+		adapterMap: make(map[string]Adapter),
 	}
 
 	// Add meta-adapters so that we can respond to queries for `overmind-type`,
@@ -37,29 +34,28 @@ func NewAdapterHost() *AdapterHost {
 }
 
 func (sh *AdapterHost) addBuiltinAdapters() {
-	sh.AddAdapters(&TypeAdapter{sh: sh})
-	sh.AddAdapters(&ScopeAdapter{sh: sh})
-	sh.AddAdapters(&SourcesAdapter{sh: sh})
+	_ = sh.AddAdapters(&TypeAdapter{sh: sh})
+	_ = sh.AddAdapters(&ScopeAdapter{sh: sh})
+	_ = sh.AddAdapters(&SourcesAdapter{sh: sh})
 }
 
+var ErrAdapterAlreadyExists = errors.New("adapter already exists")
+
 // AddAdapters Adds an adapter to this engine
-func (sh *AdapterHost) AddAdapters(adapters ...Adapter) {
+func (sh *AdapterHost) AddAdapters(adapters ...Adapter) error {
 	sh.adapterMapMutex.Lock()
 	defer sh.adapterMapMutex.Unlock()
 
 	for _, adapter := range adapters {
-		allAdapters := append(sh.adapterMap[adapter.Type()], adapter)
-
-		sort.Slice(allAdapters, func(i, j int) bool {
-			iAdapter := allAdapters[i]
-			jAdapter := allAdapters[j]
-
-			// Sort by weight, highest first
-			return iAdapter.Weight() > jAdapter.Weight()
-		})
-
-		sh.adapterMap[adapter.Type()] = allAdapters
+		_, exists := sh.adapterMap[adapter.Type()]
+		if exists {
+			return ErrAdapterAlreadyExists
+		} else {
+			sh.adapterMap[adapter.Type()] = adapter
+		}
 	}
+
+	return nil
 }
 
 // Adapters Returns a slice of all known adapters
@@ -69,8 +65,8 @@ func (sh *AdapterHost) Adapters() []Adapter {
 
 	adapters := make([]Adapter, 0)
 
-	for _, typeAdapters := range sh.adapterMap {
-		adapters = append(adapters, typeAdapters...)
+	for _, adapter := range sh.adapterMap {
+		adapters = append(adapters, adapter)
 	}
 
 	return adapters
@@ -96,18 +92,15 @@ func (sh *AdapterHost) VisibleAdapters() []Adapter {
 	return result
 }
 
-// AdapterByType Returns all adapters of a given type
-func (sh *AdapterHost) AdaptersByType(typ string) []Adapter {
+// AdapterByType Returns the adapter for a given type and a boolean indicating
+// if the adapter was found
+func (sh *AdapterHost) AdapterByType(typ string) (Adapter, bool) {
 	sh.adapterMapMutex.RLock()
 	defer sh.adapterMapMutex.RUnlock()
 
-	if adapters, ok := sh.adapterMap[typ]; ok {
-		result := make([]Adapter, len(adapters))
-		copy(result, adapters)
-		return result
-	}
+	adapter, ok := sh.adapterMap[typ]
 
-	return make([]Adapter, 0)
+	return adapter, ok
 }
 
 // ExpandQuery Expands queries with wildcards to no longer contain wildcards.
@@ -123,12 +116,7 @@ func (sh *AdapterHost) AdaptersByType(typ string) []Adapter {
 //
 // This functions returns a map of queries with the adapters that they should be
 // run against
-func (sh *AdapterHost) ExpandQuery(q *sdp.Query) map[*sdp.Query][]Adapter {
-	queries := make(map[string]*struct {
-		Query    *sdp.Query
-		Adapters []Adapter
-	})
-
+func (sh *AdapterHost) ExpandQuery(q *sdp.Query) map[*sdp.Query]Adapter {
 	var checkAdapters []Adapter
 
 	if IsWildcard(q.GetType()) {
@@ -137,8 +125,13 @@ func (sh *AdapterHost) ExpandQuery(q *sdp.Query) map[*sdp.Query][]Adapter {
 		checkAdapters = sh.VisibleAdapters()
 	} else {
 		// If the type is specific, pull just adapters for that type
-		checkAdapters = sh.AdaptersByType(q.GetType())
+		adapter, ok := sh.AdapterByType(q.GetType())
+		if ok {
+			checkAdapters = append(checkAdapters, adapter)
+		}
 	}
+
+	expandedQueries := make(map[*sdp.Query]Adapter)
 
 	for _, adapter := range checkAdapters {
 		// is the adapter is hidden
@@ -166,60 +159,21 @@ func (sh *AdapterHost) ExpandQuery(q *sdp.Query) map[*sdp.Query][]Adapter {
 					dest.Scope = adapterScope
 				}
 
-				// deal with duplicate queries after expansion
-				hash, err := queryHash(&dest)
-
-				if err == nil {
-					if existing, ok := queries[hash]; ok {
-						existing.Adapters = append(existing.Adapters, adapter)
-					} else {
-						queries[hash] = &struct {
-							Query    *sdp.Query
-							Adapters []Adapter
-						}{
-							Query: &dest,
-							Adapters: []Adapter{
-								adapter,
-							},
-						}
-					}
-				}
+				expandedQueries[&dest] = adapter
 			}
 		}
 	}
 
-	// Convert back to final map
-	finalMap := make(map[*sdp.Query][]Adapter)
-	for _, expanded := range queries {
-		finalMap[expanded.Query] = expanded.Adapters
-	}
-
-	return finalMap
+	return expandedQueries
 }
 
 // ClearAllAdapters Removes all adapters from the engine
 func (sh *AdapterHost) ClearAllAdapters() {
 	sh.adapterMapMutex.Lock()
-	sh.adapterMap = make(map[string][]Adapter)
+	sh.adapterMap = make(map[string]Adapter)
 	sh.adapterMapMutex.Unlock()
 
 	sh.addBuiltinAdapters()
-}
-
-// queryHash Calculates a hash for a given query which can be used to
-// determine if two queries are identical
-func queryHash(req *sdp.Query) (string, error) {
-	hash := sha256.New()
-
-	// Marshall to bytes so that we can use sha1 to compare the raw binary
-	b, err := proto.Marshal(req)
-
-	if err != nil {
-		sentry.CaptureException(err)
-		return "", err
-	}
-
-	return base64.URLEncoding.EncodeToString(hash.Sum(b)), nil
 }
 
 // StartPurger Starts the purger for all caching adapters

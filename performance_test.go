@@ -138,9 +138,12 @@ func TimeQueries(t *testing.T, numQueries int, linkDepth int, numParallel int) T
 	if err != nil {
 		t.Fatal(fmt.Sprintf("Error initializing Engine: %v", err))
 	}
-	e.AddAdapters(&SlowAdapter{
+	err = e.AddAdapters(&SlowAdapter{
 		QueryDuration: 100 * time.Millisecond,
 	})
+	if err != nil {
+		t.Fatal(fmt.Sprintf("Error adding adapter: %v", err))
+	}
 	err = e.Start()
 	if err != nil {
 		t.Fatal(fmt.Sprintf("Error starting Engine: %v", err))

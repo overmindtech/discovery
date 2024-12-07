@@ -6,49 +6,19 @@ import (
 	"github.com/overmindtech/sdp-go"
 )
 
-type ExpectExpand struct {
-	NumQueries int
-
-	// Note that this is not the number of unique adapters, but teh number of
-	// adapters total. So if a adapter would be hit twice this will be 2
-	NumAdapters int
-}
-
-func (e *ExpectExpand) Validate(t *testing.T, m map[*sdp.Query][]Adapter) {
-	t.Helper()
-
-	numAdapters := 0
-	numQueries := 0
-
-	for _, v := range m {
-		numQueries++
-		numAdapters = numAdapters + len(v)
-	}
-
-	if e.NumQueries != numQueries {
-		t.Errorf("Expected %v queries, got %v: %v", e.NumQueries, numQueries, m)
-	}
-
-	if e.NumAdapters != numAdapters {
-		t.Errorf("Expected %v adapters, got %v: %v", e.NumAdapters, numAdapters, m)
-	}
-}
-
 func TestAdapterHostExpandQuery(t *testing.T) {
 	sh := NewAdapterHost()
 
-	sh.AddAdapters(
+	err := sh.AddAdapters(
 		&TestAdapter{
 			ReturnScopes: []string{"test"},
 			ReturnType:   "person",
+			ReturnName:   "person",
 		},
 		&TestAdapter{
 			ReturnScopes: []string{"test"},
 			ReturnType:   "fish",
-		},
-		&TestAdapter{
-			ReturnScopes: []string{sdp.WILDCARD},
-			ReturnType:   "person",
+			ReturnName:   "fish",
 		},
 		&TestAdapter{
 			ReturnScopes: []string{
@@ -56,13 +26,18 @@ func TestAdapterHostExpandQuery(t *testing.T) {
 				"multiB",
 			},
 			ReturnType: "chair",
+			ReturnName: "chair",
 		},
 		&TestAdapter{
 			ReturnScopes: []string{"test"},
 			ReturnType:   "hidden_person",
 			IsHidden:     true,
+			ReturnName:   "hidden_person",
 		},
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	t.Run("Right type wrong scope", func(t *testing.T) {
 		req := sdp.Query{
@@ -70,12 +45,11 @@ func TestAdapterHostExpandQuery(t *testing.T) {
 			Scope: "wrong",
 		}
 
-		ee := ExpectExpand{
-			NumQueries:  1,
-			NumAdapters: 1,
-		}
+		m := sh.ExpandQuery(&req)
 
-		ee.Validate(t, sh.ExpandQuery(&req))
+		if len(m) != 0 {
+			t.Fatalf("Expected 0 queries, got %v", len(m))
+		}
 	})
 
 	t.Run("Right scope wrong type", func(t *testing.T) {
@@ -84,12 +58,11 @@ func TestAdapterHostExpandQuery(t *testing.T) {
 			Scope: "test",
 		}
 
-		ee := ExpectExpand{
-			NumQueries:  0,
-			NumAdapters: 0,
-		}
+		m := sh.ExpandQuery(&req)
 
-		ee.Validate(t, sh.ExpandQuery(&req))
+		if len(m) != 0 {
+			t.Fatalf("Expected 0 queries, got %v", len(m))
+		}
 	})
 
 	t.Run("Right both", func(t *testing.T) {
@@ -98,12 +71,11 @@ func TestAdapterHostExpandQuery(t *testing.T) {
 			Scope: "test",
 		}
 
-		ee := ExpectExpand{
-			NumQueries:  1,
-			NumAdapters: 2,
-		}
+		m := sh.ExpandQuery(&req)
 
-		ee.Validate(t, sh.ExpandQuery(&req))
+		if len(m) != 1 {
+			t.Fatalf("Expected 1 query, got %v", len(m))
+		}
 	})
 
 	t.Run("Multi-scope", func(t *testing.T) {
@@ -112,12 +84,11 @@ func TestAdapterHostExpandQuery(t *testing.T) {
 			Scope: "multiB",
 		}
 
-		ee := ExpectExpand{
-			NumQueries:  1,
-			NumAdapters: 1,
-		}
+		m := sh.ExpandQuery(&req)
 
-		ee.Validate(t, sh.ExpandQuery(&req))
+		if len(m) != 1 {
+			t.Fatalf("Expected 1 query, got %v", len(m))
+		}
 	})
 
 	t.Run("Wildcard scope", func(t *testing.T) {
@@ -126,24 +97,22 @@ func TestAdapterHostExpandQuery(t *testing.T) {
 			Scope: sdp.WILDCARD,
 		}
 
-		ee := ExpectExpand{
-			NumQueries:  2,
-			NumAdapters: 2,
-		}
+		m := sh.ExpandQuery(&req)
 
-		ee.Validate(t, sh.ExpandQuery(&req))
+		if len(m) != 1 {
+			t.Fatalf("Expected 1 query, got %v", len(m))
+		}
 
 		req = sdp.Query{
 			Type:  "chair",
 			Scope: sdp.WILDCARD,
 		}
 
-		ee = ExpectExpand{
-			NumQueries:  2,
-			NumAdapters: 2,
-		}
+		m = sh.ExpandQuery(&req)
 
-		ee.Validate(t, sh.ExpandQuery(&req))
+		if len(m) != 2 {
+			t.Fatalf("Expected 2 queries, got %v", len(m))
+		}
 	})
 
 	t.Run("Wildcard type", func(t *testing.T) {
@@ -152,12 +121,11 @@ func TestAdapterHostExpandQuery(t *testing.T) {
 			Scope: "test",
 		}
 
-		ee := ExpectExpand{
-			NumQueries:  2,
-			NumAdapters: 3,
-		}
+		m := sh.ExpandQuery(&req)
 
-		ee.Validate(t, sh.ExpandQuery(&req))
+		if len(m) != 2 {
+			t.Fatalf("Expected 2 adapters, got %v", len(m))
+		}
 	})
 
 	t.Run("Wildcard both", func(t *testing.T) {
@@ -166,12 +134,11 @@ func TestAdapterHostExpandQuery(t *testing.T) {
 			Scope: sdp.WILDCARD,
 		}
 
-		ee := ExpectExpand{
-			NumQueries:  5,
-			NumAdapters: 5,
-		}
+		m := sh.ExpandQuery(&req)
 
-		ee.Validate(t, sh.ExpandQuery(&req))
+		if len(m) != 4 {
+			t.Fatalf("Expected 4 adapters, got %v", len(m))
+		}
 	})
 
 	t.Run("substring match", func(t *testing.T) {
@@ -180,12 +147,11 @@ func TestAdapterHostExpandQuery(t *testing.T) {
 			Scope: "multi",
 		}
 
-		ee := ExpectExpand{
-			NumQueries:  3,
-			NumAdapters: 3,
-		}
+		m := sh.ExpandQuery(&req)
 
-		ee.Validate(t, sh.ExpandQuery(&req))
+		if len(m) != 2 {
+			t.Fatalf("Expected 2 queries, got %v", len(m))
+		}
 	})
 
 	t.Run("Listing hidden adapter with wildcard scope", func(t *testing.T) {
@@ -212,7 +178,10 @@ func TestAdapterHostAddAdapters(t *testing.T) {
 
 	adapter := TestAdapter{}
 
-	sh.AddAdapters(&adapter)
+	err := sh.AddAdapters(&adapter)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if x := len(sh.Adapters()); x != 4 {
 		t.Fatalf("Expected 4 adapters, got %v", x)
