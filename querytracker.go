@@ -95,9 +95,6 @@ func (qt *QueryTracker) Execute(ctx context.Context) ([]*sdp.Item, []*sdp.QueryE
 			} else {
 				errs = nil
 			}
-		case <-ctx.Done():
-			// If the context is closed, return an error
-			return sdpItems, sdpErrs, ctx.Err()
 		}
 
 		if items == nil && errs == nil {
