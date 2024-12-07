@@ -251,6 +251,14 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 				var queryErrors []*sdp.QueryError
 				numAdapters.Add(1)
 
+				// If the context is cancelled, don't even bother doing
+				// anything. Since the `p.Go` will block, it's possible that if
+				// the pool was exhausted, the context could be cancelled before
+				// the goroutine is executed
+				if ctx.Err() != nil {
+					return
+				}
+
 				// query all adapters
 				queryItems, queryErrors = e.Execute(ctx, localQ, localAdapters)
 
@@ -278,7 +286,40 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 		}()
 	}
 
-	wg.Wait()
+	waitGroupDone := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(waitGroupDone)
+	}()
+
+	select {
+	case <-waitGroupDone:
+		// All adapters have finished
+	case <-ctx.Done():
+		// The context was cancelled, this should have propagated to all the
+		// adapters and therefore we should see the wait group finish very
+		// quickly now. We will check this though to make sure
+		longRunningAdaptersTimeout := 10 * time.Second
+
+		// Wait for the wait group, but ping the logs if it's taking
+		// too long
+		func() {
+			for {
+				select {
+				case <-waitGroupDone:
+					return
+				case <-time.After(longRunningAdaptersTimeout):
+					// If we're here, then the wait group didn't finish in time
+					log.WithContext(ctx).WithFields(log.Fields{
+						"ovm.query.uuid":   query.GetUUID(),
+						"ovm.query.type":   query.GetType(),
+						"ovm.query.scope":  query.GetScope(),
+						"ovm.query.method": query.GetMethod().String(),
+					}).Errorf("Wait group still running %v after context cancelled", longRunningAdaptersTimeout)
+				}
+			}
+		}()
+	}
 
 	// If all failed then return first error
 	if numAdaptersInt := numAdapters.Load(); numErrs == int(numAdaptersInt) {
