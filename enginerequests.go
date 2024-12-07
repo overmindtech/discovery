@@ -342,6 +342,11 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 		}()
 	}
 
+	// If the context is cancelled, return that error
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
 	// If all failed then return first error
 	if numAdaptersInt := numAdapters.Load(); numErrs == int(numAdaptersInt) {
 		return AllAdaptersFailedError{
