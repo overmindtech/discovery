@@ -24,9 +24,6 @@ func (e *Engine) executeQuerySync(ctx context.Context, q *sdp.Query) ([]*sdp.Ite
 	errs := make([]*sdp.QueryError, 0)
 
 	err := e.ExecuteQuery(ctx, q, itemsChan, errsChan)
-	if err != nil {
-		return nil, nil, err
-	}
 
 	for i := range itemsChan {
 		items = append(items, i)
@@ -36,7 +33,7 @@ func (e *Engine) executeQuerySync(ctx context.Context, q *sdp.Query) ([]*sdp.Ite
 		errs = append(errs, e)
 	}
 
-	return items, errs, nil
+	return items, errs, err
 }
 
 func TestExecuteQuery(t *testing.T) {
