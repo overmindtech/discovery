@@ -79,11 +79,6 @@ type SearchableAdapter interface {
 	Search(ctx context.Context, scope string, query string, ignoreCache bool) ([]*sdp.Item, error)
 }
 
-type StreamingAdapter interface {
-	ListStream(ctx context.Context, scope string, ignoreCache bool, items chan<- *sdp.Item, errs chan<- error) error
-	SearchStream(ctx context.Context, scope string, query string, ignoreCache bool, items chan<- *sdp.Item, errs chan<- error) error
-}
-
 // HiddenAdapter adapters that define a `Hidden()` method are able to tell whether
 // or not the items they produce should be marked as hidden within the metadata.
 // Hidden items will not be shown in GUIs or stored in databases and are used
