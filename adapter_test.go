@@ -29,6 +29,7 @@ func TestEngineAddAdapters(t *testing.T) {
 func TestGet(t *testing.T) {
 	adapter := TestAdapter{
 		ReturnName: "orange",
+		ReturnType: "person",
 		ReturnScopes: []string{
 			"test",
 			"empty",
@@ -42,12 +43,12 @@ func TestGet(t *testing.T) {
 			adapter.ClearCalls()
 		})
 
-		err := e.ExecuteQuery(context.Background(), &sdp.Query{
+		_, _, err := e.executeQuerySync(context.Background(), &sdp.Query{
 			Type:   "person",
 			Scope:  "test",
 			Query:  "three",
 			Method: sdp.QueryMethod_GET,
-		}, nil, nil)
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -68,15 +69,15 @@ func TestGet(t *testing.T) {
 			adapter.ClearCalls()
 		})
 
-		items, errs, err := e.ExecuteQuerySync(context.Background(), &sdp.Query{
+		items, errs, err := e.executeQuerySync(context.Background(), &sdp.Query{
 			Type:   "person",
 			Scope:  "empty",
 			Query:  "three",
 			Method: sdp.QueryMethod_GET,
 		})
 
-		if err == nil {
-			t.Error("expected all adapters failed")
+		if err != nil {
+			t.Fatal(err)
 		}
 
 		if len(errs) == 1 {
@@ -124,13 +125,13 @@ func TestGet(t *testing.T) {
 			Method: sdp.QueryMethod_GET,
 		}
 
-		list1, _, err = e.ExecuteQuerySync(context.Background(), &req)
+		list1, _, err = e.executeQuerySync(context.Background(), &req)
 		if err != nil {
 			t.Error(err)
 		}
 
 		time.Sleep(10 * time.Millisecond)
-		item2, _, err = e.ExecuteQuerySync(context.Background(), &req)
+		item2, _, err = e.executeQuerySync(context.Background(), &req)
 		if err != nil {
 			t.Error(err)
 		}
@@ -142,7 +143,7 @@ func TestGet(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 		e.sh.Purge()
 
-		item3, _, err = e.ExecuteQuerySync(context.Background(), &req)
+		item3, _, err = e.executeQuerySync(context.Background(), &req)
 		if err != nil {
 			t.Error(err)
 		}
@@ -164,13 +165,22 @@ func TestGet(t *testing.T) {
 			Method: sdp.QueryMethod_GET,
 		}
 
-		_, _, err := e.ExecuteQuerySync(context.Background(), &req)
-		if err == nil {
-			t.Fatal("expected an error because of cache")
+		_, errs, err := e.executeQuerySync(context.Background(), &req)
+		if err != nil {
+			t.Fatal(err)
 		}
-		_, _, err = e.ExecuteQuerySync(context.Background(), &req)
-		if err == nil {
-			t.Fatal("expected an error because of cache")
+
+		if len(errs) != 1 {
+			t.Fatalf("Expected 1 error, got %v", len(errs))
+		}
+
+		_, errs, err = e.executeQuerySync(context.Background(), &req)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if len(errs) != 1 {
+			t.Fatalf("Expected 1 error, got %v", len(errs))
 		}
 
 		if l := len(adapter.GetCalls); l != 1 {
@@ -186,7 +196,7 @@ func TestGet(t *testing.T) {
 		adapter.IsHidden = true
 
 		t.Run("Get", func(t *testing.T) {
-			item, _, err := e.ExecuteQuerySync(context.Background(), &sdp.Query{
+			item, _, err := e.executeQuerySync(context.Background(), &sdp.Query{
 				Type:   "person",
 				Scope:  "test",
 				Query:  "three",
@@ -203,7 +213,7 @@ func TestGet(t *testing.T) {
 		})
 
 		t.Run("List", func(t *testing.T) {
-			items, _, err := e.ExecuteQuerySync(context.Background(), &sdp.Query{
+			items, _, err := e.executeQuerySync(context.Background(), &sdp.Query{
 				Type:   "person",
 				Scope:  "test",
 				Method: sdp.QueryMethod_LIST,
@@ -219,7 +229,7 @@ func TestGet(t *testing.T) {
 		})
 
 		t.Run("Search", func(t *testing.T) {
-			items, _, err := e.ExecuteQuerySync(context.Background(), &sdp.Query{
+			items, _, err := e.executeQuerySync(context.Background(), &sdp.Query{
 				Type:   "person",
 				Scope:  "test",
 				Query:  "three",
@@ -242,7 +252,7 @@ func TestList(t *testing.T) {
 
 	e := newStartedEngine(t, "TestList", nil, &adapter)
 
-	_, _, err := e.ExecuteQuerySync(context.Background(), &sdp.Query{
+	_, _, err := e.executeQuerySync(context.Background(), &sdp.Query{
 		Type:   "person",
 		Scope:  "test",
 		Method: sdp.QueryMethod_LIST,
@@ -267,7 +277,7 @@ func TestSearch(t *testing.T) {
 
 	e := newStartedEngine(t, "TestSearch", nil, &adapter)
 
-	_, _, err := e.ExecuteQuerySync(context.Background(), &sdp.Query{
+	_, _, err := e.executeQuerySync(context.Background(), &sdp.Query{
 		Type:   "person",
 		Scope:  "test",
 		Query:  "query",
@@ -314,7 +324,7 @@ func TestListSearchCaching(t *testing.T) {
 			Method: sdp.QueryMethod_LIST,
 		}
 
-		list1, _, err = e.ExecuteQuerySync(context.Background(), &q)
+		list1, _, err = e.executeQuerySync(context.Background(), &q)
 
 		if err != nil {
 			t.Error(err)
@@ -322,9 +332,9 @@ func TestListSearchCaching(t *testing.T) {
 
 		time.Sleep(10 * time.Millisecond)
 
-		list2, _, err = e.ExecuteQuerySync(context.Background(), &q)
+		list2, _, err = e.executeQuerySync(context.Background(), &q)
 		if err != nil {
-			t.Error(err)
+			t.Fatal(err)
 		}
 
 		if list1[0].GetAttributes().GetAttrStruct().GetFields()["generation"].GetNumberValue() != list2[0].GetAttributes().GetAttrStruct().GetFields()["generation"].GetNumberValue() {
@@ -334,9 +344,9 @@ func TestListSearchCaching(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 		e.sh.Purge()
 
-		list3, _, err = e.ExecuteQuerySync(context.Background(), &q)
+		list3, _, err = e.executeQuerySync(context.Background(), &q)
 		if err != nil {
-			t.Error(err)
+			t.Fatal(err)
 		}
 
 		if list2[0].GetAttributes().GetAttrStruct().GetFields()["generation"] == list3[0].GetAttributes().GetAttrStruct().GetFields()["generation"] {
@@ -356,17 +366,24 @@ func TestListSearchCaching(t *testing.T) {
 			Method: sdp.QueryMethod_LIST,
 		}
 
-		_, _, err = e.ExecuteQuerySync(context.Background(), &q)
-		if err == nil {
-			t.Error("expected error but got nil")
+		_, errs, err := e.executeQuerySync(context.Background(), &q)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if len(errs) != 1 {
+			t.Fatalf("Expected 1 error, got %v", len(errs))
 		}
 
 		time.Sleep(10 * time.Millisecond)
 
-		_, _, err = e.ExecuteQuerySync(context.Background(), &q)
+		_, errs, err = e.executeQuerySync(context.Background(), &q)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-		if err == nil {
-			t.Error("expected error but got nil")
+		if len(errs) != 1 {
+			t.Fatalf("Expected 1 error, got %v", len(errs))
 		}
 
 		if l := len(adapter.ListCalls); l != 1 {
@@ -375,10 +392,13 @@ func TestListSearchCaching(t *testing.T) {
 
 		time.Sleep(200 * time.Millisecond)
 
-		_, _, err = e.ExecuteQuerySync(context.Background(), &q)
+		_, errs, err = e.executeQuerySync(context.Background(), &q)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-		if err == nil {
-			t.Error("expected error but got nil")
+		if len(errs) != 1 {
+			t.Fatalf("Expected 1 error, got %v", len(errs))
 		}
 
 		if l := len(adapter.ListCalls); l != 2 {
@@ -402,14 +422,14 @@ func TestListSearchCaching(t *testing.T) {
 			Method: sdp.QueryMethod_SEARCH,
 		}
 
-		list1, _, err = e.ExecuteQuerySync(context.Background(), &q)
+		list1, _, err = e.executeQuerySync(context.Background(), &q)
 		if err != nil {
 			t.Error(err)
 		}
 
 		time.Sleep(10 * time.Millisecond)
 
-		list2, _, err = e.ExecuteQuerySync(context.Background(), &q)
+		list2, _, err = e.executeQuerySync(context.Background(), &q)
 		if err != nil {
 			t.Error(err)
 		}
@@ -420,7 +440,7 @@ func TestListSearchCaching(t *testing.T) {
 
 		time.Sleep(200 * time.Millisecond)
 
-		list3, _, err = e.ExecuteQuerySync(context.Background(), &q)
+		list3, _, err = e.executeQuerySync(context.Background(), &q)
 		if err != nil {
 			t.Error(err)
 		}
@@ -443,30 +463,38 @@ func TestListSearchCaching(t *testing.T) {
 			Method: sdp.QueryMethod_SEARCH,
 		}
 
-		_, _, err = e.ExecuteQuerySync(context.Background(), &q)
+		_, errs, err := e.executeQuerySync(context.Background(), &q)
 
-		if err == nil {
-			t.Error("expected error but got nil")
+		if err != nil {
+			t.Error(err)
+		}
+
+		if len(errs) != 1 {
+			t.Fatalf("Expected 1 error, got %v", len(errs))
 		}
 
 		time.Sleep(10 * time.Millisecond)
 
-		_, _, err = e.ExecuteQuerySync(context.Background(), &q)
+		_, errs, err = e.executeQuerySync(context.Background(), &q)
 
-		if err == nil {
-			t.Error("expected error but got nil")
+		if err != nil {
+			t.Error(err)
 		}
 
-		if l := len(adapter.SearchCalls); l != 1 {
-			t.Errorf("Expected only 1 find call, got %v, cache not working", l)
+		if len(errs) != 1 {
+			t.Fatalf("Expected 1 error, got %v", len(errs))
 		}
 
 		time.Sleep(200 * time.Millisecond)
 
-		_, _, err = e.ExecuteQuerySync(context.Background(), &q)
+		_, errs, err = e.executeQuerySync(context.Background(), &q)
 
-		if err == nil {
-			t.Error("expected error but got nil")
+		if err != nil {
+			t.Error(err)
+		}
+
+		if len(errs) != 1 {
+			t.Fatalf("Expected 1 error, got %v", len(errs))
 		}
 
 		if l := len(adapter.SearchCalls); l != 2 {
@@ -486,13 +514,19 @@ func TestListSearchCaching(t *testing.T) {
 			Method: sdp.QueryMethod_GET,
 		}
 
-		_, _, err := e.ExecuteQuerySync(context.Background(), &q)
-		if err == nil {
-			t.Fatal("expected an error because of non-caching")
+		_, errs, err := e.executeQuerySync(context.Background(), &q)
+		if err != nil {
+			t.Error(err)
 		}
-		_, _, err = e.ExecuteQuerySync(context.Background(), &q)
-		if err == nil {
-			t.Fatal("expected an error because of non-caching")
+		if len(errs) != 1 {
+			t.Fatalf("Expected 1 error, got %v", len(errs))
+		}
+		_, errs, err = e.executeQuerySync(context.Background(), &q)
+		if err != nil {
+			t.Error(err)
+		}
+		if len(errs) != 1 {
+			t.Fatalf("Expected 1 error, got %v", len(errs))
 		}
 
 		if l := len(adapter.GetCalls); l != 2 {
@@ -512,35 +546,56 @@ func TestListSearchCaching(t *testing.T) {
 			Method: sdp.QueryMethod_GET,
 		}
 
-		_, _, err := e.ExecuteQuerySync(context.Background(), &q)
-		if err == nil {
-			t.Fatal("expected an error because of non-caching")
+		_, errs, err := e.executeQuerySync(context.Background(), &q)
+		if err != nil {
+			t.Error(err)
 		}
-		_, _, err = e.ExecuteQuerySync(context.Background(), &q)
-		if err == nil {
-			t.Fatal("expected an error because of non-caching")
+		if len(errs) != 1 {
+			t.Fatalf("Expected 1 error, got %v", len(errs))
+		}
+
+		_, errs, err = e.executeQuerySync(context.Background(), &q)
+		if err != nil {
+			t.Error(err)
+		}
+		if len(errs) != 1 {
+			t.Fatalf("Expected 1 error, got %v", len(errs))
 		}
 
 		q.Method = sdp.QueryMethod_LIST
 
-		_, _, err = e.ExecuteQuerySync(context.Background(), &q)
-		if err == nil {
-			t.Fatal("expected an error because of non-caching")
+		_, errs, err = e.executeQuerySync(context.Background(), &q)
+		if err != nil {
+			t.Error(err)
 		}
-		_, _, err = e.ExecuteQuerySync(context.Background(), &q)
-		if err == nil {
-			t.Fatal("expected an error because of non-caching")
+		if len(errs) != 1 {
+			t.Fatalf("Expected 1 error, got %v", len(errs))
+		}
+
+		_, errs, err = e.executeQuerySync(context.Background(), &q)
+		if err != nil {
+			t.Error(err)
+		}
+		if len(errs) != 1 {
+			t.Fatalf("Expected 1 error, got %v", len(errs))
 		}
 
 		q.Method = sdp.QueryMethod_SEARCH
 
-		_, _, err = e.ExecuteQuerySync(context.Background(), &q)
-		if err == nil {
-			t.Fatal("expected an error because of non-caching")
+		_, errs, err = e.executeQuerySync(context.Background(), &q)
+		if err != nil {
+			t.Error(err)
 		}
-		_, _, err = e.ExecuteQuerySync(context.Background(), &q)
-		if err == nil {
-			t.Fatal("expected an error because of non-caching")
+		if len(errs) != 1 {
+			t.Fatalf("Expected 1 error, got %v", len(errs))
+		}
+
+		_, errs, err = e.executeQuerySync(context.Background(), &q)
+		if err != nil {
+			t.Error(err)
+		}
+		if len(errs) != 1 {
+			t.Fatalf("Expected 1 error, got %v", len(errs))
 		}
 
 		if l := len(adapter.GetCalls); l != 2 {
@@ -587,7 +642,7 @@ func TestSearchGetCaching(t *testing.T) {
 		}
 
 		t.Logf("Searching for %v", q.GetQuery())
-		searchResult, searchErrors, err = e.ExecuteQuerySync(context.Background(), &q)
+		searchResult, searchErrors, err = e.executeQuerySync(context.Background(), &q)
 		if err != nil {
 			t.Error(err)
 		}
@@ -613,7 +668,7 @@ func TestSearchGetCaching(t *testing.T) {
 		q.Query = searchResult[0].UniqueAttributeValue()
 
 		t.Logf("Getting %v from cache", q.GetQuery())
-		getResult, getErrors, err = e.ExecuteQuerySync(context.Background(), &q)
+		getResult, getErrors, err = e.executeQuerySync(context.Background(), &q)
 
 		if err != nil {
 			t.Error(err)

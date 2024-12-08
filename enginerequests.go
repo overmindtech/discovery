@@ -16,18 +16,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
-	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
-
-// AllAdaptersFailedError Will be returned when all adapters have failed
-type AllAdaptersFailedError struct {
-	NumAdapters int
-}
-
-func (e AllAdaptersFailedError) Error() string {
-	return fmt.Sprintf("all adapters (%v) failed", e.NumAdapters)
-}
 
 // NewItemSubject Generates a random subject name for returning items e.g.
 // return.item._INBOX.712ab421
@@ -144,33 +134,11 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 	}
 }
 
-// ExecuteQuerySync Executes a Query, waiting for all results, then returns
-// them along with the error, rather than passing the results back along channels
-func (e *Engine) ExecuteQuerySync(ctx context.Context, q *sdp.Query) ([]*sdp.Item, []*sdp.QueryError, error) {
-	itemsChan := make(chan *sdp.Item, 100_000)
-	errsChan := make(chan *sdp.QueryError, 100_000)
-	items := make([]*sdp.Item, 0)
-	errs := make([]*sdp.QueryError, 0)
-
-	err := e.ExecuteQuery(ctx, q, itemsChan, errsChan)
-
-	for i := range itemsChan {
-		items = append(items, i)
-	}
-
-	for e := range errsChan {
-		errs = append(errs, e)
-	}
-
-	return items, errs, err
-}
-
 var listExecutionPoolCount atomic.Int32
 var getExecutionPoolCount atomic.Int32
 
 // ExecuteQuery Executes a single Query and returns the results without any
-// linking. Will return an error if all adapters fail, or the Query couldn't be
-// run.
+// linking. Will return an error if the Query couldn't be run.
 //
 // Items and errors will be sent to the supplied channels as they are found.
 // Note that if these channels are not buffered, something will need to be
@@ -209,7 +177,6 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 
 	// These are used to calculate whether all adapters have failed or not
 	var numAdapters atomic.Int32
-	var numErrs int
 
 	// Since we need to wait for only the processing of this query's executions, we need a separate WaitGroup here
 	// Overall MaxParallelExecutions evaluation is handled by e.executionPool
@@ -258,8 +225,6 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 						getExecutionPoolCount.Add(-1)
 					}
 				}()
-				var queryItems []*sdp.Item
-				var queryErrors []*sdp.QueryError
 				numAdapters.Add(1)
 
 				// If the context is cancelled, don't even bother doing
@@ -270,29 +235,8 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 					return
 				}
 
-				// query all adapters
-				queryItems, queryErrors = e.Execute(ctx, localQ, localAdapter)
-
-				for _, i := range queryItems {
-					// Assign the source query
-					if i.GetMetadata() != nil {
-						i.Metadata.SourceQuery = query
-					}
-
-					if items != nil {
-						items <- i
-					}
-				}
-
-				for _, e := range queryErrors {
-					if localQ != nil {
-						numErrs++
-
-						if errs != nil {
-							errs <- e
-						}
-					}
-				}
+				// Execute the query against the adapter
+				e.Execute(ctx, localQ, localAdapter, items, errs)
 			})
 		}()
 	}
@@ -343,17 +287,15 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 		return ctx.Err()
 	}
 
-	// If all failed then return first error
-	if numAdaptersInt := numAdapters.Load(); numErrs == int(numAdaptersInt) {
-		return AllAdaptersFailedError{
-			NumAdapters: int(numAdaptersInt),
-		}
-	}
-
 	return nil
 }
 
-func (e *Engine) Execute(ctx context.Context, q *sdp.Query, adapter Adapter) ([]*sdp.Item, []*sdp.QueryError) {
+// Runs a query against an adapter. Returns an error if the query fails in a
+// "fatal" way that should consider the query as failed. Other non-fatal errors
+// should be sent on the stream. Channels for items and errors will NOT be
+// closed by this function, the caller should do that as this will likely be
+// called in parallel with other queries and the results should be merged
+func (e *Engine) Execute(ctx context.Context, q *sdp.Query, adapter Adapter, items chan<- *sdp.Item, errs chan<- *sdp.QueryError) {
 	ctx, span := tracer.Start(ctx, "Execute", trace.WithAttributes(
 		attribute.String("ovm.adapter.queryMethod", q.GetMethod().String()),
 		attribute.String("ovm.adapter.queryType", q.GetType()),
@@ -362,25 +304,6 @@ func (e *Engine) Execute(ctx context.Context, q *sdp.Query, adapter Adapter) ([]
 		attribute.String("ovm.adapter.query", q.GetQuery()),
 	))
 	defer span.End()
-
-	// Check that our context is okay before doing anything expensive
-	if ctx.Err() != nil {
-		span.RecordError(ctx.Err())
-
-		return nil, []*sdp.QueryError{
-			{
-				UUID:          q.GetUUID(),
-				ErrorType:     sdp.QueryError_OTHER,
-				ErrorString:   ctx.Err().Error(),
-				Scope:         q.GetScope(),
-				ResponderName: e.EngineConfig.SourceName,
-				ItemType:      q.GetType(),
-			},
-		}
-	}
-
-	items := make([]*sdp.Item, 0)
-	errs := make([]*sdp.QueryError, 0)
 
 	// We want to avoid having a Get and a List running at the same time, we'd
 	// rather run the List first, populate the cache, then have the Get just
@@ -420,11 +343,59 @@ func (e *Engine) Execute(ctx context.Context, q *sdp.Query, adapter Adapter) ([]
 		}
 	}()
 
-	var resultItems []*sdp.Item
-	var err error
-	var adapterDuration time.Duration
+	// Set up handling for the items and errors that are returned before they
+	// are passed back to the caller
+	var numItems atomic.Int32
+	var numErrs atomic.Int32
+	var itemHandler ItemHandler = func(item *sdp.Item) {
+		if item == nil {
+			return
+		}
 
-	start := time.Now()
+		// Store metadata
+		item.Metadata = &sdp.Metadata{
+			Timestamp:   timestamppb.New(time.Now()),
+			SourceName:  adapter.Name(),
+			SourceQuery: q,
+		}
+
+		// Mark the item as hidden if the adapter is hidden
+		if hs, ok := adapter.(HiddenAdapter); ok {
+			item.Metadata.Hidden = hs.Hidden()
+		}
+
+		// Send the item back to the caller
+		numItems.Add(1)
+		items <- item
+	}
+	var errHandler ErrHandler = func(err error) {
+		if err == nil {
+			return
+		}
+
+		// Send the error back to the caller
+		numErrs.Add(1)
+		errs <- convertToSDPError(err, q, adapter, e.EngineConfig.SourceName)
+	}
+	stream := NewQueryResultStream(itemHandler, errHandler)
+	defer stream.Close()
+
+	// Check that our context is okay before doing anything expensive
+	if ctx.Err() != nil {
+		span.RecordError(ctx.Err())
+
+		errs <- &sdp.QueryError{
+			UUID:          q.GetUUID(),
+			ErrorType:     sdp.QueryError_OTHER,
+			ErrorString:   ctx.Err().Error(),
+			Scope:         q.GetScope(),
+			ResponderName: e.EngineConfig.SourceName,
+			ItemType:      q.GetType(),
+		}
+		return
+	}
+
+	var err error
 
 	switch q.GetMethod() {
 	case sdp.QueryMethod_GET:
@@ -432,14 +403,41 @@ func (e *Engine) Execute(ctx context.Context, q *sdp.Query, adapter Adapter) ([]
 
 		newItem, err = adapter.Get(ctx, q.GetScope(), q.GetQuery(), q.GetIgnoreCache())
 
-		if err == nil {
-			resultItems = []*sdp.Item{newItem}
+		if newItem != nil {
+			stream.SendItem(newItem)
 		}
 	case sdp.QueryMethod_LIST:
-		resultItems, err = adapter.List(ctx, q.GetScope(), q.GetIgnoreCache())
+		if streamingAdapter, ok := adapter.(StreamingAdapter); ok {
+			// Prefer the streaming methods if they are available
+			streamingAdapter.ListStream(ctx, q.GetScope(), q.GetIgnoreCache(), stream)
+		} else if listableAdapter, ok := adapter.(ListableAdapter); ok {
+			var resultItems []*sdp.Item
+
+			// Fall back to the non-streaming methods
+			resultItems, err = listableAdapter.List(ctx, q.GetScope(), q.GetIgnoreCache())
+
+			for _, i := range resultItems {
+				stream.SendItem(i)
+			}
+		} else {
+			err = &sdp.QueryError{
+				ErrorType:   sdp.QueryError_NOTFOUND,
+				ErrorString: "adapter is not listable",
+			}
+		}
 	case sdp.QueryMethod_SEARCH:
-		if searchableAdapter, ok := adapter.(SearchableAdapter); ok {
+		if streamingAdapter, ok := adapter.(StreamingAdapter); ok {
+			// Prefer the streaming methods if they are available
+			streamingAdapter.SearchStream(ctx, q.GetScope(), q.GetQuery(), q.GetIgnoreCache(), stream)
+		} else if searchableAdapter, ok := adapter.(SearchableAdapter); ok {
+			var resultItems []*sdp.Item
+
+			// Fall back to the non-streaming methods
 			resultItems, err = searchableAdapter.Search(ctx, q.GetScope(), q.GetQuery(), q.GetIgnoreCache())
+
+			for _, i := range resultItems {
+				stream.SendItem(i)
+			}
 		} else {
 			err = &sdp.QueryError{
 				ErrorType:   sdp.QueryError_NOTFOUND,
@@ -448,97 +446,39 @@ func (e *Engine) Execute(ctx context.Context, q *sdp.Query, adapter Adapter) ([]
 		}
 	}
 
-	adapterDuration = time.Since(start)
-
 	span.SetAttributes(
-		attribute.Int("ovm.adapter.numItems", len(resultItems)),
+		attribute.Int("ovm.adapter.numItems", int(numItems.Load())),
+		attribute.Int("ovm.adapter.numErrors", int(numErrs.Load())),
 		attribute.Bool("ovm.adapter.cache", false),
-		attribute.String("ovm.adapter.duration", adapterDuration.String()),
 	)
 
-	if considerFailed(err) {
+	if err != nil {
+		span.SetAttributes(attribute.String("ovm.adapter.error", err.Error()))
 		span.SetStatus(codes.Error, err.Error())
 	}
 
 	if err != nil {
-		span.SetAttributes(attribute.String("ovm.adapter.error", err.Error()))
-
-		var sdpErr *sdp.QueryError
-		if errors.As(err, &sdpErr) {
-			// Add details if they aren't populated
-			scope := sdpErr.GetScope()
-			if scope == "" {
-				scope = q.GetScope()
-			}
-			errs = append(errs, &sdp.QueryError{
-				UUID:          q.GetUUID(),
-				ErrorType:     sdpErr.GetErrorType(),
-				ErrorString:   sdpErr.GetErrorString(),
-				Scope:         scope,
-				SourceName:    adapter.Name(),
-				ItemType:      adapter.Type(),
-				ResponderName: e.EngineConfig.SourceName,
-			})
-		} else {
-			errs = append(errs, &sdp.QueryError{
-				UUID:          q.GetUUID(),
-				ErrorType:     sdp.QueryError_OTHER,
-				ErrorString:   err.Error(),
-				Scope:         q.GetScope(),
-				SourceName:    adapter.Name(),
-				ItemType:      q.GetType(),
-				ResponderName: e.EngineConfig.SourceName,
-			})
-		}
+		errs <- convertToSDPError(err, q, adapter, e.EngineConfig.SourceName)
 	}
-
-	// For each found item, add more details
-	//
-	// Use the index here to ensure that we're actually editing the
-	// right thing
-	for _, item := range resultItems {
-		// Handle the case where we are given a nil pointer
-		if item == nil {
-			continue
-		}
-
-		// Store metadata
-		item.Metadata = &sdp.Metadata{
-			Timestamp:             timestamppb.New(time.Now()),
-			SourceDuration:        durationpb.New(adapterDuration),
-			SourceDurationPerItem: durationpb.New(time.Duration(adapterDuration.Nanoseconds() / int64(len(resultItems)))),
-			SourceName:            adapter.Name(),
-			SourceQuery:           q,
-		}
-
-		// Mark the item as hidden if the adapter is hidden
-		if hs, ok := adapter.(HiddenAdapter); ok {
-			item.Metadata.Hidden = hs.Hidden()
-		}
-	}
-
-	items = append(items, resultItems...)
-
-	return items, errs
 }
 
-// considerFailed Returns whether or not a given error should be considered as a
-// failure or not. The only error that isn't consider a failure is a
-// *sdp.QueryError with a Type of NOTFOUND, this means that it was queried
-// successfully but it simply doesn't exist
-func considerFailed(err error) bool {
-	if err == nil {
-		return false
-	} else {
-		var sdpErr *sdp.QueryError
-		if errors.As(err, &sdpErr) {
-			if sdpErr.GetErrorType() == sdp.QueryError_NOTFOUND {
-				return false
-			} else {
-				return true
-			}
-		} else {
-			return true
+// Converts any error type to an SDP error, if it isn't already
+func convertToSDPError(err error, q *sdp.Query, adapter Adapter, sourceName string) *sdp.QueryError {
+	// Convert all errors to SDP errors if they aren't already
+	var sdpErr *sdp.QueryError
+	if !errors.As(err, &sdpErr) {
+		sdpErr = &sdp.QueryError{
+			ErrorType:   sdp.QueryError_OTHER,
+			ErrorString: err.Error(),
 		}
 	}
+
+	// Add details that might not be populated by the adapter
+	sdpErr.Scope = q.GetScope()
+	sdpErr.UUID = q.GetUUID()
+	sdpErr.SourceName = adapter.Name()
+	sdpErr.ItemType = adapter.Metadata().GetType()
+	sdpErr.ResponderName = sourceName
+
+	return sdpErr
 }
