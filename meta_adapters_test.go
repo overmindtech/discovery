@@ -150,7 +150,7 @@ func TestScopeAdapter(t *testing.T) {
 
 func newTestAdapterHost() *AdapterHost {
 	sh := NewAdapterHost()
-	sh.AddAdapters(
+	if err := sh.AddAdapters(
 		&TestAdapter{
 			ReturnType: "aws-ec2instance",
 			ReturnScopes: []string{
@@ -185,7 +185,9 @@ func newTestAdapterHost() *AdapterHost {
 			ReturnName: "test-secret-adapter",
 			IsHidden:   true,
 		},
-	)
+	); err != nil {
+		panic(err)
+	}
 
 	return sh
 }

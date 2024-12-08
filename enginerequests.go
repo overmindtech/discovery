@@ -216,10 +216,10 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 	wg := sync.WaitGroup{}
 	expandedMutex := sync.RWMutex{}
 	expandedMutex.RLock()
-	for q, adapters := range expanded {
+	for q, adapter := range expanded {
 		wg.Add(1)
 		// localize values for the closure below
-		localQ, localAdapters := q, adapters
+		localQ, localAdapter := q, adapter
 
 		var p *pool.Pool
 		if localQ.GetMethod() == sdp.QueryMethod_LIST {
@@ -271,7 +271,7 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 				}
 
 				// query all adapters
-				queryItems, queryErrors = e.Execute(ctx, localQ, localAdapters)
+				queryItems, queryErrors = e.Execute(ctx, localQ, localAdapter)
 
 				for _, i := range queryItems {
 					// Assign the source query
@@ -323,17 +323,13 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 				case <-time.After(longRunningAdaptersTimeout):
 					// If we're here, then the wait group didn't finish in time
 					expandedMutex.RLock()
-					for q, adapters := range expanded {
-						adapterNames := make([]string, len(adapters))
-						for i, a := range adapters {
-							adapterNames[i] = a.Name()
-						}
+					for q, adapter := range expanded {
 						log.WithContext(ctx).WithFields(log.Fields{
-							"ovm.query.uuid":     q.ParseUuid().String(),
-							"ovm.query.type":     q.GetType(),
-							"ovm.query.scope":    q.GetScope(),
-							"ovm.query.method":   q.GetMethod().String(),
-							"ovm.query.adapters": adapterNames,
+							"ovm.query.uuid":    q.ParseUuid().String(),
+							"ovm.query.type":    q.GetType(),
+							"ovm.query.scope":   q.GetScope(),
+							"ovm.query.method":  q.GetMethod().String(),
+							"ovm.query.adapter": adapter.Name(),
 						}).Errorf("Wait group still running %v after context cancelled", longRunningAdaptersTimeout)
 					}
 					expandedMutex.RUnlock()
@@ -357,28 +353,13 @@ func (e *Engine) ExecuteQuery(ctx context.Context, query *sdp.Query, items chan<
 	return nil
 }
 
-// Execute Runs the query against known adapters in priority order. If nothing was
-// found, returns the first error. This returns a slice if items for
-// convenience, but this should always be of length 1 or 0
-func (e *Engine) Execute(ctx context.Context, q *sdp.Query, relevantAdapters []Adapter) ([]*sdp.Item, []*sdp.QueryError) {
-	adapters := relevantAdapters
-	if q.GetMethod() == sdp.QueryMethod_SEARCH {
-		adapters = make([]Adapter, 0)
-
-		// Filter further by searchability
-		for _, adapter := range relevantAdapters {
-			if searchable, ok := adapter.(SearchableAdapter); ok {
-				adapters = append(adapters, searchable)
-			}
-		}
-	}
-
-	return e.callAdapters(ctx, q, adapters)
-}
-
-func (e *Engine) callAdapters(ctx context.Context, q *sdp.Query, relevantAdapters []Adapter) ([]*sdp.Item, []*sdp.QueryError) {
-	ctx, span := tracer.Start(ctx, "CallAdapters", trace.WithAttributes(
+func (e *Engine) Execute(ctx context.Context, q *sdp.Query, adapter Adapter) ([]*sdp.Item, []*sdp.QueryError) {
+	ctx, span := tracer.Start(ctx, "Execute", trace.WithAttributes(
 		attribute.String("ovm.adapter.queryMethod", q.GetMethod().String()),
+		attribute.String("ovm.adapter.queryType", q.GetType()),
+		attribute.String("ovm.adapter.queryScope", q.GetScope()),
+		attribute.String("ovm.adapter.name", adapter.Name()),
+		attribute.String("ovm.adapter.query", q.GetQuery()),
 	))
 	defer span.End()
 
@@ -422,148 +403,121 @@ func (e *Engine) callAdapters(ctx context.Context, q *sdp.Query, relevantAdapter
 		attribute.String("ovm.adapter.queryScope", q.GetScope()),
 	)
 
-	for _, adapter := range relevantAdapters {
-		if func() bool {
-			// start querying the adapter after a cache miss
-			ctx, span := tracer.Start(ctx, adapter.Name(), trace.WithAttributes(
-				attribute.String("ovm.adapter.method", q.GetMethod().String()),
-				attribute.String("ovm.adapter.queryMethod", q.GetMethod().String()),
-				attribute.String("ovm.adapter.queryType", q.GetType()),
-				attribute.String("ovm.adapter.queryScope", q.GetScope()),
-				attribute.String("ovm.adapter.name", adapter.Name()),
-				attribute.String("ovm.adapter.query", q.GetQuery()),
-			))
-			defer span.End()
-
-			// Ensure that the span is closed when the context is done. This is based on
-			// the assumption that some adapters may not respect the context deadline and
-			// may run indefinitely. This ensures that we at least get notified about
-			// it.
-			go func() {
-				<-ctx.Done()
-				if ctx.Err() != nil {
-					// get a fresh copy of the span to avoid data races
-					span := trace.SpanFromContext(ctx)
-					span.RecordError(ctx.Err())
-					span.SetAttributes(
-						attribute.Bool("ovm.discover.hang", true),
-					)
-					span.End()
-				}
-			}()
-
-			var resultItems []*sdp.Item
-			var err error
-			var adapterDuration time.Duration
-
-			start := time.Now()
-
-			switch q.GetMethod() {
-			case sdp.QueryMethod_GET:
-				var newItem *sdp.Item
-
-				newItem, err = adapter.Get(ctx, q.GetScope(), q.GetQuery(), q.GetIgnoreCache())
-
-				if err == nil {
-					resultItems = []*sdp.Item{newItem}
-				}
-			case sdp.QueryMethod_LIST:
-				resultItems, err = adapter.List(ctx, q.GetScope(), q.GetIgnoreCache())
-			case sdp.QueryMethod_SEARCH:
-				if searchableAdapter, ok := adapter.(SearchableAdapter); ok {
-					resultItems, err = searchableAdapter.Search(ctx, q.GetScope(), q.GetQuery(), q.GetIgnoreCache())
-				} else {
-					err = &sdp.QueryError{
-						ErrorType:   sdp.QueryError_NOTFOUND,
-						ErrorString: "adapter is not searchable",
-					}
-				}
-			}
-
-			adapterDuration = time.Since(start)
-
+	// Ensure that the span is closed when the context is done. This is based on
+	// the assumption that some adapters may not respect the context deadline and
+	// may run indefinitely. This ensures that we at least get notified about
+	// it.
+	go func() {
+		<-ctx.Done()
+		if ctx.Err() != nil {
+			// get a fresh copy of the span to avoid data races
+			span := trace.SpanFromContext(ctx)
+			span.RecordError(ctx.Err())
 			span.SetAttributes(
-				attribute.Int("ovm.adapter.numItems", len(resultItems)),
-				attribute.Bool("ovm.adapter.cache", false),
-				attribute.String("ovm.adapter.duration", adapterDuration.String()),
+				attribute.Bool("ovm.discover.hang", true),
 			)
+			span.End()
+		}
+	}()
 
-			if considerFailed(err) {
-				span.SetStatus(codes.Error, err.Error())
+	var resultItems []*sdp.Item
+	var err error
+	var adapterDuration time.Duration
+
+	start := time.Now()
+
+	switch q.GetMethod() {
+	case sdp.QueryMethod_GET:
+		var newItem *sdp.Item
+
+		newItem, err = adapter.Get(ctx, q.GetScope(), q.GetQuery(), q.GetIgnoreCache())
+
+		if err == nil {
+			resultItems = []*sdp.Item{newItem}
+		}
+	case sdp.QueryMethod_LIST:
+		resultItems, err = adapter.List(ctx, q.GetScope(), q.GetIgnoreCache())
+	case sdp.QueryMethod_SEARCH:
+		if searchableAdapter, ok := adapter.(SearchableAdapter); ok {
+			resultItems, err = searchableAdapter.Search(ctx, q.GetScope(), q.GetQuery(), q.GetIgnoreCache())
+		} else {
+			err = &sdp.QueryError{
+				ErrorType:   sdp.QueryError_NOTFOUND,
+				ErrorString: "adapter is not searchable",
 			}
-
-			if err != nil {
-				span.SetAttributes(attribute.String("ovm.adapter.error", err.Error()))
-
-				var sdpErr *sdp.QueryError
-				if errors.As(err, &sdpErr) {
-					// Add details if they aren't populated
-					scope := sdpErr.GetScope()
-					if scope == "" {
-						scope = q.GetScope()
-					}
-					errs = append(errs, &sdp.QueryError{
-						UUID:          q.GetUUID(),
-						ErrorType:     sdpErr.GetErrorType(),
-						ErrorString:   sdpErr.GetErrorString(),
-						Scope:         scope,
-						SourceName:    adapter.Name(),
-						ItemType:      adapter.Type(),
-						ResponderName: e.EngineConfig.SourceName,
-					})
-				} else {
-					errs = append(errs, &sdp.QueryError{
-						UUID:          q.GetUUID(),
-						ErrorType:     sdp.QueryError_OTHER,
-						ErrorString:   err.Error(),
-						Scope:         q.GetScope(),
-						SourceName:    adapter.Name(),
-						ItemType:      q.GetType(),
-						ResponderName: e.EngineConfig.SourceName,
-					})
-				}
-			}
-
-			// For each found item, add more details
-			//
-			// Use the index here to ensure that we're actually editing the
-			// right thing
-			for _, item := range resultItems {
-				// Handle the case where we are given a nil pointer
-				if item == nil {
-					continue
-				}
-
-				// Store metadata
-				item.Metadata = &sdp.Metadata{
-					Timestamp:             timestamppb.New(time.Now()),
-					SourceDuration:        durationpb.New(adapterDuration),
-					SourceDurationPerItem: durationpb.New(time.Duration(adapterDuration.Nanoseconds() / int64(len(resultItems)))),
-					SourceName:            adapter.Name(),
-					SourceQuery:           q,
-				}
-
-				// Mark the item as hidden if the adapter is hidden
-				if hs, ok := adapter.(HiddenAdapter); ok {
-					item.Metadata.Hidden = hs.Hidden()
-				}
-			}
-
-			items = append(items, resultItems...)
-
-			if q.GetMethod() == sdp.QueryMethod_GET {
-				// If it's a get, we just return the first thing that works
-				if len(resultItems) > 0 {
-					return true
-				}
-			}
-
-			return false
-		}() {
-			// `get` queries only return the first adapter results
-			break
 		}
 	}
+
+	adapterDuration = time.Since(start)
+
+	span.SetAttributes(
+		attribute.Int("ovm.adapter.numItems", len(resultItems)),
+		attribute.Bool("ovm.adapter.cache", false),
+		attribute.String("ovm.adapter.duration", adapterDuration.String()),
+	)
+
+	if considerFailed(err) {
+		span.SetStatus(codes.Error, err.Error())
+	}
+
+	if err != nil {
+		span.SetAttributes(attribute.String("ovm.adapter.error", err.Error()))
+
+		var sdpErr *sdp.QueryError
+		if errors.As(err, &sdpErr) {
+			// Add details if they aren't populated
+			scope := sdpErr.GetScope()
+			if scope == "" {
+				scope = q.GetScope()
+			}
+			errs = append(errs, &sdp.QueryError{
+				UUID:          q.GetUUID(),
+				ErrorType:     sdpErr.GetErrorType(),
+				ErrorString:   sdpErr.GetErrorString(),
+				Scope:         scope,
+				SourceName:    adapter.Name(),
+				ItemType:      adapter.Type(),
+				ResponderName: e.EngineConfig.SourceName,
+			})
+		} else {
+			errs = append(errs, &sdp.QueryError{
+				UUID:          q.GetUUID(),
+				ErrorType:     sdp.QueryError_OTHER,
+				ErrorString:   err.Error(),
+				Scope:         q.GetScope(),
+				SourceName:    adapter.Name(),
+				ItemType:      q.GetType(),
+				ResponderName: e.EngineConfig.SourceName,
+			})
+		}
+	}
+
+	// For each found item, add more details
+	//
+	// Use the index here to ensure that we're actually editing the
+	// right thing
+	for _, item := range resultItems {
+		// Handle the case where we are given a nil pointer
+		if item == nil {
+			continue
+		}
+
+		// Store metadata
+		item.Metadata = &sdp.Metadata{
+			Timestamp:             timestamppb.New(time.Now()),
+			SourceDuration:        durationpb.New(adapterDuration),
+			SourceDurationPerItem: durationpb.New(time.Duration(adapterDuration.Nanoseconds() / int64(len(resultItems)))),
+			SourceName:            adapter.Name(),
+			SourceQuery:           q,
+		}
+
+		// Mark the item as hidden if the adapter is hidden
+		if hs, ok := adapter.(HiddenAdapter); ok {
+			item.Metadata.Hidden = hs.Hidden()
+		}
+	}
+
+	items = append(items, resultItems...)
 
 	return items, errs
 }

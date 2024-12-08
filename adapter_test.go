@@ -17,7 +17,9 @@ func TestEngineAddAdapters(t *testing.T) {
 
 	adapter := TestAdapter{}
 
-	e.AddAdapters(&adapter)
+	if err := e.AddAdapters(&adapter); err != nil {
+		t.Fatalf("Error adding adapter: %v", err)
+	}
 
 	if x := len(e.sh.Adapters()); x != 4 {
 		t.Fatalf("Expected 4 adapters, got %v", x)

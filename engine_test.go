@@ -18,6 +18,7 @@ import (
 )
 
 func newStartedEngine(t *testing.T, name string, no *auth.NATSOptions, adapters ...Adapter) *Engine {
+	t.Helper()
 	ec := EngineConfig{
 		MaxParallelExecutions: 10,
 		SourceName:            name,
@@ -41,7 +42,9 @@ func newStartedEngine(t *testing.T, name string, no *auth.NATSOptions, adapters 
 		t.Fatalf("Error initializing Engine: %v", err)
 	}
 
-	e.AddAdapters(adapters...)
+	if err := e.AddAdapters(adapters...); err != nil {
+		t.Fatalf("Error adding adapters: %v", err)
+	}
 
 	err = e.Start()
 	if err != nil {
@@ -193,14 +196,19 @@ func TestNats(t *testing.T) {
 
 	adapter := TestAdapter{}
 
-	e.AddAdapters(
+	err = e.AddAdapters(
 		&adapter,
 		&TestAdapter{
 			ReturnScopes: []string{
 				sdp.WILDCARD,
 			},
+			ReturnName: "test-adapter",
+			ReturnType: "test",
 		},
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	t.Run("Starting", func(t *testing.T) {
 		err := e.Start()
@@ -295,7 +303,9 @@ func TestNatsCancel(t *testing.T) {
 		ReturnScopes: []string{"test"},
 	}
 
-	e.AddAdapters(&adapter)
+	if err := e.AddAdapters(&adapter); err != nil {
+		t.Fatalf("Error adding adapters: %v", err)
+	}
 
 	t.Run("Starting", func(t *testing.T) {
 		err := e.Start()
@@ -606,14 +616,18 @@ func TestNatsAuth(t *testing.T) {
 	}
 
 	adapter := TestAdapter{}
-	e.AddAdapters(
+	if err := e.AddAdapters(
 		&adapter,
 		&TestAdapter{
 			ReturnScopes: []string{
 				sdp.WILDCARD,
 			},
+			ReturnType: "test",
+			ReturnName: "test-adapter",
 		},
-	)
+	); err != nil {
+		t.Fatalf("Error adding adapters: %v", err)
+	}
 
 	t.Run("Starting", func(t *testing.T) {
 		err := e.Start()

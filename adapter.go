@@ -36,12 +36,6 @@ type Adapter interface {
 	// List Lists all items in a given scope
 	List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error)
 
-	// Weight Returns the priority weighting of items returned by this adapter.
-	// This is used to resolve conflicts where two adapters of the same type
-	// return an item for a GET query. In this instance only one item can be
-	// sen on, so the one with the higher weight value will win.
-	Weight() int
-
 	// A struct that contains information about the adapter, it is used by the api-server to determine the capabilities of the adapter
 	// It is mandatory for all adapters to implement this method
 	Metadata() *sdp.AdapterMetadata

@@ -178,8 +178,8 @@ func (e *Engine) DeleteTrackedQuery(uuid [16]byte) {
 }
 
 // AddAdapters Adds an adapter to this engine
-func (e *Engine) AddAdapters(adapters ...Adapter) {
-	e.sh.AddAdapters(adapters...)
+func (e *Engine) AddAdapters(adapters ...Adapter) error {
+	return e.sh.AddAdapters(adapters...)
 }
 
 // Connect Connects to NATS
