@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -11,6 +12,29 @@ import (
 	"github.com/overmindtech/sdp-go/auth"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+// executeQuerySync Executes a Query, waiting for all results, then returns them
+// along with the error, rather than using channels. The singular error sill only
+// be returned if the query could not be executed, otherwise all errors will be
+// in the slice
+func (e *Engine) executeQuerySync(ctx context.Context, q *sdp.Query) ([]*sdp.Item, []*sdp.QueryError, error) {
+	itemsChan := make(chan *sdp.Item, 100_000)
+	errsChan := make(chan *sdp.QueryError, 100_000)
+	items := make([]*sdp.Item, 0)
+	errs := make([]*sdp.QueryError, 0)
+
+	err := e.ExecuteQuery(ctx, q, itemsChan, errsChan)
+
+	for i := range itemsChan {
+		items = append(items, i)
+	}
+
+	for e := range errsChan {
+		errs = append(errs, e)
+	}
+
+	return items, errs, err
+}
 
 func TestExecuteQuery(t *testing.T) {
 	adapter := TestAdapter{
@@ -39,7 +63,7 @@ func TestExecuteQuery(t *testing.T) {
 			},
 		}
 
-		items, errs, err := e.ExecuteQuerySync(context.Background(), q)
+		items, errs, err := e.executeQuerySync(context.Background(), q)
 
 		if err != nil {
 			t.Error(err)
@@ -63,7 +87,7 @@ func TestExecuteQuery(t *testing.T) {
 
 		item := items[0]
 
-		if item.GetMetadata().GetSourceQuery() != q {
+		if !reflect.DeepEqual(item.GetMetadata().GetSourceQuery(), q) {
 			t.Error("adapter query mismatch")
 		}
 	})
@@ -79,7 +103,7 @@ func TestExecuteQuery(t *testing.T) {
 			},
 		}
 
-		_, errs, err := e.ExecuteQuerySync(context.Background(), q)
+		_, errs, err := e.executeQuerySync(context.Background(), q)
 
 		if err == nil {
 			t.Error("expected error but got nil")
@@ -106,7 +130,7 @@ func TestExecuteQuery(t *testing.T) {
 			},
 		}
 
-		_, errs, err := e.ExecuteQuerySync(context.Background(), q)
+		_, errs, err := e.executeQuerySync(context.Background(), q)
 
 		if err == nil {
 			t.Error("expected error but got nil")
@@ -131,7 +155,7 @@ func TestExecuteQuery(t *testing.T) {
 			},
 		}
 
-		items, errs, err := e.ExecuteQuerySync(context.Background(), q)
+		items, errs, err := e.executeQuerySync(context.Background(), q)
 
 		if err != nil {
 			t.Error(err)
@@ -157,7 +181,7 @@ func TestExecuteQuery(t *testing.T) {
 			},
 		}
 
-		items, errs, err := e.ExecuteQuerySync(context.Background(), q)
+		items, errs, err := e.executeQuerySync(context.Background(), q)
 
 		if err != nil {
 			t.Error(err)
