@@ -85,6 +85,7 @@ type QueryResultStream struct {
 	errHandler  ErrHandler
 	open        bool
 	wg          sync.WaitGroup
+	mutex       sync.RWMutex
 }
 
 // ItemHandler is a function that can be used to handle items as they are
@@ -114,6 +115,8 @@ func NewQueryResultStream(itemHandler ItemHandler, errHandler ErrHandler) *Query
 
 // SendItem sends an item to the stream
 func (qrs *QueryResultStream) SendItem(item *sdp.Item) {
+	qrs.mutex.RLock()
+	defer qrs.mutex.RUnlock()
 	if qrs.open {
 		qrs.items <- item
 	}
@@ -121,6 +124,8 @@ func (qrs *QueryResultStream) SendItem(item *sdp.Item) {
 
 // SendError sends an error to the stream
 func (qrs *QueryResultStream) SendError(err error) {
+	qrs.mutex.RLock()
+	defer qrs.mutex.RUnlock()
 	if qrs.open {
 		qrs.errs <- err
 	}
@@ -128,6 +133,8 @@ func (qrs *QueryResultStream) SendError(err error) {
 
 // Close closes the stream and waits for all handlers to finish
 func (qrs *QueryResultStream) Close() {
+	qrs.mutex.Lock()
+	defer qrs.mutex.Unlock()
 	qrs.open = false
 	close(qrs.items)
 	close(qrs.errs)
