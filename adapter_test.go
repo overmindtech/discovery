@@ -2,6 +2,8 @@ package discovery
 
 import (
 	"context"
+	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -688,4 +690,92 @@ func TestSearchGetCaching(t *testing.T) {
 			t.Errorf("Search and Get queries had different generations, caching not working. %v != %v", searchResult[0].GetAttributes().GetAttrStruct().GetFields()["generation"], getResult[0].GetAttributes().GetAttrStruct().GetFields()["generation"])
 		}
 	})
+}
+func TestNewQueryResultStream(t *testing.T) {
+	items := make(chan *sdp.Item)
+	errs := make(chan error)
+
+	itemHandler := func(item *sdp.Item) {
+		time.Sleep(10 * time.Millisecond)
+		items <- item
+	}
+
+	errHandler := func(err error) {
+		time.Sleep(10 * time.Millisecond)
+		errs <- err
+	}
+
+	stream := NewQueryResultStream(itemHandler, errHandler)
+
+	// Test Initialization
+	if stream == nil {
+		t.Fatal("Expected stream to be initialized, got nil")
+	}
+	if stream.itemHandler == nil || stream.errHandler == nil {
+		t.Fatal("Expected handlers to be set")
+	}
+	if stream.items == nil || stream.errs == nil {
+		t.Fatal("Expected channels to be initialized")
+	}
+	if !stream.open {
+		t.Fatal("Expected stream to be open")
+	}
+
+	// Test SendItem
+	testItem := &sdp.Item{}
+	stream.SendItem(testItem)
+
+	// Due to the fact that the handlers are executed in a goroutine it
+	// essentially gives us a buffered channel with a buffer depth of 1 since
+	// the item can be pulled off the internal items channel immediately then
+	// wait on the handler in parallel. That's what allows this test to work
+	// without extra synchronization
+	if x := <-items; x != testItem {
+		t.Fatalf("Expected item to be %v, got %v", testItem, x)
+	}
+
+	// Test SendError
+	testErr := errors.New("test error")
+	stream.SendError(testErr)
+
+	if x := <-errs; x.Error() != testErr.Error() {
+		t.Fatalf("Expected error to be %v, got %v", testErr, x)
+	}
+
+	// Now I want to test that the Close() function actually blocks as expected
+	// and that the handlers are executed *before* the Close() function returns
+	// and the stream is marked as closed
+	closed := make(chan struct{})
+	go func() {
+		stream.Close()
+		close(closed)
+	}()
+	stream.SendItem(testItem)
+	stream.SendError(testErr)
+	order := make([]string, 0)
+	for {
+		select {
+		case <-items:
+			order = append(order, "item")
+		case <-errs:
+			order = append(order, "err")
+		case <-closed:
+			order = append(order, "closed")
+			break
+		}
+
+		if len(order) == 3 {
+			break
+		}
+	}
+
+	if !slices.Contains(order, "item") {
+		t.Errorf("Expected item to be handled. Results: %v", order)
+	}
+	if !slices.Contains(order, "err") {
+		t.Errorf("Expected error to be handled. Results: %v", order)
+	}
+	if order[2] != "closed" {
+		t.Errorf("Expected stream to be closed last. Results: %v", order)
+	}
 }
