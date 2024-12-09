@@ -10,6 +10,7 @@ import (
 	"github.com/overmindtech/discovery/tracing"
 	"github.com/overmindtech/sdp-go"
 	"github.com/overmindtech/sdp-go/auth"
+	"github.com/sourcegraph/conc/pool"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -321,8 +322,7 @@ func TestWildcardAdapterExpansion(t *testing.T) {
 func TestSendQuerySync(t *testing.T) {
 	SkipWithoutNats(t)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	ctx := context.Background()
 
 	ctx, span := tracing.Tracer().Start(ctx, "TestSendQuerySync")
 	defer span.End()
@@ -336,49 +336,52 @@ func TestSendQuerySync(t *testing.T) {
 
 	e := newStartedEngine(t, "TestSendQuerySync", nil, &adapter)
 
+	p := pool.New()
 	for i := 0; i < 250; i++ {
-		u := uuid.New()
-		t.Log("starting query: ", u)
+		p.Go(func() {
+			u := uuid.New()
+			t.Log("starting query: ", u)
 
-		var progress *sdp.QueryProgress
-		var items []*sdp.Item
+			var progress *sdp.QueryProgress
+			var items []*sdp.Item
 
-		progress = sdp.NewQueryProgress(&sdp.Query{
-			Type:   "person",
-			Method: sdp.QueryMethod_GET,
-			Query:  "Dylan",
-			Scope:  "test",
-			RecursionBehaviour: &sdp.Query_RecursionBehaviour{
-				LinkDepth: 0,
-			},
-			IgnoreCache: false,
-			UUID:        u[:],
-			Deadline:    timestamppb.New(time.Now().Add(10 * time.Minute)),
-		})
-		progress.StartTimeout = 10 * time.Millisecond
+			progress = sdp.NewQueryProgress(&sdp.Query{
+				Type:   "person",
+				Method: sdp.QueryMethod_GET,
+				Query:  "Dylan",
+				Scope:  "test",
+				RecursionBehaviour: &sdp.Query_RecursionBehaviour{
+					LinkDepth: 0,
+				},
+				IgnoreCache: false,
+				UUID:        u[:],
+				Deadline:    timestamppb.New(time.Now().Add(10 * time.Minute)),
+			})
+			progress.StartTimeout = 1 * time.Second
 
-		items, errs, err := progress.Execute(ctx, e.natsConnection)
+			items, errs, err := progress.Execute(ctx, e.natsConnection)
 
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if len(errs) != 0 {
-			for _, err := range errs {
+			if err != nil {
 				t.Error(err)
 			}
-		}
 
-		if len(items) != 1 {
-			t.Fatalf("expected 1 item, got %v", len(items))
-		}
+			if len(errs) != 0 {
+				for _, err := range errs {
+					t.Error(err)
+				}
+			}
 
-		if progress.NumComplete() != 1 {
-			t.Fatalf("expected 1 to be complete, got %v\nProgress: %v", progress.NumComplete(), progress)
-		}
+			if len(items) != 1 {
+				t.Fatalf("expected 1 item, got %v", len(items))
+			}
 
+			if progress.NumComplete() != 1 {
+				t.Fatalf("expected 1 to be complete, got %v\nProgress: %v", progress.NumComplete(), progress)
+			}
+		})
 	}
 
+	p.Wait()
 }
 
 func TestExpandQuery(t *testing.T) {

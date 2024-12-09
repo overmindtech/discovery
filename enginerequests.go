@@ -14,7 +14,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc/pool"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -386,6 +385,9 @@ func (e *Engine) Execute(ctx context.Context, q *sdp.Query, adapter Adapter, ite
 			return
 		}
 
+		// Record the error in the trace
+		span.RecordError(err)
+
 		// Send the error back to the caller
 		numErrs.Add(1)
 		errs <- convertToSDPError(err, q, adapter, e.EngineConfig.SourceName)
@@ -408,71 +410,62 @@ func (e *Engine) Execute(ctx context.Context, q *sdp.Query, adapter Adapter, ite
 		return
 	}
 
-	var err error
-
 	switch q.GetMethod() {
 	case sdp.QueryMethod_GET:
-		var newItem *sdp.Item
-
-		newItem, err = adapter.Get(ctx, q.GetScope(), q.GetQuery(), q.GetIgnoreCache())
+		newItem, err := adapter.Get(ctx, q.GetScope(), q.GetQuery(), q.GetIgnoreCache())
 
 		if newItem != nil {
 			stream.SendItem(newItem)
+		}
+		if err != nil {
+			stream.SendError(err)
 		}
 	case sdp.QueryMethod_LIST:
 		if streamingAdapter, ok := adapter.(StreamingAdapter); ok {
 			// Prefer the streaming methods if they are available
 			streamingAdapter.ListStream(ctx, q.GetScope(), q.GetIgnoreCache(), stream)
 		} else if listableAdapter, ok := adapter.(ListableAdapter); ok {
-			var resultItems []*sdp.Item
-
 			// Fall back to the non-streaming methods
-			resultItems, err = listableAdapter.List(ctx, q.GetScope(), q.GetIgnoreCache())
+			resultItems, err := listableAdapter.List(ctx, q.GetScope(), q.GetIgnoreCache())
 
 			for _, i := range resultItems {
 				stream.SendItem(i)
 			}
+			if err != nil {
+				stream.SendError(err)
+			}
 		} else {
-			err = &sdp.QueryError{
+			stream.SendError(&sdp.QueryError{
 				ErrorType:   sdp.QueryError_NOTFOUND,
 				ErrorString: "adapter is not listable",
-			}
+			})
 		}
 	case sdp.QueryMethod_SEARCH:
 		if streamingAdapter, ok := adapter.(StreamingAdapter); ok {
 			// Prefer the streaming methods if they are available
 			streamingAdapter.SearchStream(ctx, q.GetScope(), q.GetQuery(), q.GetIgnoreCache(), stream)
 		} else if searchableAdapter, ok := adapter.(SearchableAdapter); ok {
-			var resultItems []*sdp.Item
-
 			// Fall back to the non-streaming methods
-			resultItems, err = searchableAdapter.Search(ctx, q.GetScope(), q.GetQuery(), q.GetIgnoreCache())
+			resultItems, err := searchableAdapter.Search(ctx, q.GetScope(), q.GetQuery(), q.GetIgnoreCache())
 
 			for _, i := range resultItems {
 				stream.SendItem(i)
 			}
+			if err != nil {
+				stream.SendError(err)
+			}
 		} else {
-			err = &sdp.QueryError{
+			stream.SendError(&sdp.QueryError{
 				ErrorType:   sdp.QueryError_NOTFOUND,
 				ErrorString: "adapter is not searchable",
-			}
+			})
 		}
 	}
 
 	span.SetAttributes(
 		attribute.Int("ovm.adapter.numItems", int(numItems.Load())),
 		attribute.Int("ovm.adapter.numErrors", int(numErrs.Load())),
-		attribute.Bool("ovm.adapter.cache", false),
 	)
-
-	if err != nil {
-		span.SetAttributes(attribute.String("ovm.adapter.error", err.Error()))
-		span.SetStatus(codes.Error, err.Error())
-	}
-
-	if err != nil {
-		errs <- convertToSDPError(err, q, adapter, e.EngineConfig.SourceName)
-	}
 }
 
 // Converts any error type to an SDP error, if it isn't already
