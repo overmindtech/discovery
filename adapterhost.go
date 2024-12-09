@@ -10,6 +10,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/overmindtech/sdp-go"
+	log "github.com/sirupsen/logrus"
 )
 
 // AdapterHost This struct holds references to all Adapters in a process
@@ -46,26 +47,32 @@ func (sh *AdapterHost) AddAdapters(adapters ...Adapter) error {
 	sh.mutex.Lock()
 	defer sh.mutex.Unlock()
 
-	for _, adapter := range adapters {
-		// Validate that we don't already have an adapter for this type that has
-		// overlapping scopes. I realise that this isn't very efficient, but
-		// the number of adapters is expected to be low, so it should be fine
+	for _, newAdapter := range adapters {
 		for _, existingAdapter := range sh.adapters {
-			if existingAdapter.Type() == adapter.Type() {
-				for _, scope := range adapter.Scopes() {
-					for _, existingScope := range existingAdapter.Scopes() {
-						if existingScope == scope {
-							return fmt.Errorf("adapter %s already exists with scope %s", adapter.Type(), scope)
-						}
-					}
-				}
+			if existingAdapter.Type() == newAdapter.Type() && scopesOverlap(existingAdapter.Scopes(), newAdapter.Scopes()) {
+				log.Errorf("Error: Adapter with type %s and overlapping scopes already exists. Existing adapter scopes: %v, New adapter scopes: %v",
+					existingAdapter.Type(), existingAdapter.Scopes(), newAdapter.Scopes())
+				return fmt.Errorf("adapter with type %s and overlapping scopes already exists", newAdapter.Type())
 			}
 		}
-
-		sh.adapters = append(sh.adapters, adapter)
+		sh.adapters = append(sh.adapters, newAdapter)
 	}
 
 	return nil
+}
+
+// scopesOverlap checks if there is any overlap between two slices of scopes
+func scopesOverlap(scopes1, scopes2 []string) bool {
+	scopeSet := make(map[string]struct{}, len(scopes1))
+	for _, scope := range scopes1 {
+		scopeSet[scope] = struct{}{}
+	}
+	for _, scope := range scopes2 {
+		if _, exists := scopeSet[scope]; exists {
+			return true
+		}
+	}
+	return false
 }
 
 // Adapters Returns a slice of all known adapters
