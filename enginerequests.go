@@ -386,7 +386,7 @@ func (e *Engine) Execute(ctx context.Context, q *sdp.Query, adapter Adapter, ite
 		}
 
 		// Record the error in the trace
-		span.RecordError(err)
+		span.RecordError(err, trace.WithStackTrace(true))
 
 		// Send the error back to the caller
 		numErrs.Add(1)
