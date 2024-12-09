@@ -352,6 +352,19 @@ func (e *Engine) Execute(ctx context.Context, q *sdp.Query, adapter Adapter, ite
 			return
 		}
 
+		if err := item.Validate(); err != nil {
+			span.RecordError(err)
+			errs <- &sdp.QueryError{
+				UUID:          q.GetUUID(),
+				ErrorType:     sdp.QueryError_OTHER,
+				ErrorString:   err.Error(),
+				Scope:         q.GetScope(),
+				ResponderName: e.EngineConfig.SourceName,
+				ItemType:      q.GetType(),
+			}
+			return
+		}
+
 		// Store metadata
 		item.Metadata = &sdp.Metadata{
 			Timestamp:   timestamppb.New(time.Now()),

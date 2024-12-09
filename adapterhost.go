@@ -17,13 +17,13 @@ import (
 // struct are safe to call concurrently.
 type AdapterHost struct {
 	// Map of types to all adapters for that type
-	adapterMap      map[string]Adapter
-	adapterMapMutex sync.RWMutex
+	adapters []Adapter
+	mutex    sync.RWMutex
 }
 
 func NewAdapterHost() *AdapterHost {
 	sh := &AdapterHost{
-		adapterMap: make(map[string]Adapter),
+		adapters: make([]Adapter, 0),
 	}
 
 	// Add meta-adapters so that we can respond to queries for `overmind-type`,
@@ -43,16 +43,26 @@ var ErrAdapterAlreadyExists = errors.New("adapter already exists")
 
 // AddAdapters Adds an adapter to this engine
 func (sh *AdapterHost) AddAdapters(adapters ...Adapter) error {
-	sh.adapterMapMutex.Lock()
-	defer sh.adapterMapMutex.Unlock()
+	sh.mutex.Lock()
+	defer sh.mutex.Unlock()
 
 	for _, adapter := range adapters {
-		_, exists := sh.adapterMap[adapter.Type()]
-		if exists {
-			return ErrAdapterAlreadyExists
-		} else {
-			sh.adapterMap[adapter.Type()] = adapter
+		// Validate that we don't already have an adapter for this type that has
+		// overlapping scopes. I realise that this isn't very efficient, but
+		// the number of adapters is expected to be low, so it should be fine
+		for _, existingAdapter := range sh.adapters {
+			if existingAdapter.Type() == adapter.Type() {
+				for _, scope := range adapter.Scopes() {
+					for _, existingScope := range existingAdapter.Scopes() {
+						if existingScope == scope {
+							return fmt.Errorf("adapter %s already exists with scope %s", adapter.Type(), scope)
+						}
+					}
+				}
+			}
 		}
+
+		sh.adapters = append(sh.adapters, adapter)
 	}
 
 	return nil
@@ -60,12 +70,12 @@ func (sh *AdapterHost) AddAdapters(adapters ...Adapter) error {
 
 // Adapters Returns a slice of all known adapters
 func (sh *AdapterHost) Adapters() []Adapter {
-	sh.adapterMapMutex.RLock()
-	defer sh.adapterMapMutex.RUnlock()
+	sh.mutex.RLock()
+	defer sh.mutex.RUnlock()
 
 	adapters := make([]Adapter, 0)
 
-	for _, adapter := range sh.adapterMap {
+	for _, adapter := range sh.adapters {
 		adapters = append(adapters, adapter)
 	}
 
@@ -92,15 +102,20 @@ func (sh *AdapterHost) VisibleAdapters() []Adapter {
 	return result
 }
 
-// AdapterByType Returns the adapter for a given type and a boolean indicating
-// if the adapter was found
-func (sh *AdapterHost) AdapterByType(typ string) (Adapter, bool) {
-	sh.adapterMapMutex.RLock()
-	defer sh.adapterMapMutex.RUnlock()
+// AdapterByType Returns the adapters for a given type
+func (sh *AdapterHost) AdaptersByType(typ string) []Adapter {
+	sh.mutex.RLock()
+	defer sh.mutex.RUnlock()
 
-	adapter, ok := sh.adapterMap[typ]
+	adapters := make([]Adapter, 0)
 
-	return adapter, ok
+	for _, adapter := range sh.adapters {
+		if adapter.Type() == typ {
+			adapters = append(adapters, adapter)
+		}
+	}
+
+	return adapters
 }
 
 // ExpandQuery Expands queries with wildcards to no longer contain wildcards.
@@ -125,10 +140,7 @@ func (sh *AdapterHost) ExpandQuery(q *sdp.Query) map[*sdp.Query]Adapter {
 		checkAdapters = sh.VisibleAdapters()
 	} else {
 		// If the type is specific, pull just adapters for that type
-		adapter, ok := sh.AdapterByType(q.GetType())
-		if ok {
-			checkAdapters = append(checkAdapters, adapter)
-		}
+		checkAdapters = append(checkAdapters, sh.AdaptersByType(q.GetType())...)
 	}
 
 	expandedQueries := make(map[*sdp.Query]Adapter)
@@ -169,9 +181,9 @@ func (sh *AdapterHost) ExpandQuery(q *sdp.Query) map[*sdp.Query]Adapter {
 
 // ClearAllAdapters Removes all adapters from the engine
 func (sh *AdapterHost) ClearAllAdapters() {
-	sh.adapterMapMutex.Lock()
-	sh.adapterMap = make(map[string]Adapter)
-	sh.adapterMapMutex.Unlock()
+	sh.mutex.Lock()
+	sh.adapters = make([]Adapter, 0)
+	sh.mutex.Unlock()
 
 	sh.addBuiltinAdapters()
 }

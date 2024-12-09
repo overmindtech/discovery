@@ -131,7 +131,8 @@ func (qrs *QueryResultStream) SendError(err error) {
 	}
 }
 
-// Close closes the stream and waits for all handlers to finish
+// Close closes the stream and waits for all handlers to finish. This should be
+// called by the caller, and not by adapters themselves
 func (qrs *QueryResultStream) Close() {
 	qrs.mutex.Lock()
 	defer qrs.mutex.Unlock()
