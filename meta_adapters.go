@@ -50,16 +50,16 @@ func (t *TypeAdapter) Get(ctx context.Context, scope string, query string, ignor
 		}
 	}
 
-	adapter, ok := t.sh.AdapterByType(query)
-
-	if !ok {
-		return nil, &sdp.QueryError{
-			ErrorType:   sdp.QueryError_NOTFOUND,
-			ErrorString: fmt.Sprintf("type '%v' not found", query),
+	for _, adapter := range t.sh.Adapters() {
+		if adapter.Type() == query {
+			return newTypeItem(adapter.Type()), nil
 		}
 	}
 
-	return newTypeItem(adapter.Type()), nil
+	return nil, &sdp.QueryError{
+		ErrorType:   sdp.QueryError_NOTFOUND,
+		ErrorString: fmt.Sprintf("type '%v' not found", query),
+	}
 }
 
 func (t *TypeAdapter) List(ctx context.Context, scope string, ignoreCache bool) ([]*sdp.Item, error) {
