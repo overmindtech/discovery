@@ -18,7 +18,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-const DefaultMaxRequestTimeout = 1 * time.Minute
+const DefaultMaxRequestTimeout = 5 * time.Minute
 const DefaultConnectionWatchInterval = 3 * time.Second
 
 // The clint that will be used to send heartbeats. This will usually be an
