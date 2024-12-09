@@ -33,9 +33,6 @@ func NewResponseSubject() string {
 // HandleQuery Handles a single query. This includes responses, linking
 // etc.
 func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
-	span := trace.SpanFromContext(ctx)
-	span.SetName("HandleQuery")
-
 	var deadlineOverride bool
 
 	// If there is no deadline OR further in the future than MaxRequestTimeout, clamp the deadline to MaxRequestTimeout
@@ -52,10 +49,16 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 
 	numExpandedQueries := len(e.sh.ExpandQuery(query))
 
+	if numExpandedQueries == 0 {
+		// If we don't have any relevant adapters, exit
+		return
+	}
+
 	// Extract and parse the UUID
 	u, uuidErr := uuid.FromBytes(query.GetUUID())
 
-	span.SetAttributes(
+	// Only start the span if we actually have something that will respond
+	ctx, span := tracer.Start(ctx, "HandleQuery", trace.WithAttributes(
 		attribute.Int("ovm.discovery.numExpandedQueries", numExpandedQueries),
 		attribute.String("ovm.sdp.uuid", u.String()),
 		attribute.String("ovm.sdp.type", query.GetType()),
@@ -65,18 +68,14 @@ func (e *Engine) HandleQuery(ctx context.Context, query *sdp.Query) {
 		attribute.String("ovm.sdp.deadline", query.GetDeadline().AsTime().String()),
 		attribute.Bool("ovm.sdp.deadlineOverridden", deadlineOverride),
 		attribute.Bool("ovm.sdp.queryIgnoreCache", query.GetIgnoreCache()),
-	)
+	))
+	defer span.End()
 
 	if query.GetRecursionBehaviour() != nil {
 		span.SetAttributes(
 			attribute.Int("ovm.sdp.linkDepth", int(query.GetRecursionBehaviour().GetLinkDepth())),
 			attribute.Bool("ovm.sdp.followOnlyBlastPropagation", query.GetRecursionBehaviour().GetFollowOnlyBlastPropagation()),
 		)
-	}
-
-	if numExpandedQueries == 0 {
-		// If we don't have any relevant adapters, exit
-		return
 	}
 
 	// Respond saying we've got it
