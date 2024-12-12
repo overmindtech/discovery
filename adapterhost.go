@@ -27,17 +27,7 @@ func NewAdapterHost() *AdapterHost {
 		adapters: make([]Adapter, 0),
 	}
 
-	// Add meta-adapters so that we can respond to queries for `overmind-type`,
-	// `overmind-scope` and `overmind-adapter` resources
-	sh.addBuiltinAdapters()
-
 	return sh
-}
-
-func (sh *AdapterHost) addBuiltinAdapters() {
-	_ = sh.AddAdapters(&TypeAdapter{sh: sh})
-	_ = sh.AddAdapters(&ScopeAdapter{sh: sh})
-	_ = sh.AddAdapters(&SourcesAdapter{sh: sh})
 }
 
 var ErrAdapterAlreadyExists = errors.New("adapter already exists")
@@ -191,8 +181,6 @@ func (sh *AdapterHost) ClearAllAdapters() {
 	sh.mutex.Lock()
 	sh.adapters = make([]Adapter, 0)
 	sh.mutex.Unlock()
-
-	sh.addBuiltinAdapters()
 }
 
 // StartPurger Starts the purger for all caching adapters
