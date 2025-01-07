@@ -27,16 +27,22 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-const instrumentationName = "github.com/overmindtech/discovery"
+// ServiceVersion is the version of the service. This will be overridden by the
+// build system, using:
+// go build -ldflags "-X github.com/overmindtech/api-server/tracing.ServiceVersion=$(git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD)" -o your-app
+//
+// This allows our change detection workflow to work correctly. If we were
+// embedding the version here each time we would always produce a slightly
+// different compiled binary, and therefore it would look like there was a
+// change each time
+var ServiceVersion = "dev"
 
-//go:generate sh -c "echo -n $(git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD) > commit.txt"
-//go:embed commit.txt
-var instrumentationVersion string
+const instrumentationName = "github.com/overmindtech/discovery"
 
 var (
 	tracer = otel.GetTracerProvider().Tracer(
 		instrumentationName,
-		trace.WithInstrumentationVersion(instrumentationVersion),
+		trace.WithInstrumentationVersion(ServiceVersion),
 		trace.WithSchemaURL(semconv.SchemaURL),
 	)
 )
@@ -87,7 +93,7 @@ func tracingResource() *resource.Resource {
 		// Add your own custom attributes to identify your application
 		resource.WithAttributes(
 			semconv.ServiceNameKey.String("discovery"),
-			semconv.ServiceVersionKey.String(instrumentationVersion),
+			semconv.ServiceVersionKey.String(ServiceVersion),
 		),
 	)
 	if err != nil {
