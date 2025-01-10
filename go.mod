@@ -8,7 +8,7 @@ toolchain go1.23.4
 require (
 	connectrpc.com/connect v1.18.1
 	github.com/MrAlias/otel-schema-utils v0.2.1-alpha
-	github.com/getsentry/sentry-go v0.30.0
+	github.com/getsentry/sentry-go v0.31.1
 	github.com/google/uuid v1.6.0
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/jwt/v2 v2.7.3 // indirect
