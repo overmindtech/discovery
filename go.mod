@@ -6,7 +6,7 @@ toolchain go1.23.4
 
 // Direct dependencies of my codebase
 require (
-	connectrpc.com/connect v1.17.0
+	connectrpc.com/connect v1.18.1
 	github.com/MrAlias/otel-schema-utils v0.2.1-alpha
 	github.com/getsentry/sentry-go v0.30.0
 	github.com/google/uuid v1.6.0
